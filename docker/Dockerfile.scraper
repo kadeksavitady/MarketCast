@@ -1,0 +1,35 @@
+# 1. Gunakan base image Python 3.10-slim agar ringan
+FROM python:3.10-slim
+
+# 2. Set environment variables agar output log Python langsung muncul di terminal Docker
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+# 3. Set direktori kerja di dalam kontainer
+WORKDIR /app
+
+# 4. Instal dependensi sistem yang dibutuhkan untuk Playwright & PostgreSQL
+RUN apt-get update && apt-get install -y \
+    libpq-dev \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+# 5. Copy requirements.txt ke kontainer
+COPY requirements.txt .
+
+# 6. Instal library Python
+RUN pip install --no-cache-dir -r requirements.txt
+
+# 7. INSTALASI KRUSIAL: Browser Chromium & dependensi sistemnya
+# Perintah install-deps akan mengunduh library Linux agar browser bisa jalan
+RUN playwright install chromium
+RUN playwright install-deps chromium
+
+# 8. Copy seluruh file proyek ke dalam kontainer
+COPY . .
+
+# 9. Set PYTHONPATH agar Python bisa melakukan import antar folder di dalam src/
+ENV PYTHONPATH="${PYTHONPATH}:/app/src/data"
+
+# 10. Jalankan scraper harian
+CMD ["python", "src/data/daily_scraper.py"]

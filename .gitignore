@@ -1,0 +1,21 @@
+# Folder data dari Docker (Sangat penting karena isinya database asli)
+data/
+postgres_data/
+
+# File database SQLite
+*.db
+*.sqlite3
+
+# Virtual Environment
+venv/
+.venv/
+env/
+venv_py310/
+
+# Python cache (File sampah sistem)
+__pycache__/
+*.py[cod]
+
+# File rahasia atau log
+.env
+*.log
