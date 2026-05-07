@@ -1,17 +1,27 @@
 name: marketcast-app
+
 services:
+  # Database PostgreSQL
   db:
     image: postgres:15
     container_name: marketcast_db_container
     restart: always
     environment:
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-password123}
+      POSTGRES_DB: ${DB_NAME:-marketcast_dw}
     ports:
-      - "${DB_PORT}:5432"
+      - "${DB_PORT:-5432}:5432"
     volumes:
       - ./data/postgres_data:/var/lib/postgresql/data
+
+  # Adminer: Web Interface untuk liat isi DB (Opsional tapi sangat membantu)
+  adminer:
+    image: adminer
+    container_name: marketcast_adminer
+    restart: always
+    ports:
+      - "8080:8080"
 
 networks:
   default:

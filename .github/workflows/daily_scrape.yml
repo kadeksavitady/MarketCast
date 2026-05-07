@@ -1,37 +1,46 @@
-name: Daily MarketCast Scraper
+name: Daily Siskaperbapo Scraper
 
 on:
   schedule:
-    # 01:00 UTC = 08:00 WIB
-    - cron: '0 1 * * *'
-  workflow_dispatch: # Biar bisa kamu jalankan manual lewat tombol di GitHub
+    - cron: '0 1 * * *' # Jalan otomatis jam 8 pagi WIB (1 UTC)
+  workflow_dispatch: # Biar bisa diklik manual kalau mau ngetes
 
 jobs:
-  scrape:
+  scrape_and_push:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code
+      - name: Checkout code
         uses: actions/checkout@v3
 
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.10'
+          python-version: '3.9'
 
-      - name: Install Dependencies
+      - name: Install dependencies
         run: |
           pip install -r requirements.txt
-          pip install dvc dvc-gdrive
+          pip install dvc[gdrive] # Tetap install dvc
 
       - name: Run Scraper
-        run: python src/data/daily_scraper.py
-        # Pastikan skrip daily_scraper.py kamu menyimpan hasilnya ke data/raw/siskaperbapo.db
+        run: python src/data/historical_scraper.py
 
-      - name: Commit & Push Changes (DVC)
+      - name: Setup DVC
+        run: |
+          dvc remote add origin https://dagshub.com/kadeksavitady/MarketCast.dvc --force
+          dvc remote modify origin --local auth basic
+          dvc remote modify origin --local user kadeksavitady
+          dvc remote modify origin --local password ${{ secrets.DAGSHUB_TOKEN }}
+
+      - name: Push Data to DagsHub
+        run: |
+          dvc add data/raw/siskaperbapo.db
+          dvc push -r origin
+
+      - name: Commit DVC changes to GitHub
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          dvc add data/raw/siskaperbapo.db
           git add data/raw/siskaperbapo.db.dvc
-          git commit -m "Update daily data via GitHub Action"
+          git commit -m "auto: update database from daily scrape" || echo "No changes to commit"
           git push
