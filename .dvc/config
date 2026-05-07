@@ -3,3 +3,5 @@
 ['remote "myremote"']
     url = gdrive://1ZjIuzsgBxufut1QyQ51BbbNPsgFQITbG
     gdrive_use_service_account = true
+['remote "origin"']
+    url = https://dagshub.com/kadeksavitady/MarketCast.dvc
