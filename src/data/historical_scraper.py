@@ -1,323 +1,246 @@
 """
-╔══════════════════════════════════════════════════════════════════╗
-║   MARKETCAST - Historical Scraper (5 Tahun Harian)               ║
-║   Database : SQLite (siskaperbapo.db)                            ║
-║   Fitur    : 365 Hari/Tahun, Pause/Resume, Retry Otomatis        ║
-╚══════════════════════════════════════════════════════════════════╝
-
-Instalasi:
-    pip install playwright pandas openpyxl
-    playwright install chromium
-
-Jalankan:   
-    python historical_scraper.py
+MARKETCAST - Final Production Scraper
+Fitur:
+- Injeksi JS untuk Bypass UI Input Tanggal
+- Sistem Checkpoint (Resume otomatis jika terputus)
+- Full Whitelist 43 Komoditas
+- Output Logging ganda (Terminal & File)
 """
 
 import asyncio
 import re
+import sys
 import sqlite3
 import logging
-from datetime import datetime, date, timedelta
+import argparse
+from datetime import date, timedelta
 from pathlib import Path
-from zoneinfo import ZoneInfo
+from playwright.async_api import async_playwright
 
-from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeout
+# ── FIX ENCODING WINDOWS ──
+if sys.platform == "win32":
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
-# ─────────────────────────────────────────────────────────────
-# KONFIGURASI
-# ─────────────────────────────────────────────────────────────
-BASE_URL   = "https://siskaperbapo.jatimprov.go.id/harga/tabel/?kabkota=surabayakot"
-DB_PATH    = Path("data/raw/siskaperbapo.db")
-TIMEZONE   = ZoneInfo("Asia/Jakarta")
-HEADLESS   = False # Set False agar bisa memantau prosesnya langsung
-TIMEOUT_MS = 30_000
-RETRY_MAX  = 3
-DELAY_ANTAR_REQUEST = 2.0  # Menghindari blokir/rate limit
+# ── KONFIGURASI ──
+BASE_URL   = "https://siskaperbapo.jatimprov.go.id/harga/tabel"
+DB_PATH    = Path("data/raw/siskaperbapo_fixed.db")
+TIMEOUT_MS = 60_000
 
-# # REVISI: Rentang historis 5 tahun kebelakang sesuai Resume Diskusi 
-# TANGGAL_AKHIR  = date.today()
-# TANGGAL_AWAL   = TANGGAL_AKHIR.replace(year=TANGGAL_AKHIR.year - 5)
+TANGGAL_AWAL  = date(2026, 4, 25)
+TANGGAL_AKHIR = date(2026, 5, 1)
 
-# MENGAMBIL GAP TANGGAL SCRAPER TERAKHIR SAMPAI HARI INI (25 APRIL 2026 - 7 MEI 2026)
-TANGGAL_AWAL  = date(2026, 4, 25) 
-TANGGAL_AKHIR = date.today()
+# Full Whitelist 43 Komoditas
+WHITELIST = {
+    'Beras Premium', 'Beras Medium', 'Gula Kristal Putih',
+    'Minyak Goreng Curah', 'Minyak Goreng Kemasan Premium',
+    'Minyak Goreng Kemasan Sederhana', 'Minyak Goreng MINYAKITA',
+    'Daging Sapi Paha Belakang', 'Daging Ayam Ras', 'Daging Ayam Kampung',
+    'Telur Ayam Ras', 'Telur Ayam Kampung',
+    'Susu Kental Manis Merk Bendera', 'Susu Kental Manis Merk Indomilk',
+    'Susu Bubuk Merk Bendera (Instant)', 'Susu Bubuk Merk Indomilk (Instant)',
+    'Jagung Pipilan Kering', 'Garam Bata', 'Garam Halus',
+    'Terigu Protein Sedang (Kemasan)', 'Kedelai Impor', 'Kedelai Lokal',
+    'Indomie Rasa Kari Ayam', 'Cabe Merah Keriting', 'Cabe Merah Besar',
+    'Cabe Rawit Merah', 'Bawang Merah', 'Bawang Putih Sinco/Honan',
+    'Ikan Asin Teri', 'Kacang Hijau', 'Kacang Tanah', 'Ketela Pohon',
+    'Kol/Kubis', 'Kentang', 'Tomat Merah', 'Wortel', 'Buncis',
+    'Ikan Bandeng', 'Ikan Kembung', 'Ikan Tuna', 'Ikan Tongkol',
+    'Ikan Cakalang', 'Gas Elpiji 3 Kg',
+}
 
-# REVISI: Frekuensi harian (1 hari) untuk menangkap pola seasonality 
-STEP_HARI = 1
-
+# ── SETUP LOGGING ──
+Path("data").mkdir(parents=True, exist_ok=True)
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
+    handlers=[
+        logging.StreamHandler(sys.stdout),
+        logging.FileHandler("data/scraper.log", encoding="utf-8")
+    ]
 )
 log = logging.getLogger(__name__)
 
-
-# ─────────────────────────────────────────────────────────────
-# DATABASE — init semua tabel [cite: 148]
-# ─────────────────────────────────────────────────────────────
+# ── DATABASE & CHECKPOINT ──
 def init_db():
-    # Pastikan folder data/raw sudah ada
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute("""
             CREATE TABLE IF NOT EXISTS harga_bahan_pokok (
-                id              INTEGER PRIMARY KEY AUTOINCREMENT,
-                tanggal_scrape  TEXT NOT NULL,
-                tanggal_data    TEXT,
-                komoditas       TEXT,
-                satuan          TEXT,
-                harga_rp        REAL,
-                kabkota         TEXT DEFAULT 'Surabaya',
-                created_at      TEXT DEFAULT (datetime('now','localtime')),
-                UNIQUE(tanggal_scrape, komoditas)
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                tanggal_data TEXT,
+                komoditas TEXT,
+                satuan TEXT,
+                harga_rp REAL,
+                kabkota TEXT DEFAULT 'Surabaya',
+                created_at TEXT DEFAULT (datetime('now','localtime')),
+                UNIQUE(tanggal_data, komoditas)
             )
         """)
-
         conn.execute("""
             CREATE TABLE IF NOT EXISTS scrape_checkpoint (
-                tanggal      TEXT PRIMARY KEY,
-                status       TEXT NOT NULL,
-                baris_dapat  INTEGER DEFAULT 0,
-                catatan      TEXT,
-                updated_at   TEXT DEFAULT (datetime('now','localtime'))
+                tanggal TEXT PRIMARY KEY,
+                status TEXT NOT NULL,
+                baris_dapat INTEGER DEFAULT 0
             )
         """)
-
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_tgl ON harga_bahan_pokok(tanggal_scrape)")
         conn.commit()
-    log.info(f"Database siap → {DB_PATH.resolve()}")
-
 
 def sudah_diproses(tanggal: date) -> bool:
     with sqlite3.connect(DB_PATH) as conn:
-        row = conn.execute(
-            "SELECT status FROM scrape_checkpoint WHERE tanggal = ?",
-            (tanggal.isoformat(),)
-        ).fetchone()
+        row = conn.execute("SELECT status FROM scrape_checkpoint WHERE tanggal = ?", (tanggal.isoformat(),)).fetchone()
     return row is not None and row[0] == "done"
 
-
-def tandai_checkpoint(tanggal: date, status: str, baris: int = 0, catatan: str = ""):
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.execute("""
-            INSERT INTO scrape_checkpoint (tanggal, status, baris_dapat, catatan)
-            VALUES (?, ?, ?, ?)
-            ON CONFLICT(tanggal) DO UPDATE SET
-                status      = excluded.status,
-                baris_dapat = excluded.baris_dapat,
-                catatan     = excluded.catatan,
-                updated_at  = datetime('now','localtime')
-        """, (tanggal.isoformat(), status, baris, catatan))
-        conn.commit()
-
-
-def simpan_batch(rows: list[dict]) -> int:
-    if not rows:
-        return 0
+def simpan_batch(rows, tanggal_data):
     inserted = 0
     with sqlite3.connect(DB_PATH) as conn:
         for row in rows:
             try:
                 conn.execute("""
-                    INSERT OR IGNORE INTO harga_bahan_pokok
-                        (tanggal_scrape, tanggal_data, komoditas, satuan, harga_rp, kabkota)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                """, (
-                    row["tanggal_scrape"],
-                    row.get("tanggal_data"),
-                    row.get("komoditas"),
-                    row.get("satuan"),
-                    row.get("harga_rp"),
-                    row.get("kabkota", "Surabaya"),
-                ))
-                if conn.execute("SELECT changes()").fetchone()[0]:
-                    inserted += 1
+                    INSERT OR REPLACE INTO harga_bahan_pokok 
+                    (tanggal_data, komoditas, satuan, harga_rp) 
+                    VALUES (?, ?, ?, ?)
+                """, (tanggal_data, row['komoditas'], row['satuan'], row['harga_rp']))
+                inserted += 1
             except Exception as e:
-                log.warning(f"Gagal simpan baris {row}: {e}")
+                log.warning(f"Gagal simpan komoditas {row['komoditas']}: {e}")
+        conn.execute("""
+            INSERT OR REPLACE INTO scrape_checkpoint (tanggal, status, baris_dapat) 
+            VALUES (?, 'done', ?)
+        """, (tanggal_data, inserted))
         conn.commit()
     return inserted
 
+# ── PARSING UTILS ──
+def normalisasi_nama(nama):
+    return re.sub(r"^[\s\-–]+", "", nama).strip()
 
-def progres_ringkasan():
-    with sqlite3.connect(DB_PATH) as conn:
-        total_done  = conn.execute("SELECT COUNT(*) FROM scrape_checkpoint WHERE status='done'").fetchone()[0]
-        total_error = conn.execute("SELECT COUNT(*) FROM scrape_checkpoint WHERE status='error'").fetchone()[0]
-        total_baris = conn.execute("SELECT COUNT(*) FROM harga_bahan_pokok").fetchone()[0]
-    return total_done, total_error, total_baris
+def parse_harga(text):
+    if not text or text.strip() in ("-", "0", ""): return None
+    cleaned = re.sub(r"[^\d]", "", text)
+    try: return float(cleaned)
+    except: return None
 
-
-# ─────────────────────────────────────────────────────────────
-# PARSING & SCRAPING
-# ─────────────────────────────────────────────────────────────
-def parse_harga(text: str):
-    if not text:
-        return None
-    cleaned = re.sub(r"\.(?=\d{3})", "", text.strip())
-    cleaned = cleaned.replace(",", ".")
-    try:
-        return float(cleaned)
-    except ValueError:
-        return None
-
-
-def baris_valid(cells: list[str]) -> bool:
-    joined = " ".join(cells).strip()
-    if not joined:
-        return False
-    tokens = re.findall(r"\S+", joined)
-    if all(re.fullmatch(r"\d{1,2}", t) for t in tokens):
-        return False
-    if all(re.fullmatch(r"\d{1,2}:\d{2}", t) for t in tokens):
-        return False
-    bulan = {"jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec",
-             "januari","februari","maret","april","mei","juni","juli","agustus",
-             "september","oktober","november","desember"}
-    if any(t.lower() in bulan for t in tokens):
-        return False
-    if all(re.fullmatch(r"20[1-3]\d", t) for t in tokens):
-        return False
-    return True
-
-
-async def scrape_tanggal(page, target: date) -> list[dict]:
-    tgl_str = target.strftime("%Y-%m-%d")
-    try:
-        await page.goto(BASE_URL, wait_until="networkidle", timeout=TIMEOUT_MS)
-    except PlaywrightTimeout:
-        log.warning(f"  [{tgl_str}] Timeout load halaman")
-
-    date_set = False
-    for selector in ["input[type='date']", "input[name*='tanggal']", "input[id*='tanggal']"]:
-        el = await page.query_selector(selector)
-        if el:
-            # Menggunakan JS Injection karena Read-Only 
-            await el.evaluate(f"(el) => el.value = '{tgl_str}'")
-            await el.dispatch_event("change")
-            await page.wait_for_timeout(2000)
-            date_set = True
-            break
-
-    if not date_set:
-        for btn_sel in ["button[type='submit']", ".btn-search"]:
-            btn = await page.query_selector(btn_sel)
-            if btn:
-                await btn.click()
-                await page.wait_for_timeout(1500)
-                break
-
-    try:
-        await page.wait_for_selector("table", timeout=TIMEOUT_MS)
-    except PlaywrightTimeout:
-        return []
-
-    headers = []
-    for sel in ["table thead th", "table tr:first-child th"]:
-        els = await page.query_selector_all(sel)
-        if els:
-            headers = [(await el.inner_text()).strip() for el in els]
-            break
-
-    hasil = []
-    row_els = await page.query_selector_all("table tbody tr")
-    for row_el in row_els:
-        cells   = await row_el.query_selector_all("td")
-        vals    = [(await c.inner_text()).strip() for c in cells]
-
-        if not baris_valid(vals):
-            continue
-
-        row_dict = {"tanggal_scrape": tgl_str, "tanggal_data": tgl_str, "kabkota": "Surabaya"}
-
-        if headers and len(headers) == len(vals):
-            paired = dict(zip(headers, vals))
-            for k, v in paired.items():
-                kl = k.lower()
-                if any(x in kl for x in ["komodit", "nama", "bahan", "barang"]):
-                    row_dict["komoditas"] = v
-                elif any(x in kl for x in ["satuan", "unit"]):
-                    row_dict["satuan"] = v
-                elif any(x in kl for x in ["harga", "price", "rp"]):
-                    row_dict["harga_rp"] = parse_harga(v)
-        else:
-            if len(vals) >= 4:
-                row_dict.update({"komoditas": vals[1], "satuan": vals[2], "harga_rp": parse_harga(vals[3])})
-            elif len(vals) == 3:
-                row_dict.update({"komoditas": vals[0], "satuan": vals[1], "harga_rp": parse_harga(vals[2])})
-            else:
-                continue
-
-        if not row_dict.get("komoditas") or re.fullmatch(r"[\d\s.,]+", row_dict.get("komoditas", "")):
-            continue
-        hasil.append(row_dict)
-
-    return hasil
-
-
-# ─────────────────────────────────────────────────────────────
-# MAIN LOOP
-# ─────────────────────────────────────────────────────────────
-async def main():
+# ── CORE SCRAPER ──
+async def run_scraper():
     init_db()
+    
+    tgl_target = []
+    curr = TANGGAL_AWAL
+    while curr <= TANGGAL_AKHIR:
+        tgl_target.append(curr)
+        curr += timedelta(days=1)
 
-    semua_tanggal = []
-    t = TANGGAL_AWAL
-    while t <= TANGGAL_AKHIR:
-        semua_tanggal.append(t)
-        t += timedelta(days=STEP_HARI)
-
-    total = len(semua_tanggal)
-    done, error, _ = progres_ringkasan()
-
-    log.info(f"📅 Rentang  : {TANGGAL_AWAL} → {TANGGAL_AKHIR}")
-    log.info(f"🔢 Target   : {total} hari (Harian)")
-    log.info(f"✅ Selesai  : {done} | ❌ Error: {error} | ⏭ Sisa: {total - done}")
+    total = len(tgl_target)
+    log.info("=" * 60)
+    log.info(f"Target Ekstraksi : {TANGGAL_AWAL} s/d {TANGGAL_AKHIR} ({total} hari)")
+    log.info("=" * 60)
 
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=HEADLESS)
-        context = await browser.new_context(user_agent="Mozilla/5.0...", locale="id-ID")
+        browser = await p.chromium.launch(headless=True)
+        context = await browser.new_context(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            timezone_id="Asia/Jakarta"
+        )
         page = await context.new_page()
-        await page.route("**/*.{png,jpg,jpeg,gif,svg,woff,ttf,ico}", lambda r: r.abort())
-
+        
+        # Block resource yang tidak perlu agar loading jauh lebih ringan
+        await page.route("**/*.{png,jpg,jpeg,gif,svg,css,woff,woff2}", lambda r: r.abort())
+        
         try:
-            for idx, tgl in enumerate(semua_tanggal, 1):
-                if sudah_diproses(tgl):
-                    continue
-
-                tgl_str = tgl.isoformat()
-                log.info(f"[{idx:>4}/{total}] Scraping {tgl_str} ...")
-
-                berhasil = False
-                for attempt in range(1, RETRY_MAX + 1):
-                    try:
-                        rows = await scrape_tanggal(page, tgl)
-                        inserted = simpan_batch(rows)
-                        tandai_checkpoint(tgl, "done", inserted)
-                        log.info(f"         ✔ {inserted} item disimpan")
-                        berhasil = True
-                        break
-                    except Exception as e:
-                        log.warning(f"         ✗ Percobaan {attempt}/{RETRY_MAX}: {e}")
-                        await asyncio.sleep(3)
-
-                if not berhasil:
-                    tandai_checkpoint(tgl, "error", 0, "Retry failed")
-
-                if idx % 10 == 0:
-                    done_now, _, total_rows = progres_ringkasan()
-                    sisa = total - done_now
-                    eta = round(sisa * (DELAY_ANTAR_REQUEST + 4) / 60, 1)
-                    log.info(f"\n── Progres: {done_now}/{total} | {total_rows} baris | ETA ~{eta} mnt ──\n")
-
-                await asyncio.sleep(DELAY_ANTAR_REQUEST)
-
-        except KeyboardInterrupt:
-            log.info("\n⏸ Dihentikan oleh user.")
-        finally:
+            await page.goto(BASE_URL, wait_until="domcontentloaded", timeout=TIMEOUT_MS)
+        except Exception as e:
+            log.error(f"Gagal memuat halaman utama: {e}")
             await browser.close()
+            return
 
-    log.info("🏁 Selesai.")
+        for idx, tgl in enumerate(tgl_target, 1):
+            tgl_str = tgl.strftime("%Y-%m-%d")
+            
+            if sudah_diproses(tgl):
+                log.info(f"[{idx:>3}/{total}] {tgl_str} - Dilewati (Sudah ada di DB)")
+                continue
+                
+            log.info(f"[{idx:>3}/{total}] Memproses: {tgl_str}")
+            
+            try:
+                # 1. Bypass Tanggal dengan JS Evaluation
+                date_input = await page.query_selector("input[name='tanggal']")
+                await date_input.evaluate(f"""
+                    (el) => {{
+                        el.value = '{tgl_str}';
+                        el.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                        el.dispatchEvent(new Event('change', {{ bubbles: true }}));
+                    }}
+                """)
+                
+                # 2. Set Area Kota Surabaya
+                area_el = await page.query_selector("select[name='kabkota']")
+                if area_el: await area_el.select_option(label="Kota Surabaya")
+                    
+                # 3. Eksekusi Pencarian
+                btn = await page.query_selector("button:has-text('Tampilkan')")
+                await btn.click()
+                
+                # Tunggu respons tabel
+                await page.wait_for_timeout(3000)
+                
+                # 4. Parsing HTML
+                rows_data = []
+                baris_html = await page.query_selector_all("table tbody tr")
+                
+                for row in baris_html:
+                    cells = await row.query_selector_all("td")
+                    vals = [(await c.inner_text()).strip() for c in cells]
+                    
+                    if len(vals) >= 5:
+                        nama_bersih = normalisasi_nama(vals[1])
+                        if nama_bersih in WHITELIST:
+                            harga = parse_harga(vals[4])
+                            if harga:
+                                rows_data.append({
+                                    'komoditas': nama_bersih,
+                                    'satuan': vals[2],
+                                    'harga_rp': harga
+                                })
+                
+                # 5. Penyimpanan Data
+                if rows_data:
+                    jumlah_tersimpan = simpan_batch(rows_data, tgl_str)
+                    log.info(f"         [OK] Tersimpan {jumlah_tersimpan} data komoditas.")
+                else:
+                    log.warning(f"         [!!] Tidak ada komoditas whitelist yang terekstrak.")
+                    # Tetap catat checkpoint agar tidak diloop berulang kali bila server memang kosong
+                    with sqlite3.connect(DB_PATH) as conn:
+                        conn.execute("INSERT OR REPLACE INTO scrape_checkpoint (tanggal, status, baris_dapat) VALUES (?, 'done', 0)", (tgl_str,))
+                        conn.commit()
+                        
+            except Exception as e:
+                log.error(f"         [X] Error pada {tgl_str}: {e}")
+                
+            await asyncio.sleep(2.0) # Jeda aman agar tidak diblokir server
+
+        await browser.close()
+        
+    log.info("=" * 60)
+    log.info("EKSTRAKSI SELESAI")
+    log.info("=" * 60)
+
+# ── VERIFIKASI CLI ──
+def verifikasi_hasil():
+    with sqlite3.connect(DB_PATH) as conn:
+        rekap = conn.execute("SELECT tanggal_data, COUNT(*) FROM harga_bahan_pokok GROUP BY tanggal_data ORDER BY tanggal_data").fetchall()
+        print("\n📊 REKAPITULASI DATABASE:")
+        for r in rekap:
+            print(f"   {r[0]} : {r[1]:>2} Komoditas")
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    parser = argparse.ArgumentParser(description="MarketCast Main Scraper")
+    parser.add_argument("--verify", action="store_true", help="Hanya memunculkan rekap database")
+    args = parser.parse_args()
+
+    if args.verify:
+        verifikasi_hasil()
+    else:
+        asyncio.run(run_scraper())
+        verifikasi_hasil()
