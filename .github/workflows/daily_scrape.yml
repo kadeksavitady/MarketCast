@@ -1,0 +1,37 @@
+name: Daily MarketCast Scraper
+
+on:
+  schedule:
+    # 01:00 UTC = 08:00 WIB
+    - cron: '0 1 * * *'
+  workflow_dispatch: # Biar bisa kamu jalankan manual lewat tombol di GitHub
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install Dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install dvc dvc-gdrive
+
+      - name: Run Scraper
+        run: python src/data/daily_scraper.py
+        # Pastikan skrip daily_scraper.py kamu menyimpan hasilnya ke data/raw/siskaperbapo.db
+
+      - name: Commit & Push Changes (DVC)
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          dvc add data/raw/siskaperbapo.db
+          git add data/raw/siskaperbapo.db.dvc
+          git commit -m "Update daily data via GitHub Action"
+          git push
