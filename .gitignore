@@ -1,21 +1,23 @@
-# Folder data dari Docker (Sangat penting karena isinya database asli)
-data/
+# --- DATABASE & DATA STORAGE ---
 postgres_data/
 
-# File database SQLite
+data/processed/
+
+data/raw/siskaperbapo.db
+
 *.db
 *.sqlite3
 
-# Virtual Environment
+# --- PYTHON & ENVIRONMENTS ---
 venv/
 .venv/
 env/
 venv_py310/
 
-# Python cache (File sampah sistem)
+# Blokir cache Python
 __pycache__/
 *.py[cod]
 
-# File rahasia atau log
+# --- CREDENTIALS & LOGS ---
 .env
 *.log
