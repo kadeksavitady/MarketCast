@@ -27,8 +27,8 @@ BASE_URL   = "https://siskaperbapo.jatimprov.go.id/harga/tabel"
 DB_PATH    = Path("data/raw/siskaperbapo_fixed.db")
 TIMEOUT_MS = 60_000
 
-TANGGAL_AWAL  = date(2026, 4, 25)
-TANGGAL_AKHIR = date(2026, 5, 1)
+TANGGAL_AWAL  = date(2021, 5, 7)
+TANGGAL_AKHIR = date(2026, 5, 7)
 
 # Full Whitelist 43 Komoditas
 WHITELIST = {
