@@ -1,8 +1,5 @@
 # --- DATABASE & DATA STORAGE ---
 postgres_data/
-
-data/processed/
-
 data/raw/siskaperbapo.db
 
 *.db
