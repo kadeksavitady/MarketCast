@@ -1,4 +1,4 @@
 cluster_id,label,avg_cv,avg_mean_harga,avg_trend_pct_per_year,n_komoditas,centroid_representative
-0,Cluster 0: Labil & Murah (→Datar),0.3580248829240927,32936.43774104683,0.008620759901391998,4,Cabe Merah Besar
-1,Cluster 1: Labil & Murah (↑Inflasi),0.09545944967654263,26217.186130648992,0.046164266594991066,24,Telur Ayam Ras
-2,Cluster 2: Stabil & Mahal (→Datar),0.02945827478876333,91799.50482674074,0.01058650167926661,5,Ikan Asin Teri
+0,Cluster 0: Labil & Murah (→Datar),0.3580248829240927,32936.43774104683,0.008620759901392008,4,Cabe Merah Besar
+1,Cluster 1: Labil & Murah (↑Inflasi),0.09545944967654263,26217.186130648992,0.04616426659499107,24,Telur Ayam Ras
+2,Cluster 2: Stabil & Mahal (→Datar),0.02945827478876333,91799.50482674074,0.010586501679266606,5,Ikan Asin Teri
