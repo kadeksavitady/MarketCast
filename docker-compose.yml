@@ -11,30 +11,37 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD:-password123}
       POSTGRES_DB: ${DB_NAME:-marketcast_dw}
     ports:
-      - "${DB_PORT:-5432}:5432"
+      - "5433:5432"
     volumes:
       - ./data/postgres_data:/var/lib/postgresql/data
+    networks:
+      - marketcast_network
 
-  # Adminer: Web Interface untuk liat isi DB (Opsional tapi sangat membantu)
+  # Adminer
   adminer:
     image: adminer
     container_name: marketcast_adminer
     restart: always
     ports:
       - "8080:8080"
+    networks:
+      - marketcast_network
 
-networks:
-  default:
-    name: marketcast_network
-
-mlflow:
+  # MLflow
+  mlflow:
     build:
       context: .
-      dockerfile: Dockerfile.mlflow
+      dockerfile: docker/Dockerfile.mlflow
     container_name: marketcast_mlflow
     ports:
       - "5000:5000"
     volumes:
-      - ./mlflow_data:/mlflow  # Jalur ini adalah kuncinya!
+      - ./mlflow_data:/mlflow
     networks:
       - marketcast_network
+
+# Definisi Network diletakkan di paling bawah, sejajar dengan services
+networks:
+  marketcast_network:
+    name: marketcast_network
+    driver: bridge
