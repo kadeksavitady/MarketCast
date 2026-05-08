@@ -26,3 +26,15 @@ services:
 networks:
   default:
     name: marketcast_network
+
+mlflow:
+    build:
+      context: .
+      dockerfile: Dockerfile.mlflow
+    container_name: marketcast_mlflow
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./mlflow_data:/mlflow  # Jalur ini adalah kuncinya!
+    networks:
+      - marketcast_network
