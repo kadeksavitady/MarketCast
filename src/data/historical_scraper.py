@@ -24,7 +24,7 @@ if sys.platform == "win32":
 
 # ── KONFIGURASI ──
 BASE_URL   = "https://siskaperbapo.jatimprov.go.id/harga/tabel"
-DB_PATH    = Path("data/raw/siskaperbapo_fixed.db")
+DB_PATH    = Path("data/raw/siskaperbapo.db")
 TIMEOUT_MS = 60_000
 
 TANGGAL_AWAL  = date(2021, 5, 7)
