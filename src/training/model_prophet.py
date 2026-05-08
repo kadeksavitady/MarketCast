@@ -1,0 +1,228 @@
+"""
+src/training/model_prophet.py
+==============================
+Baseline 2: Facebook Prophet
+------------------------------
+Kenapa Prophet relevan untuk projek ini:
+    - Built-in support untuk multiple seasonality (mingguan + tahunan)
+    - Bisa inject Indonesian public holidays sebagai regressor eksternal
+    - Robust terhadap missing values dan outlier moderat
+    - Dipakai luas di jurnal forecasting harga pangan Asia Tenggara
+
+Limitasi yang perlu didokumentasikan di laporan:
+    - Overconfident confidence interval untuk data volatile (Cluster 0: cabai)
+    - Tidak menangkap autokorelasi residual sebaik SARIMA
+    - "Black box" seasonality: sulit diinterpretasi secara statistik
+"""
+
+import warnings
+import numpy as np
+import pandas as pd
+import mlflow
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+
+from prophet import Prophet
+from prophet.diagnostics import cross_validation, performance_metrics
+
+from pathlib import Path
+from config import (MLFLOW_TRACKING_URI, FORECAST_DAYS, get_logger, 
+                    compute_metrics, get_cluster, get_cluster_short,
+                    DIR_TMP)
+
+warnings.filterwarnings("ignore")
+log = get_logger("prophet")
+
+MODEL_NAME = "Prophet"
+
+# ── Indonesian public holidays ────────────────────────────
+# Pengaruh ke harga pangan sudah terdokumentasi di data BPS Jatim
+INDONESIAN_HOLIDAYS = pd.DataFrame({
+    "holiday": [
+        "Idul_Fitri", "Idul_Fitri", "Idul_Fitri", "Idul_Fitri", "Idul_Fitri",
+        "Natal",      "Natal",      "Natal",      "Natal",      "Natal",
+        "Tahun_Baru", "Tahun_Baru", "Tahun_Baru", "Tahun_Baru", "Tahun_Baru",
+    ],
+    "ds": pd.to_datetime([
+        # Idul Fitri (approx, bergeser tiap tahun)
+        "2021-05-13", "2022-05-02", "2023-04-21", "2024-04-10", "2025-03-31",
+        # Natal
+        "2021-12-25", "2022-12-25", "2023-12-25", "2024-12-25", "2025-12-25",
+        # Tahun Baru
+        "2021-01-01", "2022-01-01", "2023-01-01", "2024-01-01", "2025-01-01",
+    ]),
+    "lower_window": [-7, -7, -7, -7, -7,   # 7 hari sebelum mulai efek harga
+                     -3, -3, -3, -3, -3,
+                     -3, -3, -3, -3, -3],
+    "upper_window": [ 3,  3,  3,  3,  3,   # 3 hari setelah
+                      1,  1,  1,  1,  1,
+                      1,  1,  1,  1,  1],
+})
+
+
+def train_prophet(komoditas: str, data: dict, mlflow_experiment: str = None) -> dict:
+    """
+    Train Prophet untuk satu komoditas dan log ke MLflow.
+
+    Flow:
+        1. Format data ke Prophet (ds, y)
+        2. Fit model dengan holidays Indonesia
+        3. Predict test set
+        4. Cross-validation (opsional, diaktifkan untuk cluster mid/low)
+        5. Hitung metrics & log ke MLflow
+    """
+    mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
+    mlflow.set_experiment(mlflow_experiment or "MarketCast-Tournament")
+
+    train       = data["train"]
+    test        = data["test"]
+    dates_train = data["dates_train"]
+    dates_test  = data["dates_test"]
+    cluster     = get_cluster_short(komoditas)
+
+    log.info(f"[{MODEL_NAME}] Training: {komoditas} (cluster: {cluster})")
+
+    # Format untuk Prophet
+    df_train = pd.DataFrame({"ds": dates_train, "y": train})
+
+    with mlflow.start_run(run_name=f"{MODEL_NAME}__{komoditas}"):
+
+        mlflow.set_tags({
+            "model"    : MODEL_NAME,
+            "komoditas": komoditas,
+            "cluster"  : cluster,
+            "project"  : "PBL-MarketCast",
+        })
+
+        # ── Step 1: Konfigurasi model ─────────────────────
+        # changepoint_prior_scale:
+        #   Mengontrol seberapa fleksibel tren bisa berubah.
+        #   Nilai kecil (0.05) = tren smooth, cocok untuk Cluster 1 & 2.
+        #   Nilai besar (0.3)  = tren fleksibel, cocok untuk Cluster 0 (cabai).
+        changepoint_scale = 0.3 if cluster == "high_volatility" else 0.05
+
+        model = Prophet(
+            yearly_seasonality  = True,
+            weekly_seasonality  = True,
+            daily_seasonality   = False,
+            holidays            = INDONESIAN_HOLIDAYS,
+            changepoint_prior_scale = changepoint_scale,
+            interval_width      = 0.95,    # 95% CI
+            uncertainty_samples = 500,     # turunkan ke 200 kalau lambat
+        )
+
+        # Tambah seasonality bulanan secara manual
+        # (Prophet default hanya weekly + yearly)
+        model.add_seasonality(
+            name="monthly",
+            period=30.5,
+            fourier_order=5,   # 5 = cukup untuk menangkap pola bulanan
+        )
+
+        # ── Step 2: Fit ───────────────────────────────────
+        model.fit(df_train)
+
+        # ── Step 3: Log params ────────────────────────────
+        mlflow.log_params({
+            "changepoint_prior_scale": changepoint_scale,
+            "yearly_seasonality"     : True,
+            "weekly_seasonality"     : True,
+            "monthly_seasonality"    : True,
+            "holidays"               : "ID_Idul_Fitri,Natal,Tahun_Baru",
+            "interval_width"         : 0.95,
+            "n_train"                : len(train),
+            "n_test"                 : len(test),
+        })
+
+        # ── Step 4: Predict test set ──────────────────────
+        future_test = pd.DataFrame({"ds": dates_test})
+        forecast_df = model.predict(future_test)
+        forecast    = forecast_df["yhat"].values
+
+        # ── Step 5: Future forecast ───────────────────────
+        last_date    = dates_test[-1]
+        future_dates = pd.date_range(last_date + pd.Timedelta(days=1),
+                                      periods=FORECAST_DAYS, freq="D")
+        future_df    = pd.DataFrame({"ds": future_dates})
+        future_pred  = model.predict(future_df)
+
+        # ── Step 6: Metrics ───────────────────────────────
+        metrics = compute_metrics(test, forecast)
+        mlflow.log_metrics(metrics)
+        log.info(f"  Metrics: MAE={metrics['mae']:,.0f} | RMSE={metrics['rmse']:,.0f} "
+                 f"| MAPE={metrics['mape']:.2f}% | SMAPE={metrics['smape']:.2f}%")
+
+        # ── Step 7: Plot ──────────────────────────────────
+        fig = _plot_prophet(
+            komoditas, train, test, dates_train, dates_test,
+            forecast_df, future_pred, cluster
+        )
+        # Gunakan DIR_TMP dari config agar aman di Windows
+        slug = komoditas.replace(' ', '_')
+        plot_path = DIR_TMP / f"prophet_{slug}.png"
+
+        # Gunakan .as_posix() agar path Windows dipahami MLflow
+        fig.savefig(plot_path.as_posix(), dpi=120, bbox_inches="tight")
+        plt.close(fig)
+        mlflow.log_artifact(plot_path.as_posix(), artifact_path="plots")
+
+        # Component plot (seasonality decomposition)
+        fig_comp = model.plot_components(
+            pd.concat([forecast_df, future_pred], ignore_index=True)
+        )
+        comp_path = DIR_TMP / f"prophet_components_{slug}.png"
+        fig_comp.savefig(comp_path.as_posix(), dpi=100, bbox_inches="tight")
+        plt.close(fig_comp)
+        mlflow.log_artifact(comp_path.as_posix(), artifact_path="plots")
+        # Capture run info untuk model_registry_map.yaml
+        active_run = mlflow.active_run()
+        run_id     = active_run.info.run_id if active_run else ""
+        model_uri  = f"runs:/{run_id}/model" if run_id else ""
+
+
+    return {
+        "komoditas"      : komoditas,
+        "model"          : model,
+        "forecast_test"  : forecast,
+        "forecast_df"    : forecast_df,
+        "future_pred"    : future_pred,
+        "run_id"         : run_id,
+        "model_uri"      : model_uri,
+        "data"           : data,
+        "metrics"        : metrics,
+    }
+
+
+def _plot_prophet(komoditas, train, test, dates_train, dates_test,
+                  forecast_df, future_pred, cluster):
+    fig, ax = plt.subplots(figsize=(14, 5))
+
+    ax.plot(dates_train[-90:], train[-90:],
+            color="#2C3E50", lw=1.5, label="Train (90 hari terakhir)")
+    ax.plot(dates_test, test,
+            color="#27AE60", lw=2, label="Aktual (test)")
+    ax.plot(dates_test, forecast_df["yhat"].values,
+            color="#E67E22", lw=2, linestyle="--", label="Forecast Prophet")
+    ax.fill_between(dates_test,
+                    forecast_df["yhat_lower"].values,
+                    forecast_df["yhat_upper"].values,
+                    color="#E67E22", alpha=0.15, label="95% CI")
+
+    # Future
+    future_dates_plot = future_pred["ds"].values
+    ax.plot(future_dates_plot, future_pred["yhat"].values,
+            color="#8E44AD", lw=2, linestyle=":", label="Future forecast")
+    ax.fill_between(future_dates_plot,
+                    future_pred["yhat_lower"].values,
+                    future_pred["yhat_upper"].values,
+                    color="#8E44AD", alpha=0.12)
+
+    ax.axvline(dates_test[0], color="gray", lw=1, linestyle="--", alpha=0.7)
+    ax.set_title(f"Prophet — {komoditas}  [cluster: {cluster}]",
+                 fontsize=13, fontweight="bold")
+    ax.set_xlabel("Tanggal"); ax.set_ylabel("Harga/kg (Rp)")
+    ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: f"Rp{x:,.0f}"))
+    ax.legend(fontsize=9); ax.grid(alpha=0.2)
+    plt.tight_layout()
+    return fig
