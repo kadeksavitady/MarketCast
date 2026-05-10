@@ -1,22 +1,15 @@
 FROM python:3.11-slim
 
-# MLflow 3.11.1 — versi yang dipakai di modul praktikum
-# Perubahan dari 2.13.0 ke 3.x yang relevan untuk proyek ini:
-#   - log_model: parameter artifact_path deprecated → pakai name=
-#   - Model Registry: endpoint /logged-models sekarang tersedia di SQLite
-#   - MLflow Projects: support penuh
-#   - UI: tampilan baru, tab Models aktif
 RUN pip install --no-cache-dir mlflow==3.11.1 psycopg2-binary boto3
 
 EXPOSE 5000
 
 RUN mkdir -p /mlflow/artifacts
 
-# Backend SQLite: cukup untuk tim kecil, tidak butuh PostgreSQL terpisah
-# Artifacts disimpan lokal di bind mount ./mlflow_data (lihat docker-compose.yml)
-CMD mlflow server \
-    --host 0.0.0.0 \
-    --port 5000 \
-    --backend-store-uri sqlite:////mlflow/mlflow.db \
-    --default-artifact-root /mlflow/artifacts \
-    --serve-artifacts
+CMD ["mlflow", "server", \
+     "--host", "0.0.0.0", \
+     "--port", "5000", \
+     "--backend-store-uri", "sqlite:////mlflow/mlflow.db", \
+     "--default-artifact-root", "mlflow-artifacts:/artifacts", \
+     "--artifacts-destination", "/mlflow/artifacts", \
+     "--serve-artifacts"]
