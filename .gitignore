@@ -1,7 +1,11 @@
 # --- DATABASE & DATA STORAGE ---
 postgres_data/
 data/raw/siskaperbapo.db
-
+mlflow_data/
+outputs/
+data/processed/
+*.csv
+*.joblib
 *.db
 *.sqlite3
 
@@ -18,4 +22,4 @@ __pycache__/
 # --- CREDENTIALS & LOGS ---
 .env
 *.log
-cek_sinkron.pymlflow_data/
+cek_sinkron.py
