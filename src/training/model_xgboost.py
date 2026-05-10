@@ -226,7 +226,7 @@ def train_xgboost(komoditas: str, data: dict, mlflow_experiment: str = None) -> 
         mlflow.log_artifact(plot_path, artifact_path="plots")
 
         # ── Log model ─────────────────────────────────────────
-        mlflow.xgboost.log_model(model, artifact_path="model")
+        mlflow.xgboost.log_model(model, name="model")
         # Capture run info untuk model_registry_map.yaml
         active_run = mlflow.active_run()
         run_id     = active_run.info.run_id if active_run else ""

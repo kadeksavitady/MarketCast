@@ -122,7 +122,7 @@ def train_prophet(komoditas: str, data: dict, mlflow_experiment: str = None) -> 
         plt.close(fig_comp)
         mlflow.log_artifact(comp_path, artifact_path="plots")
 
-        mlflow.prophet.log_model(model, artifact_path="model")
+        mlflow.prophet.log_model(model, name="model")
         active_run = mlflow.active_run()
         run_id     = active_run.info.run_id if active_run else ""
         model_uri  = f"runs:/{run_id}/model" if run_id else ""
