@@ -109,7 +109,7 @@ def train_prophet(komoditas: str, data: dict, mlflow_experiment: str = None) -> 
 
         fig = _plot_prophet(komoditas, train, test, dates_train, dates_test,
                             forecast_df, future_pred, cluster)
-        plot_path = f"/tmp/prophet_{komoditas.replace(' ','_')}.png"
+        plot_path = f"/tmp/prophet_{komoditas.replace(' ','_').replace('/','_').replace('/','_')}.png"
         fig.savefig(plot_path, dpi=120, bbox_inches="tight")
         plt.close(fig)
         mlflow.log_artifact(plot_path, artifact_path="plots")
@@ -117,7 +117,7 @@ def train_prophet(komoditas: str, data: dict, mlflow_experiment: str = None) -> 
         fig_comp = model.plot_components(
             pd.concat([forecast_df, future_pred], ignore_index=True)
         )
-        comp_path = f"/tmp/prophet_components_{komoditas.replace(' ','_')}.png"
+        comp_path = f"/tmp/prophet_components_{komoditas.replace(' ','_').replace('/','_').replace('/','_')}.png"
         fig_comp.savefig(comp_path, dpi=100, bbox_inches="tight")
         plt.close(fig_comp)
         mlflow.log_artifact(comp_path, artifact_path="plots")

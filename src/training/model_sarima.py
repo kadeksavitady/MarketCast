@@ -152,7 +152,7 @@ def train_sarima(komoditas: str, data: dict, mlflow_experiment: str = None) -> d
             komoditas, train, test, dates_train, dates_test,
             forecast, conf_int, future_forecast, future_ci
         )
-        plot_path = f"/tmp/sarima_{komoditas.replace(' ','_')}.png"
+        plot_path = f"/tmp/sarima_{komoditas.replace(' ','_').replace('/','_').replace('/','_')}.png"
         fig.savefig(plot_path, dpi=120, bbox_inches="tight")
         plt.close(fig)
         mlflow.log_artifact(plot_path, artifact_path="plots")

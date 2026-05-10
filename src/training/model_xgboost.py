@@ -210,7 +210,7 @@ def train_xgboost(komoditas: str, data: dict, mlflow_experiment: str = None) -> 
 
         # ── Feature importance plot ───────────────────────────
         fig_imp = _plot_importance(model, feature_cols, komoditas)
-        imp_path = f"/tmp/xgb_importance_{komoditas.replace(' ','_')}.png"
+        imp_path = f"/tmp/xgb_importance_{komoditas.replace(' ','_').replace('/','_').replace('/','_')}.png"
         fig_imp.savefig(imp_path, dpi=120, bbox_inches="tight")
         plt.close(fig_imp)
         mlflow.log_artifact(imp_path, artifact_path="plots")
@@ -220,7 +220,7 @@ def train_xgboost(komoditas: str, data: dict, mlflow_experiment: str = None) -> 
             komoditas, train, test, dates_train, dates_test,
             forecast_test, future_forecast, cluster
         )
-        plot_path = f"/tmp/xgb_{komoditas.replace(' ','_')}.png"
+        plot_path = f"/tmp/xgb_{komoditas.replace(' ','_').replace('/','_').replace('/','_')}.png"
         fig.savefig(plot_path, dpi=120, bbox_inches="tight")
         plt.close(fig)
         mlflow.log_artifact(plot_path, artifact_path="plots")
