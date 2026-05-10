@@ -73,34 +73,8 @@ MIN_TRAIN_ROWS = 180   # minimal data train setelah split (6 bulan)
 # Kalau CSV_CLUSTER_ASSIGN ada, load_cluster_map() dipakai.
 # Kalau tidak ada (first run), fallback ke hardcode ini.
 # ─────────────────────────────────────────────────────────
-CLUSTER_MAP_FALLBACK = {
-    "Cluster 0: Labil & Murah (\u2192Datar)": [
-        "Cabe Merah Besar", "Cabe Merah Keriting",
-        "Cabe Rawit Merah", "Tomat Merah",
-    ],
-    "Cluster 1: Labil & Murah (\u2191Inflasi)": [
-        "Bawang Merah", "Bawang Putih Sinco/Honan",
-        "Beras Medium", "Beras Premium",
-        "Daging Ayam Ras", "Gula Kristal Putih",
-        "Ikan Bandeng", "Ikan Cakalang", "Ikan Kembung",
-        "Ikan Tongkol", "Ikan Tuna",
-        "Indomie Rasa Kari Ayam", "Jagung Pipilan Kering",
-        "Kedelai Impor", "Kedelai Lokal",
-        "Minyak Goreng Curah", "Minyak Goreng Kemasan Premium",
-        "Minyak Goreng Kemasan Sederhana", "Minyak Goreng MINYAKITA",
-        "Susu Kental Manis Merk Bendera", "Susu Kental Manis Merk Indomilk",
-        "Telur Ayam Kampung", "Telur Ayam Ras",
-        "Terigu Protein Sedang (Kemasan)",
-    ],
-    "Cluster 2: Stabil & Mahal (\u2192Datar)": [
-        "Daging Ayam Kampung", "Daging Sapi Paha Belakang",
-        "Ikan Asin Teri",
-        "Susu Bubuk Merk Bendera (Instant)",
-        "Susu Bubuk Merk Indomilk (Instant)",
-    ],
-}
-
-# Label pendek → nama cluster penuh (untuk reverse lookup)
+# Tidak ada hardcode fallback — jalankan clustering.py dulu
+CLUSTER_MAP_FALLBACK = {}
 CLUSTER_SHORT_TO_FULL = {
     "C0_LabilDatar"  : "Cluster 0: Labil & Murah (\u2192Datar)",
     "C1_LabilInflasi": "Cluster 1: Labil & Murah (\u2191Inflasi)",
@@ -123,8 +97,8 @@ def load_cluster_map(csv_path: Path = CSV_CLUSTER_ASSIGN) -> dict:
     """
     if not csv_path.exists():
         log = logging.getLogger("config")
-        log.warning(f"{csv_path} tidak ditemukan — pakai CLUSTER_MAP_FALLBACK")
-        return CLUSTER_MAP_FALLBACK
+        log.error(f"{csv_path} tidak ditemukan. Jalankan: python src/preprocessing/clustering.py")
+        raise FileNotFoundError(f"{csv_path} tidak ditemukan. Jalankan clustering.py dulu.")
 
     df = pd.read_csv(csv_path)
 
@@ -152,7 +126,7 @@ def load_centroid_list(csv_path: Path = CSV_CENTROID) -> list:
     """
     if not csv_path.exists():
         # Fallback: ambil centroid pertama tiap cluster dari CLUSTER_MAP_FALLBACK
-        return [members[0] for members in CLUSTER_MAP_FALLBACK.values()]
+        raise FileNotFoundError(f"{csv_path} tidak ditemukan. Jalankan clustering.py dulu.")
 
     df = pd.read_csv(csv_path)
     col = next((c for c in df.columns if "komoditas" in c.lower()), df.columns[0])
