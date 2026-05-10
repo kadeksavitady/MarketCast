@@ -77,7 +77,7 @@ def train_prophet(komoditas: str, data: dict, mlflow_experiment: str = None) -> 
             holidays                = INDONESIAN_HOLIDAYS,
             changepoint_prior_scale = changepoint_scale,
             interval_width          = 0.95,
-            uncertainty_samples     = 500,
+            uncertainty_samples     = 100,
         )
         model.add_seasonality(name="monthly", period=30.5, fourier_order=5)
         model.fit(df_train)
