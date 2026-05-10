@@ -18,4 +18,4 @@ __pycache__/
 # --- CREDENTIALS & LOGS ---
 .env
 *.log
-cek_sinkron.py
+cek_sinkron.pymlflow_data/
