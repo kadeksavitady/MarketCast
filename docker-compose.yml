@@ -1,33 +1,7 @@
 name: marketcast-app
 
 services:
-  # Database PostgreSQL
-  db:
-    image: postgres:15
-    container_name: marketcast_db_container
-    restart: always
-    environment:
-      POSTGRES_USER: ${DB_USER:-postgres}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-password123}
-      POSTGRES_DB: ${DB_NAME:-marketcast_dw}
-    ports:
-      - "5433:5432"
-    volumes:
-      - ./data/postgres_data:/var/lib/postgresql/data
-    networks:
-      - marketcast_network
-
-  # Adminer
-  adminer:
-    image: adminer
-    container_name: marketcast_adminer
-    restart: always
-    ports:
-      - "8080:8080"
-    networks:
-      - marketcast_network
-
-  # MLflow
+  # MLflow (Tetap dipertahankan untuk MLOps / tracking model)
   mlflow:
     build:
       context: .
@@ -39,10 +13,30 @@ services:
       - ./mlflow_data:/mlflow
     environment:
       - MLFLOW_TRACKING_URI=http://localhost:5000
+    env_file:
+      - .env  # Membaca DATABASE_URL dari file .env
     networks:
       - marketcast_network
 
-# Definisi Network diletakkan di paling bawah, sejajar dengan services
+  # NANTI: Tambahkan Backend Flask (Tugas Laila/Raja)
+  # backend:
+  #   build: ./backend
+  #   ports:
+  #     - "5001:5000"
+  #   env_file:
+  #     - .env
+  #   networks:
+  #     - marketcast_network
+
+  # NANTI: Tambahkan Frontend Vue (Tugas Raja/Laila)
+  # frontend:
+  #   build: ./frontend
+  #   ports:
+  #     - "8080:80"
+  #   networks:
+  #     - marketcast_network
+
+# Definisi Network
 networks:
   marketcast_network:
     name: marketcast_network
