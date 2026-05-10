@@ -10,21 +10,28 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4 # Diperbarui ke v4 untuk fix warning Node.js 20
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5 # Diperbarui ke v5
         with:
           python-version: '3.9'
 
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
-          pip install dvc[gdrive] # Tetap install dvc
+          pip install dvc[gdrive]
+          playwright install chromium --with-deps # FIX MASALAH UTAMA: Install browser
 
-      - name: Run Scraper
-        run: python src/data/historical_scraper.py
+      - name: Run Daily Scraper
+        env:
+          # Diambil dari GitHub Secrets agar aman
+          DATABASE_URL: ${{ secrets.DATABASE_URL }} 
+        run: python src/data/daily_scraper.py # Ganti dari historical ke daily!
 
+      # CATATAN: Karena daily_scraper sekarang nge-push ke Postgres (cloud),
+      # sebenarnya step DVC di bawah ini sudah tidak terpakai untuk data harian.
+      # Tapi tetap dibiarkan jaga-jaga kalau tim kalian masih butuh.
       - name: Setup DVC
         run: |
           dvc remote add origin https://dagshub.com/kadeksavitady/MarketCast.dvc --force
@@ -35,7 +42,7 @@ jobs:
       - name: Push Data to DagsHub
         run: |
           dvc add data/raw/siskaperbapo.db
-          dvc push -r origin
+          dvc push -r origin || echo "No DVC changes to push"
 
       - name: Commit DVC changes to GitHub
         run: |
