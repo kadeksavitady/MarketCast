@@ -37,6 +37,8 @@ services:
       - "5000:5000"
     volumes:
       - ./mlflow_data:/mlflow
+    environment:
+      - MLFLOW_TRACKING_URI=http://localhost:5000
     networks:
       - marketcast_network
 

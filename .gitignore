@@ -1,11 +1,7 @@
 # --- DATABASE & DATA STORAGE ---
 postgres_data/
 data/raw/siskaperbapo.db
-mlflow_data/
-outputs/
-data/processed/
-*.csv
-*.joblib
+
 *.db
 *.sqlite3
 

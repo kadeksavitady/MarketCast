@@ -1,0 +1,240 @@
+_meta:
+  generated_at: '2026-05-10T19:48:12.837201'
+  total_komoditas: 33
+  description: Model registry PBL-MarketCast. Dipakai oleh FastAPI untuk load model
+    saat serving. Di-generate otomatis oleh train_all.py --mode specialize.
+models:
+  Bawang Merah:
+    cluster: C1_LabilInflasi
+    model: prophet
+    mlflow_run_id: 4529bb6cc8454bbe9fd24386eb6cf395
+    model_uri: runs:/4529bb6cc8454bbe9fd24386eb6cf395/model
+    mape: 20.5846
+    mae: 7715.53
+  Bawang Putih Sinco/Honan:
+    cluster: C1_LabilInflasi
+    model: prophet
+    mlflow_run_id: 5f07106357ff42a1ad4859763453d91b
+    model_uri: runs:/5f07106357ff42a1ad4859763453d91b/model
+    mape: 28.8424
+    mae: 9358.92
+  Beras Medium:
+    cluster: C1_LabilInflasi
+    model: prophet
+    mlflow_run_id: 575130375c1e468fb08540e09a117d3c
+    model_uri: runs:/575130375c1e468fb08540e09a117d3c/model
+    mape: 5.4408
+    mae: 698.86
+  Beras Premium:
+    cluster: C1_LabilInflasi
+    model: prophet
+    mlflow_run_id: 1bd7f004331446fdb421f263eaa9f685
+    model_uri: runs:/1bd7f004331446fdb421f263eaa9f685/model
+    mape: 3.6531
+    mae: 563.76
+  Cabe Merah Keriting:
+    cluster: C0_LabilDatar
+    model: sarima
+    mlflow_run_id: 39d1b988695c4140890fcea038fc3eda
+    model_uri: runs:/39d1b988695c4140890fcea038fc3eda/model
+    mape: 15.667
+    mae: 6096.34
+  Cabe Rawit Merah:
+    cluster: C0_LabilDatar
+    model: sarima
+    mlflow_run_id: e2c2e1029ea342489023b06240430238
+    model_uri: runs:/e2c2e1029ea342489023b06240430238/model
+    mape: 37.0396
+    mae: 17005.94
+  Daging Ayam Kampung:
+    cluster: C2_StabilMahal
+    model: xgboost
+    mlflow_run_id: ce6ca30a39844f7d96d6f372eb8b6867
+    model_uri: runs:/ce6ca30a39844f7d96d6f372eb8b6867/model
+    mape: 3.8418
+    mae: 2509.67
+  Daging Ayam Ras:
+    cluster: C1_LabilInflasi
+    model: prophet
+    mlflow_run_id: 7362d97da4564210bf1e9fa629b54833
+    model_uri: runs:/7362d97da4564210bf1e9fa629b54833/model
+    mape: 11.4059
+    mae: 4224.93
+  Daging Sapi Paha Belakang:
+    cluster: C2_StabilMahal
+    model: xgboost
+    mlflow_run_id: b690803dc1144b5896db86f1e9d1dc54
+    model_uri: runs:/b690803dc1144b5896db86f1e9d1dc54/model
+    mape: 1.1419
+    mae: 1310.2
+  Gula Kristal Putih:
+    cluster: C1_LabilInflasi
+    model: prophet
+    mlflow_run_id: 1e0ca055dab5487bbbc762086b1dff6f
+    model_uri: runs:/1e0ca055dab5487bbbc762086b1dff6f/model
+    mape: 2.5666
+    mae: 435.45
+  Ikan Bandeng:
+    cluster: C1_LabilInflasi
+    model: prophet
+    mlflow_run_id: 6450e2c3bb9349d88f206955f69fc03a
+    model_uri: runs:/6450e2c3bb9349d88f206955f69fc03a/model
+    mape: 10.3058
+    mae: 4285.63
+  Ikan Cakalang:
+    cluster: C1_LabilInflasi
+    model: prophet
+    mlflow_run_id: cdea5b6761cd4094aa380507122631f6
+    model_uri: runs:/cdea5b6761cd4094aa380507122631f6/model
+    mape: 2.9608
+    mae: 1317.42
+  Ikan Kembung:
+    cluster: C1_LabilInflasi
+    model: prophet
+    mlflow_run_id: dd8a8051b00e4e98b0599b34578a498b
+    model_uri: runs:/dd8a8051b00e4e98b0599b34578a498b/model
+    mape: 9.715
+    mae: 4156.86
+  Ikan Tongkol:
+    cluster: C1_LabilInflasi
+    model: prophet
+    mlflow_run_id: 029de867bb2947af81e0f4b3619c6a03
+    model_uri: runs:/029de867bb2947af81e0f4b3619c6a03/model
+    mape: 2.4892
+    mae: 1019.2
+  Ikan Tuna:
+    cluster: C1_LabilInflasi
+    model: prophet
+    mlflow_run_id: 79be5dbd8d1c444c9063fe0c957d36f9
+    model_uri: runs:/79be5dbd8d1c444c9063fe0c957d36f9/model
+    mape: 3.4779
+    mae: 1661.0
+  Indomie Rasa Kari Ayam:
+    cluster: C1_LabilInflasi
+    model: prophet
+    mlflow_run_id: 7de2a28603714958b01a36b4dc019420
+    model_uri: runs:/7de2a28603714958b01a36b4dc019420/model
+    mape: 0.4618
+    mae: 172.22
+  Jagung Pipilan Kering:
+    cluster: C1_LabilInflasi
+    model: prophet
+    mlflow_run_id: 040cbf6b6ae5448e94bcb830d6013ff3
+    model_uri: runs:/040cbf6b6ae5448e94bcb830d6013ff3/model
+    mape: 6.2844
+    mae: 686.79
+  Kedelai Impor:
+    cluster: C1_LabilInflasi
+    model: prophet
+    mlflow_run_id: b183de21a1c14991afd9ec214ec78ad8
+    model_uri: runs:/b183de21a1c14991afd9ec214ec78ad8/model
+    mape: 9.0746
+    mae: 1459.33
+  Kedelai Lokal:
+    cluster: C1_LabilInflasi
+    model: prophet
+    mlflow_run_id: 9530fb495f2f48938238c95d052dce86
+    model_uri: runs:/9530fb495f2f48938238c95d052dce86/model
+    mape: 11.6571
+    mae: 1669.48
+  Minyak Goreng Curah:
+    cluster: C1_LabilInflasi
+    model: prophet
+    mlflow_run_id: 0cbf889f86984a5dbafb85bfc53e7a60
+    model_uri: runs:/0cbf889f86984a5dbafb85bfc53e7a60/model
+    mape: 6.0203
+    mae: 1198.03
+  Minyak Goreng Kemasan Premium:
+    cluster: C1_LabilInflasi
+    model: prophet
+    mlflow_run_id: 172f686a568246d8b483aad4b3b4a06e
+    model_uri: runs:/172f686a568246d8b483aad4b3b4a06e/model
+    mape: 2.9311
+    mae: 579.17
+  Minyak Goreng Kemasan Sederhana:
+    cluster: C1_LabilInflasi
+    model: prophet
+    mlflow_run_id: f423676227894caa91fb4b4f51982377
+    model_uri: runs:/f423676227894caa91fb4b4f51982377/model
+    mape: 0.0
+    mae: 0.0
+  Minyak Goreng MINYAKITA:
+    cluster: C1_LabilInflasi
+    model: prophet
+    mlflow_run_id: de24a9e6e13c4cd6ae23b51aecece979
+    model_uri: runs:/de24a9e6e13c4cd6ae23b51aecece979/model
+    mape: 3.3826
+    mae: 589.23
+  Susu Bubuk Merk Bendera (Instant):
+    cluster: C2_StabilMahal
+    model: xgboost
+    mlflow_run_id: acc7c159cdcd4c829c4d0c32bb242366
+    model_uri: runs:/acc7c159cdcd4c829c4d0c32bb242366/model
+    mape: 2.6421
+    mae: 2777.37
+  Susu Bubuk Merk Indomilk (Instant):
+    cluster: C2_StabilMahal
+    model: xgboost
+    mlflow_run_id: 96c4abdcf8ea4c419b6134b8df709d83
+    model_uri: runs:/96c4abdcf8ea4c419b6134b8df709d83/model
+    mape: 0.0
+    mae: 0.0
+  Susu Kental Manis Merk Bendera:
+    cluster: C1_LabilInflasi
+    model: prophet
+    mlflow_run_id: 409d4bd9409a4d3182930f2f99e9705f
+    model_uri: runs:/409d4bd9409a4d3182930f2f99e9705f/model
+    mape: 3.2571
+    mae: 1133.18
+  Susu Kental Manis Merk Indomilk:
+    cluster: C1_LabilInflasi
+    model: prophet
+    mlflow_run_id: 4da0ddd6ab1e4cb3b8b4d9626e9e8573
+    model_uri: runs:/4da0ddd6ab1e4cb3b8b4d9626e9e8573/model
+    mape: 0.8363
+    mae: 290.21
+  Telur Ayam Kampung:
+    cluster: C1_LabilInflasi
+    model: prophet
+    mlflow_run_id: 121706639c204f2984cf683648ac1645
+    model_uri: runs:/121706639c204f2984cf683648ac1645/model
+    mape: 2.2297
+    mae: 1033.21
+  Terigu Protein Sedang (Kemasan):
+    cluster: C1_LabilInflasi
+    model: prophet
+    mlflow_run_id: 6e1bb32402b3486db7d85926d7b5c92b
+    model_uri: runs:/6e1bb32402b3486db7d85926d7b5c92b/model
+    mape: 1.1875
+    mae: 146.97
+  Tomat Merah:
+    cluster: C0_LabilDatar
+    model: sarima
+    mlflow_run_id: 3d778c069bf34ed5b28ec4f679af005b
+    model_uri: runs:/3d778c069bf34ed5b28ec4f679af005b/model
+    mape: 21.023
+    mae: 3007.17
+  Cabe Merah Besar:
+    cluster: C0_LabilDatar
+    model: sarima
+    mlflow_run_id: ''
+    model_uri: ''
+    mape: null
+    mae: null
+    note: centroid — run_id dari Tournament experiment
+  Ikan Asin Teri:
+    cluster: C2_StabilMahal
+    model: xgboost
+    mlflow_run_id: ''
+    model_uri: ''
+    mape: null
+    mae: null
+    note: centroid — run_id dari Tournament experiment
+  Telur Ayam Ras:
+    cluster: C1_LabilInflasi
+    model: prophet
+    mlflow_run_id: ''
+    model_uri: ''
+    mape: null
+    mae: null
+    note: centroid — run_id dari Tournament experiment

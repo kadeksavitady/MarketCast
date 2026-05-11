@@ -1,0 +1,9 @@
+channels:
+- conda-forge
+dependencies:
+- python=3.12.3
+- pip<=24.0
+- pip:
+  - mlflow==3.12.0
+  - prophet==1.3.0
+name: mlflow-env
