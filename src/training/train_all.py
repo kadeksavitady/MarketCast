@@ -54,6 +54,9 @@ from data_loader import load_preprocessed, load_all_series
 from model_sarima   import train_sarima
 from model_prophet  import train_prophet
 from model_xgboost  import train_xgboost
+import dagshub
+# Ini akan otomatis mengatur autentikasi MLflow ke repo temanmu
+dagshub.init(repo_owner='kadeksavitady', repo_name='MarketCast', mlflow=True)
 
 log = get_logger("train_all")
 

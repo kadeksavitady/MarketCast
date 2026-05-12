@@ -24,7 +24,7 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error
 # ─────────────────────────────────────────────────────────
 # MLFLOW
 # ─────────────────────────────────────────────────────────
-MLFLOW_TRACKING_URI  = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000")
+MLFLOW_TRACKING_URI  = "https://dagshub.com/kadeksavitady/MarketCast.mlflow"
 MLFLOW_EXP_TOURNAMENT  = "MarketCast-Tournament"      # Tahap 2
 MLFLOW_EXP_SPECIALIZE  = "MarketCast-Specialization"  # Tahap 3a
 
