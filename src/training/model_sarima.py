@@ -3,12 +3,6 @@ src/training/model_sarima.py
 =============================
 Baseline 1: SARIMA via auto_arima (pmdarima)
 ---------------------------------------------
-Kenapa auto_arima bukan manual grid search:
-    - Lazim di jurnal forecasting pangan (Zhang et al. 2022, FAO 2023)
-    - auto_arima pakai AIC/BIC sebagai kriteria seleksi order —
-      sama dengan pendekatan Box-Jenkins manual, tapi otomatis
-    - Lebih reproducible: order yang dipilih bisa di-log ke MLflow
-    - Tetap bisa di-override manual kalau hasilnya tidak masuk akal
 
 Seasonality period (m=7):
     Dipilih 7 (mingguan) karena:
@@ -32,9 +26,9 @@ from pathlib import Path
 import pmdarima as pm
 from pmdarima.arima import auto_arima
 
-from config import (MLFLOW_TRACKING_URI,
+from config import (MLFLOW_TRACKING_URI, init_mlflow,
                     FORECAST_DAYS, get_logger, compute_metrics,
-                    get_cluster, get_cluster_short)
+                    get_cluster_short)
 
 warnings.filterwarnings("ignore")
 log = get_logger("sarima")
@@ -42,7 +36,11 @@ log = get_logger("sarima")
 MODEL_NAME = "SARIMA"
 
 
-def train_sarima(komoditas: str, data: dict, mlflow_experiment: str = None) -> dict:
+def train_sarima(komoditas: str, data: dict, 
+                 mlflow_experiment: str = None,
+                 max_p: int = 3, max_q: int = 3,
+                 max_P: int = 2, max_Q: int = 2
+                 ) -> dict:
     """
     Train SARIMA untuk satu komoditas dan log ke MLflow.
 
@@ -56,6 +54,9 @@ def train_sarima(komoditas: str, data: dict, mlflow_experiment: str = None) -> d
     Returns:
         dict dengan model, metrics, forecast
     """
+    init_mlflow()
+    mlflow.set_experiment(mlflow_experiment or "MarketCast-Tournament")
+
     mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
     mlflow.set_experiment(mlflow_experiment or "MarketCast-Tournament")
 
@@ -66,6 +67,9 @@ def train_sarima(komoditas: str, data: dict, mlflow_experiment: str = None) -> d
     cluster     = get_cluster_short(komoditas)
 
     log.info(f"[{MODEL_NAME}] Training: {komoditas} (cluster: {cluster})")
+
+    run_id = ""
+    model_uri = ""
 
     with mlflow.start_run(run_name=f"{MODEL_NAME}__{komoditas}"):
 
@@ -78,7 +82,7 @@ def train_sarima(komoditas: str, data: dict, mlflow_experiment: str = None) -> d
         })
 
         # ── Step 1: auto_arima ────────────────────────────
-        log.info(f"  auto_arima fitting (m=7, stepwise=True) ...")
+        log.info(f"  auto_arima fitting (m=7, stepwise) max_p={max_p} max_q={max_q} ...")
         try:
             auto_model = auto_arima(
                 train,
@@ -97,7 +101,7 @@ def train_sarima(komoditas: str, data: dict, mlflow_experiment: str = None) -> d
                 trace=False,
             )
             order         = auto_model.order
-            seasonal_order = auto_model.seasonal_order
+            seasonal_order = (auto_model.seasonal_order)
             log.info(f"  Best order: SARIMA{order}x{seasonal_order}")
 
         except Exception as e:
@@ -123,8 +127,13 @@ def train_sarima(komoditas: str, data: dict, mlflow_experiment: str = None) -> d
             "Q"       : seasonal_order[2],
             "m"       : seasonal_order[3],
             "aic"     : round(auto_model.aic(), 4),
-            "n_train" : len(train),
-            "n_test"  : len(test),
+            # Search space — dicatat agar bisa dibandingkan antar run di MLflow
+            "max_p"  : max_p,
+            "max_q"  : max_q,
+            "max_P"  : max_P,
+            "max_Q"  : max_Q,
+            "n_train": len(train),
+            "n_test" : len(test),
         })
 
         # ── Step 3: Forecast test set ─────────────────────
@@ -152,18 +161,24 @@ def train_sarima(komoditas: str, data: dict, mlflow_experiment: str = None) -> d
             komoditas, train, test, dates_train, dates_test,
             forecast, conf_int, future_forecast, future_ci
         )
-        plot_path = f"/tmp/sarima_{komoditas.replace(' ','_')}.png"
+        plot_path = f"/tmp/sarima_{komoditas.replace(' ','_').replace('/','_').replace('/','_')}.png"
         fig.savefig(plot_path, dpi=120, bbox_inches="tight")
         plt.close(fig)
         mlflow.log_artifact(plot_path, artifact_path="plots")
 
         # ── Step 7: Log model ─────────────────────────────
-        mlflow.sklearn.log_model(auto_model, artifact_path="model")
-        # Capture run info untuk model_registry_map.yaml
+        import pickle, tempfile, os
+        with tempfile.TemporaryDirectory() as tmpdir:
+            pkl_path = os.path.join(tmpdir, "model.pkl")
+            with open(pkl_path, "wb") as f:
+                pickle.dump(auto_model, f)
+            mlflow.log_artifact(pkl_path, artifact_path=f"SARIMA_{komoditas.replace(' ', '_')}")
         active_run = mlflow.active_run()
         run_id     = active_run.info.run_id if active_run else ""
         model_uri  = f"runs:/{run_id}/model" if run_id else ""
 
+        if not run_id:
+            log.error(f"  run_id kosong untuk {komoditas} — model tidak ter-log!")
 
     return {
         "komoditas"      : komoditas,
