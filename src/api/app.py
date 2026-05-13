@@ -1,16 +1,84 @@
-from contextlib import asynccontextmanager    
+from contextlib import asynccontextmanager
+from sqlalchemy import create_engine
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import Dict, List, Optional
-import pickle
+import pandas as pd  # Ditambahkan untuk format input MLflow
 import numpy as np
 import os
 import logging
 
+import mlflow
+import dagshub
+
 # ── Logging ───────────────────────────────────────────────────────────────────
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# --- CONFIG DAGSHUB & MLFLOW ---
+# Pastikan variabel ini ada di .env
+DAGSHUB_REPO_OWNER = os.getenv("DAGSHUB_USER", "kadeksavitady")
+DAGSHUB_REPO_NAME = os.getenv("DAGSHUB_REPO", "MarketCast")
+MODEL_NAME = "marketcast_model" # Sesuaikan dengan nama model yang di-register Laila
+
+# --- CONFIG DATABASE NEON CLOUD ---
+DATABASE_URL = os.getenv("DATABASE_URL")
+engine = None
+if DATABASE_URL:
+    try:
+        engine = create_engine(DATABASE_URL)
+        logger.info("✅ Terhubung ke Neon Cloud Database!")
+    except Exception as e:
+        logger.error(f"❌ Gagal konek ke database: {e}")
+
+# Inisialisasi DagsHub agar MLflow tahu jalannya ke cloud
+try:
+    dagshub.init(repo_owner=DAGSHUB_REPO_OWNER, repo_name=DAGSHUB_REPO_NAME, mlflow=True)
+except Exception as e:
+    logger.warning(f"⚠️ Gagal inisialisasi DagsHub (Abaikan jika sedang tidak pakai internet): {e}")
+
+# Variabel Global Model
+model = None
+
+# ── Lifespan (Load Model dari Cloud DagsHub) ─────────────────────────────────
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global model
+    try:
+        # Kita ambil model yang statusnya 'Production' atau 'Latest'
+        model_uri = f"models:/{MODEL_NAME}/latest"
+        
+        logger.info(f"🚀 Mencoba menarik model terbaru dari DagsHub: {model_uri}")
+        
+        # MLflow akan otomatis men-download dan me-load modelnya dari Cloud!
+        model = mlflow.pyfunc.load_model(model_uri)
+        
+        logger.info("✅ Model berhasil ditarik dari DagsHub dan siap digunakan!")
+    except Exception as e:
+        logger.error(f"❌ Gagal narik model dari DagsHub: {e}")
+        logger.warning("⚠️ Menggunakan mode standby (Katalog fallback).")
+    
+    yield  # Server berjalan di sini
+    
+    # SHUTDOWN
+    model = None
+    logger.info("🛑 Model unloaded.")
+
+# ── App ───────────────────────────────────────────────────────────────────────
+app = FastAPI(
+    title="Budget Belanja API",
+    description="Prediksi total belanja bahan pokok dan rekomendasi substitusi cerdas",
+    version="1.0.0",
+    lifespan=lifespan,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # ── Katalog Komoditas ─────────────────────────────────────────────────────────
 COMMODITY_CATALOG: Dict[str, dict] = {
@@ -51,45 +119,17 @@ SUBSTITUTION_MAP: Dict[str, str] = {
     "udang":          "ikan_tongkol",
 }
 
-# ── Model ─────────────────────────────────────────────────────────────────────
-MODEL_PATH = os.getenv("MODEL_PATH", "models/model.pkl")
-model = None
-
-# ── Lifespan (load & unload model) ───────────────────────────────────────────
-# Harus didefinisikan SEBELUM FastAPI() dipanggil
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # STARTUP
-    global model
-    if os.path.exists(MODEL_PATH):
-        with open(MODEL_PATH, "rb") as f:
-            model = pickle.load(f)
-        logger.info(f"✅ Model loaded from {MODEL_PATH}")
-    else:
-        logger.warning("⚠️  Model not found. Using harga_ref fallback.")
-
-    yield  # server berjalan di sini
-
-    # SHUTDOWN
-    model = None
-    logger.info("🛑 Model unloaded.")
-
-# ── App (pakai lifespan yang sudah didefinisikan di atas) ─────────────────────
-app = FastAPI(
-    title="Budget Belanja API",
-    description="Prediksi total belanja bahan pokok dan rekomendasi substitusi cerdas",
-    version="1.0.0",
-    lifespan=lifespan,              # ← aman karena lifespan sudah ada di atas
-)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 # ── Schemas ───────────────────────────────────────────────────────────────────
+class TitikGrafik(BaseModel):
+    tanggal: str
+    harga: float
+
+class GrafikResponse(BaseModel):
+    komoditas_id: str
+    nama_komoditas: str
+    satuan: str
+    data_historis: List[TitikGrafik]
+
 class CartItem(BaseModel):
     komoditas_id: str = Field(..., description="Slug komoditas, e.g. 'beras_premium'")
     jumlah: float     = Field(..., gt=0, description="Jumlah dalam satuan (kg / liter)")
@@ -138,14 +178,20 @@ class CommodityInfo(BaseModel):
 def predict_harga_satuan(komoditas_id: str) -> float:
     """
     Prediksi harga per satuan.
-    Jika model ada → pakai model.
-    Jika tidak → fallback ke harga_ref.
-    ⚠️  Sesuaikan feature vector dengan waktu training!
+    Jika model ada di memory (dari DagsHub) → pakai model.
+    Jika gagal/tidak ada → fallback ke harga_ref.
     """
     info = COMMODITY_CATALOG[komoditas_id]
+    
     if model is not None:
-        X = np.array([[info["harga_ref"]]])   # ganti sesuai fitur training
-        return float(model.predict(X)[0])
+        try:
+            # Format input diubah menjadi DataFrame sesuai standar MLflow PyFunc
+            X_input = pd.DataFrame([{"harga_ref": info["harga_ref"]}]) 
+            prediction = model.predict(X_input)
+            return float(prediction[0])
+        except Exception as e:
+            logger.error(f"⚠️ Gagal prediksi dengan model untuk {komoditas_id}: {e}")
+            
     return float(info["harga_ref"])
 
 
@@ -179,11 +225,9 @@ def build_substitution(
 def root():
     return {"message": "Budget Belanja API 🚀"}
 
-
 @app.get("/health", tags=["Health"])
 def health():
     return {"status": "ok", "model_loaded": model is not None}
-
 
 @app.get("/categories", tags=["Katalog"])
 def list_categories():
@@ -193,19 +237,16 @@ def list_categories():
         cats[info["kategori"]] = cats.get(info["kategori"], 0) + 1
     return [{"kategori": k, "jumlah_komoditas": v} for k, v in cats.items()]
 
-
 @app.get("/commodities", response_model=List[CommodityInfo], tags=["Katalog"])
 def list_commodities(kategori: Optional[str] = None):
     """
-    Semua komoditas tersedia.
-    Filter opsional: ?kategori=Daging
+    Semua komoditas tersedia. Filter opsional: ?kategori=Daging
     """
     return [
         CommodityInfo(id=slug, **info)
         for slug, info in COMMODITY_CATALOG.items()
         if not kategori or info["kategori"].lower() == kategori.lower()
     ]
-
 
 @app.post("/predict", response_model=PredictResponse, tags=["Prediksi"])
 def predict(payload: PredictRequest):
@@ -254,6 +295,54 @@ def predict(payload: PredictRequest):
         smart_substitution=subs,
         potensi_hemat_total=hemat,
     )
+
+@app.get("/grafik/{komoditas_id}", response_model=GrafikResponse, tags=["Grafik"])
+def get_data_grafik(komoditas_id: str, limit_hari: int = 30):
+    """
+    Mengambil data riwayat harga dari Neon Database untuk ditampilkan di Chart Frontend.
+    - limit_hari: Berapa hari ke belakang yang mau ditampilkan (default 30 hari)
+    """
+    if komoditas_id not in COMMODITY_CATALOG:
+        raise HTTPException(404, detail="Komoditas tidak ditemukan")
+        
+    info = COMMODITY_CATALOG[komoditas_id]
+    nama_asli = info["nama"]
+    
+    if engine is None:
+        raise HTTPException(500, detail="Database belum terhubung")
+
+    try:
+        # Menarik data langsung dari tabel harga_historis di Neon
+        query = f"""
+            SELECT tanggal_data, harga_per_kg 
+            FROM harga_historis 
+            WHERE komoditas = '{nama_asli}' 
+            ORDER BY tanggal_data DESC 
+            LIMIT {limit_hari}
+        """
+        df_history = pd.pd.read_sql(query, engine)
+        
+        # Karena kita order DESC (terbaru di atas), kita balik lagi agar di grafik urut dari kiri (lama) ke kanan (baru)
+        df_history = df_history.sort_values('tanggal_data')
+        
+        # Format data agar gampang dibaca oleh chart di Frontend
+        titik_data = []
+        for _, row in df_history.iterrows():
+            titik_data.append(TitikGrafik(
+                tanggal=row['tanggal_data'].strftime("%Y-%m-%d"),
+                harga=row['harga_per_kg']
+            ))
+            
+        return GrafikResponse(
+            komoditas_id=komoditas_id,
+            nama_komoditas=nama_asli,
+            satuan=info["satuan"],
+            data_historis=titik_data
+        )
+        
+    except Exception as e:
+        logger.error(f"Gagal narik data grafik: {e}")
+        raise HTTPException(500, detail="Gagal mengambil data dari database")
 
 if __name__ == "__main__":
     import uvicorn
