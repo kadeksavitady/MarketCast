@@ -167,12 +167,7 @@ def train_sarima(komoditas: str, data: dict,
         mlflow.log_artifact(plot_path, artifact_path="plots")
 
         # ── Step 7: Log model ─────────────────────────────
-        import pickle, tempfile, os
-        with tempfile.TemporaryDirectory() as tmpdir:
-            pkl_path = os.path.join(tmpdir, "model.pkl")
-            with open(pkl_path, "wb") as f:
-                pickle.dump(auto_model, f)
-            mlflow.log_artifact(pkl_path, artifact_path=f"SARIMA_{komoditas.replace(' ', '_')}")
+        mlflow.sklearn.log_model(auto_model, artifact_path=f"SARIMA_{komoditas.replace(' ', '_')}")
         active_run = mlflow.active_run()
         run_id     = active_run.info.run_id if active_run else ""
         model_uri  = f"runs:/{run_id}/model" if run_id else ""

@@ -19,6 +19,8 @@ INFRASTRUKTUR DOCKER (docker-compose.yml):
 
 import os
 import logging
+from dotenv import load_dotenv
+load_dotenv()
 import numpy as np
 import pandas as pd
 from pathlib import Path

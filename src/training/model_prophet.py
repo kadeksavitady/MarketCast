@@ -86,7 +86,7 @@ def train_prophet(komoditas: str, data: dict,
             weekly_seasonality      = True,
             daily_seasonality       = False,
             holidays                = INDONESIAN_HOLIDAYS,
-            changepoint_prior_scale = changepoint_prior_scale,
+            changepoint_prior_scale = changepoint_scale,
             seasonality_prior_scale = seasonality_prior_scale,
             interval_width          = 0.95,
             uncertainty_samples     = 100,
@@ -137,12 +137,7 @@ def train_prophet(komoditas: str, data: dict,
         plt.close(fig_comp)
         mlflow.log_artifact(comp_path, artifact_path="plots")
 
-        import pickle, tempfile, os
-        with tempfile.TemporaryDirectory() as tmpdir:
-            pkl_path = os.path.join(tmpdir, "model.pkl")
-            with open(pkl_path, "wb") as f:
-                pickle.dump(model, f)
-            mlflow.log_artifact(pkl_path, artifact_path=f"Prophet_{komoditas.replace(' ', '_')}")
+        mlflow.prophet.log_model(model, artifact_path=f"Prophet_{komoditas.replace(' ', '_')}")
         active_run = mlflow.active_run()
         run_id     = active_run.info.run_id if active_run else ""
         model_uri  = f"runs:/{run_id}/model" if run_id else ""

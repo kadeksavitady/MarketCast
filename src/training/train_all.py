@@ -164,7 +164,7 @@ def run_specialize(champion_map: dict, all_data: dict,
 
     centroid_list   = load_centroid_list()
     all_komoditas   = list(all_data.keys())
-    # specialize_list = [k for k in all_komoditas if k not in centroid_list]
+    specialize_list = [k for k in all_komoditas if k not in centroid_list]
     full_train_list = all_komoditas  # tidak filter centroid keluar
 
     log.info("=" * 65)
@@ -290,6 +290,42 @@ def _save_registry(registry: dict):
 # MAIN
 # ══════════════════════════════════════════════════════════════
 
+
+def load_champion_from_registry() -> dict:
+    """
+    Baca alias @champion dari MLflow Model Registry.
+    Return: {cluster_short: model_name}
+    Contoh: {"C0_LabilDatar": "sarima", "C1_LabilInflasi": "xgboost"}
+    """
+    import mlflow
+    import dagshub
+    from config import DAGSHUB_USER, DAGSHUB_REPO
+    dagshub.init(DAGSHUB_REPO, DAGSHUB_USER, mlflow=True)
+    client = mlflow.tracking.MlflowClient()
+
+    # Mapping: nama registered model → (cluster, model_type)
+    # Dibaca dari tag "cluster" dan "model" di version champion
+    champion_map = {}
+    try:
+        registered_models = client.search_registered_models()
+        for rm in registered_models:
+            # Cari version dengan alias @champion
+            for alias in ["champion"]:
+                try:
+                    mv = client.get_model_version_by_alias(rm.name, alias)
+                    # Baca tag cluster dan model dari run sumber
+                    run = client.get_run(mv.run_id)
+                    cluster = run.data.tags.get("cluster", "")
+                    model   = run.data.tags.get("model", "").lower()
+                    if cluster and model:
+                        champion_map[cluster] = model
+                        log.info(f"  Registry @champion: {rm.name} → {cluster}={model}")
+                except Exception:
+                    pass
+    except Exception as e:
+        log.warning(f"Gagal baca Registry: {e}")
+    return champion_map
+
 def parse_champion(champion_args: list) -> dict:
     if not champion_args:
         return {}
@@ -368,6 +404,9 @@ def main():
 
     elif args.mode == "specialize":
         champion_map = parse_champion(args.champion)
+        if not champion_map:
+            log.info("--champion tidak diisi → auto-load dari MLflow Registry (@champion)...")
+            champion_map = load_champion_from_registry()
         if not champion_map:
             log.error(
                 "Mode specialize butuh --champion. Contoh:\n"

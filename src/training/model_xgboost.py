@@ -205,12 +205,7 @@ def train_xgboost(komoditas: str,
         mlflow.log_artifact(plot_path, artifact_path="plots")
 
         # ── Log model ─────────────────────────────────────────
-        import pickle, tempfile, os
-        with tempfile.TemporaryDirectory() as tmpdir:
-            pkl_path = os.path.join(tmpdir, "model.pkl")
-            with open(pkl_path, "wb") as f:
-                pickle.dump(model, f)
-            mlflow.log_artifact(pkl_path, artifact_path=f"XGBoost_{komoditas.replace(' ', '_')}")
+        mlflow.xgboost.log_model(model, artifact_path=f"XGBoost_{komoditas.replace(' ', '_')}")
         # Capture run info untuk model_registry_map.yaml
         active_run = mlflow.active_run()
         run_id     = active_run.info.run_id if active_run else ""
