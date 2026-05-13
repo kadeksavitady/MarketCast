@@ -1,37 +1,8 @@
 """
 src/training/model_xgboost.py
 ==============================
-Baseline 3: XGBoost dengan Lag Features
+Baseline 3: XGBoost
 -----------------------------------------
-Kenapa XGBoost valid sebagai baseline time series:
-    XGBoost bukan model time series native, tapi bisa digunakan
-    untuk forecasting dengan sliding window feature engineering.
-    Pendekatan ini disebut "direct multi-step forecasting" — lazim
-    di jurnal ML-based food price forecasting (lihat: Göb et al. 2021,
-    Tealab 2018, Hameed et al. 2022).
-
-Strategi feature engineering (lag features):
-    Fitur utama yang dipakai:
-      - harga_t-1 s/d harga_t-LAG_MAX  (autokorelasi jangka pendek)
-      - rolling_mean_7, rolling_mean_30 (tren lokal)
-      - rolling_std_7, rolling_std_30   (volatilitas lokal)
-      - bulan, hari_dalam_minggu        (seasonality sederhana)
-      - days_since_start                (tren global)
-
-    LAG_MAX = 30 (satu bulan ke belakang).
-    Untuk Cluster 0 (cabai, volatile), rolling_std penting —
-    model perlu "tahu" sedang di periode volatile atau tidak.
-
-Forecasting strategy:
-    Recursive/iterative: prediksi t+1 dipakai sebagai input untuk t+2, dst.
-    Ini memungkinkan forecast 30 hari ke depan dari model single-step.
-    Kelemahannya: error bisa akumulasi. Untuk volatile commodity (cabai),
-    ini limitasi yang harus didokumentasikan di laporan.
-
-Kenapa tidak LSTM:
-    Lihat evaluasi di rancangan awal — 1.815 data per komoditas terlalu
-    kecil untuk LSTM generalize dengan baik. XGBoost dengan lag features
-    lebih stabil untuk data pendek dan hasilnya lebih interpretable.
 """
 
 import warnings
@@ -45,7 +16,7 @@ import matplotlib.pyplot as plt
 from xgboost import XGBRegressor
 from sklearn.preprocessing import MinMaxScaler
 
-from config import (MLFLOW_TRACKING_URI,
+from config import (MLFLOW_TRACKING_URI, init_mlflow,
                     FORECAST_DAYS, get_logger, compute_metrics, get_cluster_short)
 
 warnings.filterwarnings("ignore")
@@ -109,7 +80,19 @@ def get_feature_cols() -> list:
 # TRAIN
 # ══════════════════════════════════════════════════════════════
 
-def train_xgboost(komoditas: str, data: dict, mlflow_experiment: str = None) -> dict:
+def train_xgboost(komoditas: str, 
+                  data: dict, 
+                  mlflow_experiment: str = None,
+                  # ── Hyperparameters — semua eksplisit untuk tuning ──────
+                  n_estimators     : int   = 300,
+                  learning_rate    : float = 0.05,
+                  max_depth        : int   = 4,
+                  subsample        : float = 0.8,
+                  colsample_bytree : float = 0.8,
+                  min_child_weight : int   = 5,
+                  reg_alpha        : float = 0.1,
+                  reg_lambda       : float = 1.0,
+                  ) -> dict:
     """
     Train XGBoost untuk satu komoditas dan log ke MLflow.
 
@@ -121,7 +104,7 @@ def train_xgboost(komoditas: str, data: dict, mlflow_experiment: str = None) -> 
         5. Iterative forecast 30 hari ke depan
         6. Hitung metrics & log ke MLflow
     """
-    mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
+    init_mlflow()
     mlflow.set_experiment(mlflow_experiment or "MarketCast-Tournament")
 
     series_full  = data["series_full"]
@@ -147,6 +130,9 @@ def train_xgboost(komoditas: str, data: dict, mlflow_experiment: str = None) -> 
     X_test  = test_feat[feature_cols].values
     y_test  = test_feat["target"].values
 
+    run_id = ''
+    model_uri = ''
+
     with mlflow.start_run(run_name=f"{MODEL_NAME}__{komoditas}"):
 
         mlflow.set_tags({
@@ -157,22 +143,15 @@ def train_xgboost(komoditas: str, data: dict, mlflow_experiment: str = None) -> 
         })
 
         # ── Hyperparameters ───────────────────────────────────
-        # n_estimators, learning_rate, max_depth:
-        #   Dipilih konservatif untuk data kecil (~1800 rows).
-        #   Terlalu besar (n_estimators=1000) → overfit pada data 1800 rows.
-        # subsample + colsample_bytree:
-        #   Regularisasi untuk hindari overfit.
-        #   Penting untuk Cluster 1 & 2 yang datanya lebih "smooth" —
-        #   tanpa ini XGBoost akan terlalu hafal tren train, jelek di test.
         params = {
-            "n_estimators"      : 300,
-            "learning_rate"     : 0.05,
-            "max_depth"         : 4,
-            "subsample"         : 0.8,
-            "colsample_bytree"  : 0.8,
-            "min_child_weight"  : 5,
-            "reg_alpha"         : 0.1,   # L1 regularization
-            "reg_lambda"        : 1.0,   # L2 regularization
+            "n_estimators"      : n_estimators,
+            "learning_rate"     : learning_rate,
+            "max_depth"         : max_depth,
+            "subsample"         : subsample,
+            "colsample_bytree"  : colsample_bytree,
+            "min_child_weight"  : min_child_weight,
+            "reg_alpha"         : reg_alpha,   # L1 regularization
+            "reg_lambda"        : reg_lambda,   # L2 regularization
             "random_state"      : 42,
             "n_jobs"            : -1,
         }
@@ -226,13 +205,20 @@ def train_xgboost(komoditas: str, data: dict, mlflow_experiment: str = None) -> 
         mlflow.log_artifact(plot_path, artifact_path="plots")
 
         # ── Log model ─────────────────────────────────────────
-        mlflow.xgboost.log_model(model, name="model")
+        import pickle, tempfile, os
+        with tempfile.TemporaryDirectory() as tmpdir:
+            pkl_path = os.path.join(tmpdir, "model.pkl")
+            with open(pkl_path, "wb") as f:
+                pickle.dump(model, f)
+            mlflow.log_artifact(pkl_path, artifact_path=f"XGBoost_{komoditas.replace(' ', '_')}")
         # Capture run info untuk model_registry_map.yaml
         active_run = mlflow.active_run()
         run_id     = active_run.info.run_id if active_run else ""
         model_uri  = f"runs:/{run_id}/model" if run_id else ""
 
-
+        if not run_id:
+            log.error(f"  run_id kosong untuk {komoditas} — model tidak ter-log!")
+            
     return {
         "komoditas"      : komoditas,
         "model"          : model,
@@ -244,6 +230,121 @@ def train_xgboost(komoditas: str, data: dict, mlflow_experiment: str = None) -> 
         "metrics"        : metrics,
     }
 
+def tune_xgboost_optuna(
+    komoditas: str,
+    data: dict,
+    n_trials: int = 30,
+    mlflow_experiment: str = "MarketCast-XGBoost-Tuning",
+) -> dict:
+    """
+    Bayesian hyperparameter search via Optuna untuk XGBoost.
+ 
+    Returns:
+        dict dengan best_params, best_mape, best_run_id
+    """
+    try:
+        import optuna
+        optuna.logging.set_verbosity(optuna.logging.WARNING)
+    except ImportError:
+        raise ImportError("Optuna belum terinstall. Jalankan: pip install optuna")
+ 
+    init_mlflow()
+    mlflow.set_experiment(mlflow_experiment)
+ 
+    series_full  = data["series_full"]
+    dates_full   = data["dates_full"]
+    test         = data["test"]
+    dates_test   = data["dates_test"]
+ 
+    feat_df      = build_features(series_full, dates_full)
+    feature_cols = get_feature_cols()
+ 
+    train_feat = feat_df[feat_df.index < dates_test[0]]
+    test_feat  = feat_df[feat_df.index >= dates_test[0]]
+    X_train = train_feat[feature_cols].values
+    y_train = train_feat["target"].values
+    y_test  = test_feat["target"].values
+ 
+    log.info(f"[XGBoost-Optuna] Tuning: {komoditas} | {n_trials} trials")
+ 
+    best_params  = {}
+    best_mape    = float("inf")
+    best_run_id  = ""
+ 
+    # Parent MLflow run untuk tuning session
+    with mlflow.start_run(run_name=f"XGBoost_Tuning__{komoditas}") as parent_run:
+        mlflow.set_tags({
+            "model"    : "XGBoost-Optuna",
+            "komoditas": komoditas,
+            "cluster"  : get_cluster_short(komoditas),
+            "project"  : "PBL-MarketCast",
+            "tuning"   : "optuna_tpe",
+        })
+ 
+        def objective(trial):
+            """
+            Optuna objective function.
+            Setiap pemanggilan = 1 trial = 1 child MLflow run.
+            Return: MAPE (minimized by Optuna).
+            """
+            trial_params = {
+                "n_estimators"    : trial.suggest_int("n_estimators", 100, 600),
+                "learning_rate"   : trial.suggest_float("learning_rate",
+                                                         0.01, 0.3, log=True),
+                "max_depth"       : trial.suggest_int("max_depth", 3, 7),
+                "subsample"       : trial.suggest_float("subsample", 0.6, 1.0),
+                "colsample_bytree": trial.suggest_float("colsample_bytree", 0.6, 1.0),
+                "min_child_weight": trial.suggest_int("min_child_weight", 1, 10),
+                "reg_alpha"       : trial.suggest_float("reg_alpha",
+                                                         1e-8, 1.0, log=True),
+                "reg_lambda"      : trial.suggest_float("reg_lambda",
+                                                         1e-8, 10.0, log=True),
+                "random_state"    : 42,
+                "n_jobs"          : -1,
+            }
+ 
+            # Child run nested di dalam parent
+            with mlflow.start_run(
+                run_name=f"trial_{trial.number:03d}",
+                nested=True
+            ):
+                mlflow.log_params(trial_params)
+ 
+                m = XGBRegressor(**trial_params)
+                m.fit(X_train, y_train, verbose=False)
+ 
+                # Eval langsung pada X_test (bukan recursive) untuk kecepatan
+                y_pred  = m.predict(test_feat[feature_cols].values)
+                metrics = compute_metrics(y_test, y_pred)
+                mlflow.log_metrics(metrics)
+ 
+            return metrics["mape"]
+ 
+        # Jalankan Optuna study
+        study = optuna.create_study(
+            direction="minimize",
+            sampler=optuna.samplers.TPESampler(seed=42),
+        )
+        study.optimize(objective, n_trials=n_trials, show_progress_bar=False)
+ 
+        best_params = study.best_params
+        best_mape   = study.best_value
+ 
+        # Log best result ke parent run
+        mlflow.log_params({f"best_{k}": v for k, v in best_params.items()})
+        mlflow.log_metric("best_mape", best_mape)
+        mlflow.log_metric("n_trials", n_trials)
+        best_run_id = parent_run.info.run_id
+ 
+        log.info(f"  Best MAPE: {best_mape:.4f}%")
+        log.info(f"  Best params: {best_params}")
+ 
+    return {
+        "komoditas"  : komoditas,
+        "best_params": best_params,
+        "best_mape"  : best_mape,
+        "best_run_id": best_run_id,
+    }
 
 def _recursive_forecast(model, series_full, dates_full,
                          n_steps: int, feature_cols: list) -> np.ndarray:
@@ -325,7 +426,7 @@ def _plot_importance(model, feature_cols: list, komoditas: str):
     names, vals = zip(*pairs)
 
     fig, ax = plt.subplots(figsize=(8, 6))
-    bars = ax.barh(range(len(names)), vals, color="#3498DB", alpha=0.8)
+    ax.barh(range(len(names)), vals, color="#3498DB", alpha=0.8)
     ax.set_yticks(range(len(names)))
     ax.set_yticklabels(names, fontsize=9)
     ax.invert_yaxis()

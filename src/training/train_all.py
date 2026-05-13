@@ -46,6 +46,7 @@ from datetime import datetime
 
 from config import (
     MLFLOW_TRACKING_URI, MLFLOW_EXP_TOURNAMENT, MLFLOW_EXP_SPECIALIZE,
+    init_mlflow,
     YAML_MODEL_REGISTRY, DIR_REGISTRY, CSV_PREPROCESSED,
     load_cluster_map, load_centroid_list,
     CLUSTER_SHORT_TO_FULL, get_logger,
@@ -54,6 +55,10 @@ from data_loader import load_preprocessed, load_all_series
 from model_sarima   import train_sarima
 from model_prophet  import train_prophet
 from model_xgboost  import train_xgboost
+import dagshub
+
+# Ini akan otomatis mengatur autentikasi MLflow ke repo temanmu
+dagshub.init(repo_owner='kadeksavitady', repo_name='MarketCast', mlflow=True)
 
 log = get_logger("train_all")
 
@@ -75,7 +80,7 @@ def run_tournament(models: list, komoditas_list: list,
     MLflow experiment: MarketCast-Tournament
     """
     import mlflow
-    mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
+    init_mlflow()
 
     results  = []
     n_total  = len(models) * len(komoditas_list)
@@ -159,7 +164,8 @@ def run_specialize(champion_map: dict, all_data: dict,
 
     centroid_list   = load_centroid_list()
     all_komoditas   = list(all_data.keys())
-    specialize_list = [k for k in all_komoditas if k not in centroid_list]
+    # specialize_list = [k for k in all_komoditas if k not in centroid_list]
+    full_train_list = all_komoditas  # tidak filter centroid keluar
 
     log.info("=" * 65)
     log.info("  TAHAP 3a — SPESIALISASI")
@@ -171,9 +177,9 @@ def run_specialize(champion_map: dict, all_data: dict,
     registry  = {}
     n_done    = 0
     n_failed  = 0
-    n_total   = len(specialize_list)
+    n_total   = len(full_train_list)
 
-    for komoditas in specialize_list:
+    for komoditas in full_train_list:
         data = all_data.get(komoditas)
         if data is None:
             log.warning(f"Skip {komoditas}: data tidak tersedia")
@@ -191,14 +197,29 @@ def run_specialize(champion_map: dict, all_data: dict,
             n_failed += 1
             continue
 
+        is_centroid = komoditas in centroid_list
         n_done += 1
-        log.info(f"[{n_done}/{n_total}] {model_name.upper()} × {komoditas} [{cluster_short}]")
-
+        label = "[CENTROID]" if is_centroid else ""
+        log.info(f"[{n_done}/{n_total}] {model_name.upper()} × {komoditas} "
+                 f"[{cluster_short}] {label}")
         try:
             result = MODEL_REGISTRY[model_name](
                 komoditas, data,
                 mlflow_experiment=MLFLOW_EXP_SPECIALIZE
             )
+
+            run_id    = result.get("run_id",    "")
+            model_uri = result.get("model_uri", "")
+
+            # Validasi model_uri tidak kosong — ini kondisi wajib untuk FastAPI
+            if not model_uri:
+                log.error(
+                    f"  ✗ model_uri kosong untuk {komoditas} (run_id={run_id}). "
+                    "Run berhasil tapi model tidak ter-log ke MLflow."
+                )
+                n_failed += 1
+                continue
+
             registry[komoditas] = {
                 "cluster"      : cluster_short,
                 "model"        : model_name,
@@ -206,8 +227,10 @@ def run_specialize(champion_map: dict, all_data: dict,
                 "model_uri"    : result.get("model_uri", ""),
                 "mape"         : result["metrics"]["mape"],
                 "mae"          : result["metrics"]["mae"],
+                "is_centroid"  : is_centroid,
             }
-            log.info(f"  ✓ MAPE={result['metrics']['mape']:.2f}%")
+            log.info(f"  ✓ MAPE={result['metrics']['mape']:.2f}%  "
+                     f"uri={model_uri}")
 
         except Exception as e:
             n_failed += 1
@@ -231,7 +254,15 @@ def run_specialize(champion_map: dict, all_data: dict,
             }
 
     _save_registry(registry)
-    log.info(f"\n✓ Spesialisasi: {n_done}/{n_total} berhasil | {n_failed} gagal")
+
+    log.info(f"\n{'='*65}")
+    log.info(f"  SPESIALISASI SELESAI")
+    log.info(f"  Berhasil : {len(registry)}/{n_total}")
+    log.info(f"  Gagal    : {n_failed}")
+    log.info(f"  Registry : {YAML_MODEL_REGISTRY}")
+    log.info(f"  Coverage : {len([k for k, v in registry.items() if v.get('model_uri')])} "
+             f"komoditas punya model_uri valid")
+    log.info(f"{'='*65}")
     return registry
 
 
@@ -285,6 +316,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="MarketCast Training Pipeline",
         formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=""
     )
     parser.add_argument("--mode",
                         choices=["tournament", "specialize"],
@@ -292,10 +324,16 @@ def main():
     parser.add_argument("--model",
                         choices=list(MODEL_REGISTRY.keys()) + ["all"],
                         default="all")
-    parser.add_argument("--komoditas", default=None)
+    parser.add_argument("--komoditas",
+                        default=None,
+                        help="[tournament] Komoditas spesifik (default: semua centroid)")
     parser.add_argument("--champion",
                         action="append",
-                        metavar="CLUSTER=MODEL")
+                        metavar="CLUSTER=MODEL",
+                        help="[specialize] Juara per cluster, format: C0_LabilDatar=xgboost")
+    parser.add_argument("--csv",
+                        default=None,
+                        help="Override path data_preprocessed.csv")
     args = parser.parse_args()
 
     # ── Resolve path CSV — selalu dari root repo ──────────────
@@ -317,7 +355,10 @@ def main():
 
         df       = load_preprocessed(csv_path)
         # FIX: panggil load_all_series langsung, bukan via __import__
-        all_data = load_all_series(df, komoditas_list, cluster_map)
+        all_data = {k: v for k, v in
+                    __import__("data_loader").load_all_series(
+                        df, komoditas_list, cluster_map
+                    ).items()}
 
         results = run_tournament(models, komoditas_list, all_data, cluster_map)
 
@@ -338,17 +379,20 @@ def main():
 
         log.info(f"Champion map: {champion_map}")
 
-        df            = load_preprocessed(csv_path)
+        # Load SEMUA komoditas (centroid + non-centroid)
+        df          = load_preprocessed(
+            csv_path or "outputs/clustering/data_preprocessed.csv"
+        )
         all_komoditas = df["komoditas"].unique().tolist()
-        # FIX: panggil load_all_series langsung, bukan via __import__
-        all_data      = load_all_series(df, all_komoditas, cluster_map)
-
+        all_data      = __import__("data_loader").load_all_series(
+            df, all_komoditas, cluster_map
+        )
+ 
         registry = run_specialize(champion_map, all_data, cluster_map)
-
+ 
         if not registry:
             log.error("Registry kosong — tidak ada model berhasil ditraining.")
             sys.exit(1)
-
 
 if __name__ == "__main__":
     main()
