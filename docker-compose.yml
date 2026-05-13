@@ -1,7 +1,7 @@
 name: marketcast-app
 
 services:
-  # MLflow (Tetap dipertahankan untuk MLOps / tracking model)
+  # ── 1. MLOps Tracker (MLflow) ───────────────────────────────────────────────
   mlflow:
     build:
       context: .
@@ -11,32 +11,45 @@ services:
       - "5000:5000"
     volumes:
       - ./mlflow_data:/mlflow
-    environment:
-      - MLFLOW_TRACKING_URI=http://localhost:5000
     env_file:
-      - .env  # Membaca DATABASE_URL dari file .env
+      - .env  # Menggunakan Neon Cloud
     networks:
       - marketcast_network
 
-  # NANTI: Tambahkan Backend Flask (Tugas Laila/Raja)
-  # backend:
-  #   build: ./backend
-  #   ports:
-  #     - "5001:5000"
-  #   env_file:
-  #     - .env
-  #   networks:
-  #     - marketcast_network
+  # ── 2. Backend FastAPI (Otak Aplikasi) ───────────────────────────────────────
+  backend-api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    container_name: marketcast_api
+    ports:
+      - "8000:8000"
+    volumes:
+      # Konsep shared volume dari file baru, tapi diubah ke struktur folder kita
+      - ./models:/app/models 
+      - ./src/api:/app/src/api
+    env_file:
+      - .env  # Menggunakan Neon Cloud, TIDAK ADA database lokal!
+    networks:
+      - marketcast_network
+    restart: unless-stopped
 
-  # NANTI: Tambahkan Frontend Vue (Tugas Raja/Laila)
+  # ── 3. Frontend Streamlit (UI Interaktif) ───────────────────────────────────────────────
   # frontend:
-  #   build: ./frontend
+  #   build:
+  #     context: .
+  #     dockerfile: docker/Dockerfile.frontend
+  #   container_name: marketcast_frontend
   #   ports:
-  #     - "8080:80"
+  #     - "8501:8501"
+  #   environment:
+  #     - BACKEND_URL=http://backend-api:8000
+  #   depends_on:
+  #     - backend-api
   #   networks:
   #     - marketcast_network
+  #   restart: unless-stopped
 
-# Definisi Network
 networks:
   marketcast_network:
     name: marketcast_network
