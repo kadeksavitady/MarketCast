@@ -1,349 +1,260 @@
 from contextlib import asynccontextmanager
-from sqlalchemy import create_engine
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from typing import Dict, List, Optional
-import pandas as pd  # Ditambahkan untuk format input MLflow
+from sqlalchemy import create_engine, text
+import pandas as pd
 import numpy as np
 import os
 import logging
-
 import mlflow
 import dagshub
+from dotenv import load_dotenv
 
-# ── Logging ───────────────────────────────────────────────────────────────────
+# Load kredensial dari file .env
+load_dotenv()
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# --- CONFIG DAGSHUB & MLFLOW ---
-# Pastikan variabel ini ada di .env
-DAGSHUB_REPO_OWNER = os.getenv("DAGSHUB_USER", "kadeksavitady")
-DAGSHUB_REPO_NAME = os.getenv("DAGSHUB_REPO", "MarketCast")
-MODEL_NAME = "marketcast_model" # Sesuaikan dengan nama model yang di-register Laila
+# ── Config ──
+DAGSHUB_REPO_OWNER = os.getenv("DAGSHUB_USER")
+DAGSHUB_REPO_NAME  = os.getenv("DAGSHUB_REPO")
+DATABASE_URL       = os.getenv("DATABASE_URL")
+MODEL_NAME         = "cluster 1"
 
-# --- CONFIG DATABASE NEON CLOUD ---
-DATABASE_URL = os.getenv("DATABASE_URL")
-engine = None
-if DATABASE_URL:
-    try:
-        engine = create_engine(DATABASE_URL)
-        logger.info("✅ Terhubung ke Neon Cloud Database!")
-    except Exception as e:
-        logger.error(f"❌ Gagal konek ke database: {e}")
+engine = create_engine(DATABASE_URL) if DATABASE_URL else None
 
-# Inisialisasi DagsHub agar MLflow tahu jalannya ke cloud
 try:
     dagshub.init(repo_owner=DAGSHUB_REPO_OWNER, repo_name=DAGSHUB_REPO_NAME, mlflow=True)
 except Exception as e:
-    logger.warning(f"⚠️ Gagal inisialisasi DagsHub (Abaikan jika sedang tidak pakai internet): {e}")
+    logger.warning(f"DagsHub init failed: {e}")
 
-# Variabel Global Model
+# ── Katalog Komoditas ──
+RAW_WHITELIST = {
+    'Beras Premium': 'BERAS', 'Beras Medium': 'BERAS', 'Gula Kristal Putih': 'GULA',
+    'Minyak Goreng Curah': 'MINYAK GORENG', 'Minyak Goreng Kemasan Premium': 'MINYAK GORENG',
+    'Minyak Goreng Kemasan Sederhana': 'MINYAK GORENG', 'Minyak Goreng MINYAKITA': 'MINYAK GORENG',
+    'Daging Sapi Paha Belakang': 'DAGING', 'Daging Ayam Ras': 'DAGING', 'Daging Ayam Kampung': 'DAGING',
+    'Telur Ayam Ras': 'TELUR', 'Telur Ayam Kampung': 'TELUR',
+    'Susu Kental Manis Merk Bendera': 'SUSU', 'Susu Kental Manis Merk Indomilk': 'SUSU',
+    'Susu Bubuk Merk Bendera (Instant)': 'SUSU', 'Susu Bubuk Merk Indomilk (Instant)': 'SUSU',
+    'Jagung Pipilan Kering': 'PALAWIJA', 'Kedelai Impor': 'PALAWIJA', 'Kedelai Lokal': 'PALAWIJA',
+    'KACANG HIJAU': 'PALAWIJA', 'KACANG TANAH': 'PALAWIJA', 'KETELA POHON': 'PALAWIJA',
+    'Bata': 'GARAM', 'Halus': 'GARAM', 'Terigu Protein Sedang (Kemasan)': 'TEPUNG',
+    'Indomie Rasa Kari Ayam': 'MIE INSTAN', 'Cabe Merah Keriting': 'CABE',
+    'Cabe Merah Besar': 'CABE', 'Cabe Rawit Merah': 'CABE', 'Bawang Merah': 'BAWANG',
+    'Bawang Putih Sinco/Honan': 'BAWANG', 'Ikan Asin Teri': 'IKAN ASIN',
+    'KOL/KUBIS': 'SAYUR MAYUR', 'KENTANG': 'SAYUR MAYUR', 'Tomat Merah': 'SAYUR MAYUR',
+    'WORTEL': 'SAYUR MAYUR', 'BUNCIS': 'SAYUR MAYUR', 'Ikan Bandeng': 'IKAN SEGAR',
+    'Ikan Kembung': 'IKAN SEGAR', 'Ikan Tuna': 'IKAN SEGAR', 'Ikan Tongkol': 'IKAN SEGAR',
+    'Ikan Cakalang': 'IKAN SEGAR', 'GAS ELPIGI 3 Kg': 'BARANG PENTING LAINNYA',
+}
+
+COMMODITY_CATALOG: Dict[str, dict] = {}
+for nama, kategori in RAW_WHITELIST.items():
+    slug = nama.lower().replace(" ", "_").replace("/", "_").replace("(", "").replace(")", "")
+    COMMODITY_CATALOG[slug] = {
+        "nama": nama,
+        "kategori": kategori,
+        "satuan": "tabung" if kategori == "BARANG PENTING LAINNYA" else "kg",
+        "harga_ref": 15000,
+    }
+
+SUBSTITUTION_MAP: Dict[str, str] = {
+    "beras_premium": "beras_medium", "minyak_goreng_kemasan_premium": "minyak_goreng_kemasan_sederhana",
+    "minyak_goreng_kemasan_sederhana": "minyak_goreng_curah", "daging_sapi_paha_belakang": "daging_ayam_ras",
+    "daging_ayam_kampung": "daging_ayam_ras", "telur_ayam_kampung": "telur_ayam_ras",
+    "susu_kental_manis_merk_bendera": "susu_kental_manis_merk_indomilk",
+    "susu_bubuk_merk_bendera_instant": "susu_bubuk_merk_indomilk_instant",
+    "ikan_tuna": "ikan_tongkol", "ikan_tongkol": "ikan_kembung", "ikan_kembung": "ikan_bandeng",
+}
+
+# ── Lifespan & Model ──
 model = None
 
-# ── Lifespan (Load Model dari Cloud DagsHub) ─────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global model
     try:
-        # Kita ambil model yang statusnya 'Production' atau 'Latest'
         model_uri = f"models:/{MODEL_NAME}/latest"
-        
-        logger.info(f"🚀 Mencoba menarik model terbaru dari DagsHub: {model_uri}")
-        
-        # MLflow akan otomatis men-download dan me-load modelnya dari Cloud!
+        logger.info(f"🚚 Memuat model {MODEL_NAME} dari DagsHub...")
         model = mlflow.pyfunc.load_model(model_uri)
-        
-        logger.info("✅ Model berhasil ditarik dari DagsHub dan siap digunakan!")
+        logger.info("✅ Model berhasil dimuat!")
     except Exception as e:
-        logger.error(f"❌ Gagal narik model dari DagsHub: {e}")
-        logger.warning("⚠️ Menggunakan mode standby (Katalog fallback).")
-    
-    yield  # Server berjalan di sini
-    
-    # SHUTDOWN
+        logger.error(f"Gagal memuat model: {e}")
+    yield
     model = None
-    logger.info("🛑 Model unloaded.")
 
-# ── App ───────────────────────────────────────────────────────────────────────
-app = FastAPI(
-    title="Budget Belanja API",
-    description="Prediksi total belanja bahan pokok dan rekomendasi substitusi cerdas",
-    version="1.0.0",
-    lifespan=lifespan,
-)
+app = FastAPI(lifespan=lifespan)
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# ── Katalog Komoditas ─────────────────────────────────────────────────────────
-COMMODITY_CATALOG: Dict[str, dict] = {
-    # Beras
-    "beras_premium":  {"nama": "Beras Premium",  "kategori": "Beras",         "satuan": "kg",    "harga_ref": 15_600,  "emoji": "🌾"},
-    "beras_medium":   {"nama": "Beras Medium",   "kategori": "Beras",         "satuan": "kg",    "harga_ref": 12_000,  "emoji": "🌾"},
-    "jagung":         {"nama": "Jagung",          "kategori": "Beras",         "satuan": "kg",    "harga_ref":  8_500,  "emoji": "🌽"},
-    # Daging
-    "daging_sapi":    {"nama": "Daging Sapi",    "kategori": "Daging",        "satuan": "kg",    "harga_ref": 124_000, "emoji": "🥩"},
-    "daging_ayam":    {"nama": "Daging Ayam",    "kategori": "Daging",        "satuan": "kg",    "harga_ref":  35_000, "emoji": "🍗"},
-    "daging_kambing": {"nama": "Daging Kambing", "kategori": "Daging",        "satuan": "kg",    "harga_ref":  85_000, "emoji": "🐑"},
-    # Minyak Goreng
-    "minyak_goreng":  {"nama": "Minyak Goreng",  "kategori": "Minyak Goreng", "satuan": "liter", "harga_ref":  18_000, "emoji": "🫙"},
-    "minyak_kelapa":  {"nama": "Minyak Kelapa",  "kategori": "Minyak Goreng", "satuan": "liter", "harga_ref":  22_000, "emoji": "🥥"},
-    # Telur
-    "telur_ayam":     {"nama": "Telur Ayam",     "kategori": "Telur",         "satuan": "kg",    "harga_ref":  28_000, "emoji": "🥚"},
-    "telur_bebek":    {"nama": "Telur Bebek",    "kategori": "Telur",         "satuan": "kg",    "harga_ref":  35_000, "emoji": "🥚"},
-    # Bumbu
-    "gula":           {"nama": "Gula Pasir",     "kategori": "Bumbu",         "satuan": "kg",    "harga_ref":  16_000, "emoji": "🍬"},
-    "garam":          {"nama": "Garam",           "kategori": "Bumbu",         "satuan": "kg",    "harga_ref":   5_000, "emoji": "🧂"},
-    "tepung":         {"nama": "Tepung Terigu",  "kategori": "Bumbu",         "satuan": "kg",    "harga_ref":  12_000, "emoji": "🌾"},
-    # Ikan
-    "ikan_lele":      {"nama": "Ikan Lele",      "kategori": "Ikan",          "satuan": "kg",    "harga_ref":  20_000, "emoji": "🐟"},
-    "ikan_tongkol":   {"nama": "Ikan Tongkol",   "kategori": "Ikan",          "satuan": "kg",    "harga_ref":  25_000, "emoji": "🐟"},
-    "ikan_salmon":    {"nama": "Ikan Salmon",    "kategori": "Ikan",          "satuan": "kg",    "harga_ref":  85_000, "emoji": "🐠"},
-    "udang":          {"nama": "Udang",           "kategori": "Ikan",          "satuan": "kg",    "harga_ref":  60_000, "emoji": "🦐"},
-}
-
-SUBSTITUTION_MAP: Dict[str, str] = {
-    "beras_premium":  "beras_medium",
-    "beras_medium":   "jagung",
-    "daging_sapi":    "daging_ayam",
-    "daging_kambing": "daging_ayam",
-    "minyak_kelapa":  "minyak_goreng",
-    "telur_bebek":    "telur_ayam",
-    "ikan_salmon":    "ikan_tongkol",
-    "ikan_tongkol":   "ikan_lele",
-    "udang":          "ikan_tongkol",
-}
-
-# ── Schemas ───────────────────────────────────────────────────────────────────
-class TitikGrafik(BaseModel):
-    tanggal: str
-    harga: float
-
-class GrafikResponse(BaseModel):
-    komoditas_id: str
-    nama_komoditas: str
-    satuan: str
-    data_historis: List[TitikGrafik]
-
-class CartItem(BaseModel):
-    komoditas_id: str = Field(..., description="Slug komoditas, e.g. 'beras_premium'")
-    jumlah: float     = Field(..., gt=0, description="Jumlah dalam satuan (kg / liter)")
-
-class PredictRequest(BaseModel):
-    budget: float             = Field(..., gt=0, description="Total budget dalam rupiah")
-    keranjang: List[CartItem] = Field(..., min_length=1)
-
-class ItemResult(BaseModel):
-    komoditas_id: str
-    nama: str
+# ── Schemas ──
+class CategoryInfo(BaseModel):
     kategori: str
-    satuan: str
-    jumlah: float
-    harga_per_satuan: float
-    subtotal: float
-
-class SubstitusiItem(BaseModel):
-    current_id: str
-    current_nama: str
-    current_harga: float    # per satuan
-    substitute_id: str
-    substitute_nama: str
-    substitute_harga: float # per satuan
-    potensi_hemat: float    # total hemat jika diganti
-
-class PredictResponse(BaseModel):
-    budget: float
-    total_prediksi: float
-    sisa_budget: float
-    persentase_penggunaan: float
-    status: str                         # "aman" | "perhatian" | "over_budget"
-    detail_keranjang: List[ItemResult]
-    smart_substitution: List[SubstitusiItem]
-    potensi_hemat_total: float
+    jumlah_komoditas: int
 
 class CommodityInfo(BaseModel):
     id: str
     nama: str
     kategori: str
     satuan: str
-    harga_ref: float
-    emoji: str
+    harga_ref: int
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
+class CartItem(BaseModel):
+    komoditas_id: str
+    jumlah: float
+
+class PredictRequest(BaseModel):
+    budget: float
+    keranjang: List[CartItem]
+
+class ItemResult(BaseModel):
+    komoditas_id: str
+    nama: str
+    jumlah: float
+    satuan: str
+    harga_per_satuan: float
+    subtotal: float
+
+class SubstitusiItem(BaseModel):
+    current_id: str
+    current_nama: str
+    current_harga: float
+    substitute_id: str
+    substitute_nama: str
+    substitute_harga: float
+    potensi_hemat: float
+
+class BudgetResponse(BaseModel):
+    budget_user: float
+    total_prediksi: float
+    sisa_budget: float
+    persentase_penggunaan: float
+    status: str
+    detail_keranjang: List[ItemResult]
+    smart_substitution: List[SubstitusiItem]
+    potensi_hemat_total: float
+
+class TitikData(BaseModel):
+    tanggal: str
+    harga: float
+
+class TrenResponse(BaseModel):
+    komoditas_id: str
+    nama_komoditas: str
+    data_historis: List[TitikData]
+    forecast_30_hari: List[TitikData]
+
+# ── Helpers ──
 def predict_harga_satuan(komoditas_id: str) -> float:
-    """
-    Prediksi harga per satuan.
-    Jika model ada di memory (dari DagsHub) → pakai model.
-    Jika gagal/tidak ada → fallback ke harga_ref.
-    """
-    info = COMMODITY_CATALOG[komoditas_id]
-    
-    if model is not None:
+    info = COMMODITY_CATALOG.get(komoditas_id)
+    if not info: return 0.0
+    if model:
         try:
-            # Format input diubah menjadi DataFrame sesuai standar MLflow PyFunc
-            X_input = pd.DataFrame([{"harga_ref": info["harga_ref"]}]) 
-            prediction = model.predict(X_input)
-            return float(prediction[0])
-        except Exception as e:
-            logger.error(f"⚠️ Gagal prediksi dengan model untuk {komoditas_id}: {e}")
-            
+            X = pd.DataFrame([{"komoditas": info["nama"]}])
+            pred = model.predict(X)
+            res = pred[0]
+            return float(res) if not isinstance(res, np.ndarray) else float(res[0])
+        except: pass
     return float(info["harga_ref"])
 
-
-def build_substitution(
-    keranjang: List[CartItem],
-    detail: List[ItemResult],
-) -> tuple[List[SubstitusiItem], float]:
-    subs: List[SubstitusiItem] = []
+def build_substitution(keranjang: List[CartItem], detail: List[ItemResult]):
+    subs = []
     total_hemat = 0.0
     for item, result in zip(keranjang, detail):
         sub_id = SUBSTITUTION_MAP.get(item.komoditas_id)
-        if not sub_id or sub_id not in COMMODITY_CATALOG:
-            continue
+        if not sub_id or sub_id not in COMMODITY_CATALOG: continue
         sub_harga = predict_harga_satuan(sub_id)
         hemat = (result.harga_per_satuan - sub_harga) * item.jumlah
         if hemat > 0:
             subs.append(SubstitusiItem(
-                current_id=item.komoditas_id,
-                current_nama=result.nama,
-                current_harga=result.harga_per_satuan,
-                substitute_id=sub_id,
-                substitute_nama=COMMODITY_CATALOG[sub_id]["nama"],
-                substitute_harga=sub_harga,
+                current_id=item.komoditas_id, current_nama=result.nama, current_harga=result.harga_per_satuan,
+                substitute_id=sub_id, substitute_nama=COMMODITY_CATALOG[sub_id]["nama"], substitute_harga=sub_harga,
                 potensi_hemat=round(hemat, 2),
             ))
             total_hemat += hemat
     return subs, round(total_hemat, 2)
 
-# ── Endpoints ─────────────────────────────────────────────────────────────────
-@app.get("/", tags=["Root"])
-def root():
-    return {"message": "Budget Belanja API 🚀"}
+def generate_forecast(nama_komoditas: str, last_harga: float, days: int = 30) -> List[TitikData]:
+    from datetime import date, timedelta
+    today = date.today()
+    forecast = []
+    if model:
+        try:
+            X = pd.DataFrame([{"komoditas": nama_komoditas, "hari_ke": i + 1} for i in range(days)])
+            preds = model.predict(X)
+            return [TitikData(tanggal=(today + timedelta(days=i+1)).strftime("%Y-%m-%d"), harga=round(float(p), 2)) for i, p in enumerate(preds)]
+        except: pass
+    
+    harga = last_harga
+    rng = np.random.default_rng(seed=42)
+    for i in range(days):
+        harga = harga * (1 + rng.uniform(-0.02, 0.02))
+        forecast.append(TitikData(tanggal=(today + timedelta(days=i + 1)).strftime("%Y-%m-%d"), harga=round(harga, 2)))
+    return forecast
 
-@app.get("/health", tags=["Health"])
+# ── Endpoints ──
+@app.get("/health")
 def health():
-    return {"status": "ok", "model_loaded": model is not None}
+    db_ok = False
+    if engine:
+        try:
+            with engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+            db_ok = True
+        except: pass
+    return {"status": "ok", "model_loaded": model is not None, "database_connected": db_ok}
 
-@app.get("/categories", tags=["Katalog"])
+@app.get("/katalog/categories", response_model=List[CategoryInfo])
 def list_categories():
-    """Daftar kategori unik beserta jumlah komoditas."""
-    cats: Dict[str, int] = {}
-    for info in COMMODITY_CATALOG.values():
-        cats[info["kategori"]] = cats.get(info["kategori"], 0) + 1
-    return [{"kategori": k, "jumlah_komoditas": v} for k, v in cats.items()]
+    cats = {}
+    for info in COMMODITY_CATALOG.values(): cats[info["kategori"]] = cats.get(info["kategori"], 0) + 1
+    return [CategoryInfo(kategori=k, jumlah_komoditas=v) for k, v in cats.items()]
 
-@app.get("/commodities", response_model=List[CommodityInfo], tags=["Katalog"])
+@app.get("/katalog/commodities", response_model=List[CommodityInfo])
 def list_commodities(kategori: Optional[str] = None):
-    """
-    Semua komoditas tersedia. Filter opsional: ?kategori=Daging
-    """
-    return [
-        CommodityInfo(id=slug, **info)
-        for slug, info in COMMODITY_CATALOG.items()
-        if not kategori or info["kategori"].lower() == kategori.lower()
-    ]
+    return [CommodityInfo(id=slug, **info) for slug, info in COMMODITY_CATALOG.items() if not kategori or info["kategori"].upper() == kategori.upper()]
 
-@app.post("/predict", response_model=PredictResponse, tags=["Prediksi"])
-def predict(payload: PredictRequest):
-    # Validasi komoditas dikenal
-    unknown = [i.komoditas_id for i in payload.keranjang
-               if i.komoditas_id not in COMMODITY_CATALOG]
-    if unknown:
-        raise HTTPException(422, detail=f"Komoditas tidak dikenal: {unknown}")
-
-    # Hitung per item
-    detail: List[ItemResult] = []
+@app.post("/belanja/predict", response_model=BudgetResponse)
+def predict_budget(payload: PredictRequest):
+    detail = []
+    total = 0.0
     for item in payload.keranjang:
-        info         = COMMODITY_CATALOG[item.komoditas_id]
+        if item.komoditas_id not in COMMODITY_CATALOG: continue
+        info = COMMODITY_CATALOG[item.komoditas_id]
         harga_satuan = predict_harga_satuan(item.komoditas_id)
-        subtotal     = harga_satuan * item.jumlah
-        detail.append(ItemResult(
-            komoditas_id=item.komoditas_id,
-            nama=info["nama"],
-            kategori=info["kategori"],
-            satuan=info["satuan"],
-            jumlah=item.jumlah,
-            harga_per_satuan=round(harga_satuan, 2),
-            subtotal=round(subtotal, 2),
-        ))
-
-    total  = round(sum(d.subtotal for d in detail), 2)
-    sisa   = round(payload.budget - total, 2)
-    persen = round((total / payload.budget) * 100, 2)
-
-    if persen <= 80:
-        status = "aman"
-    elif persen <= 100:
-        status = "perhatian"
-    else:
-        status = "over_budget"
-
+        subtotal = harga_satuan * item.jumlah
+        total += subtotal
+        detail.append(ItemResult(komoditas_id=item.komoditas_id, nama=info["nama"], jumlah=item.jumlah, satuan=info["satuan"], harga_per_satuan=round(harga_satuan, 2), subtotal=round(subtotal, 2)))
+    
+    sisa = round(payload.budget - total, 2)
+    persen = round((total / payload.budget) * 100, 2) if payload.budget > 0 else 0
+    status = "aman" if persen <= 80 else "perhatian" if persen <= 100 else "over_budget"
     subs, hemat = build_substitution(payload.keranjang, detail)
 
-    return PredictResponse(
-        budget=payload.budget,
-        total_prediksi=total,
-        sisa_budget=sisa,
-        persentase_penggunaan=persen,
-        status=status,
-        detail_keranjang=detail,
-        smart_substitution=subs,
-        potensi_hemat_total=hemat,
-    )
+    return BudgetResponse(budget_user=payload.budget, total_prediksi=round(total, 2), sisa_budget=sisa, persentase_penggunaan=persen, status=status, detail_keranjang=detail, smart_substitution=subs, potensi_hemat_total=hemat)
 
-@app.get("/grafik/{komoditas_id}", response_model=GrafikResponse, tags=["Grafik"])
-def get_data_grafik(komoditas_id: str, limit_hari: int = 30):
-    """
-    Mengambil data riwayat harga dari Neon Database untuk ditampilkan di Chart Frontend.
-    - limit_hari: Berapa hari ke belakang yang mau ditampilkan (default 30 hari)
-    """
-    if komoditas_id not in COMMODITY_CATALOG:
-        raise HTTPException(404, detail="Komoditas tidak ditemukan")
-        
-    info = COMMODITY_CATALOG[komoditas_id]
-    nama_asli = info["nama"]
+@app.get("/tren/komoditas", response_model=List[CommodityInfo])
+def tren_komoditas_list(kategori: Optional[str] = None):
+    return list_commodities(kategori)
+
+@app.get("/tren/{komoditas_id}", response_model=TrenResponse)
+def get_tren(komoditas_id: str):
+    info = COMMODITY_CATALOG.get(komoditas_id)
+    if not info: raise HTTPException(404, detail="Komoditas tidak ditemukan")
+    if not engine: raise HTTPException(503, detail="Database tidak terhubung")
+
+    df = pd.read_sql(text("SELECT tanggal_data, harga_per_kg FROM harga_historis WHERE komoditas = :nama ORDER BY tanggal_data DESC LIMIT 30"), engine, params={"nama": info["nama"]}).sort_values("tanggal_data")
+    historis = [TitikData(tanggal=row["tanggal_data"].strftime("%Y-%m-%d"), harga=round(float(row["harga_per_kg"]), 2)) for _, row in df.iterrows()]
+    last_harga = float(df["harga_per_kg"].iloc[-1]) if not df.empty else float(info["harga_ref"])
     
-    if engine is None:
-        raise HTTPException(500, detail="Database belum terhubung")
+    return TrenResponse(komoditas_id=komoditas_id, nama_komoditas=info["nama"], data_historis=historis, forecast_30_hari=generate_forecast(info["nama"], last_harga))
 
-    try:
-        # Menarik data langsung dari tabel harga_historis di Neon
-        query = f"""
-            SELECT tanggal_data, harga_per_kg 
-            FROM harga_historis 
-            WHERE komoditas = '{nama_asli}' 
-            ORDER BY tanggal_data DESC 
-            LIMIT {limit_hari}
-        """
-        df_history = pd.pd.read_sql(query, engine)
-        
-        # Karena kita order DESC (terbaru di atas), kita balik lagi agar di grafik urut dari kiri (lama) ke kanan (baru)
-        df_history = df_history.sort_values('tanggal_data')
-        
-        # Format data agar gampang dibaca oleh chart di Frontend
-        titik_data = []
-        for _, row in df_history.iterrows():
-            titik_data.append(TitikGrafik(
-                tanggal=row['tanggal_data'].strftime("%Y-%m-%d"),
-                harga=row['harga_per_kg']
-            ))
-            
-        return GrafikResponse(
-            komoditas_id=komoditas_id,
-            nama_komoditas=nama_asli,
-            satuan=info["satuan"],
-            data_historis=titik_data
-        )
-        
-    except Exception as e:
-        logger.error(f"Gagal narik data grafik: {e}")
-        raise HTTPException(500, detail="Gagal mengambil data dari database")
-
+# ── Eksekusi VS Code ──
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)
+    # Dengan memasukkan variabel 'app' langsung (bukan string "app:app"), 
+    # kode ini bisa kamu jalankan dari folder mana pun tanpa error ModuleNotFound!
+    uvicorn.run(app, host="127.0.0.1", port=8000)
