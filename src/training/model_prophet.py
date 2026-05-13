@@ -14,9 +14,9 @@ import matplotlib.pyplot as plt
 
 from prophet import Prophet
 
-from config import (MLFLOW_TRACKING_URI,
+from config import (MLFLOW_TRACKING_URI, init_mlflow,
                     FORECAST_DAYS, get_logger, compute_metrics,
-                    get_cluster, get_cluster_short)
+                    get_cluster_short)
 
 warnings.filterwarnings("ignore")
 log = get_logger("prophet")
@@ -39,8 +39,16 @@ INDONESIAN_HOLIDAYS = pd.DataFrame({
 })
 
 
-def train_prophet(komoditas: str, data: dict, mlflow_experiment: str = None) -> dict:
+def train_prophet(komoditas: str, data: dict, 
+                  mlflow_experiment: str = None,
+                  changepoint_prior_scale: float = None,
+                  seasonality_prior_scale: float = 10.0
+                  ) -> dict:
+
     mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
+    mlflow.set_experiment(mlflow_experiment or "MarketCast-Tournament")
+
+    init_mlflow()
     mlflow.set_experiment(mlflow_experiment or "MarketCast-Tournament")
 
     train       = data["train"]
@@ -56,6 +64,9 @@ def train_prophet(komoditas: str, data: dict, mlflow_experiment: str = None) -> 
     log.info(f"[{MODEL_NAME}] Training: {komoditas} (cluster: {cluster})")
 
     df_train = pd.DataFrame({"ds": dates_train, "y": train})
+
+    run_id = ""
+    model_uri = ""
 
     with mlflow.start_run(run_name=f"{MODEL_NAME}__{komoditas}"):
 
@@ -75,7 +86,8 @@ def train_prophet(komoditas: str, data: dict, mlflow_experiment: str = None) -> 
             weekly_seasonality      = True,
             daily_seasonality       = False,
             holidays                = INDONESIAN_HOLIDAYS,
-            changepoint_prior_scale = changepoint_scale,
+            changepoint_prior_scale = changepoint_prior_scale,
+            seasonality_prior_scale = seasonality_prior_scale,
             interval_width          = 0.95,
             uncertainty_samples     = 100,
         )
@@ -83,12 +95,15 @@ def train_prophet(komoditas: str, data: dict, mlflow_experiment: str = None) -> 
         model.fit(df_train)
 
         mlflow.log_params({
-            "changepoint_prior_scale": changepoint_scale,
+            "changepoint_prior_scale": changepoint_prior_scale,
+            "seasonality_prior_scale": seasonality_prior_scale,
             "yearly_seasonality"     : True,
             "weekly_seasonality"     : True,
             "monthly_seasonality"    : True,
+            "fourier_order_monthly"  : 5,
             "holidays"               : "ID_Idul_Fitri,Natal,Tahun_Baru",
             "interval_width"         : 0.95,
+            "uncertainty_samples"    : 100,
             "n_train"                : len(train),
             "n_test"                 : len(test),
         })
@@ -122,10 +137,18 @@ def train_prophet(komoditas: str, data: dict, mlflow_experiment: str = None) -> 
         plt.close(fig_comp)
         mlflow.log_artifact(comp_path, artifact_path="plots")
 
-        mlflow.prophet.log_model(model, name="model")
+        import pickle, tempfile, os
+        with tempfile.TemporaryDirectory() as tmpdir:
+            pkl_path = os.path.join(tmpdir, "model.pkl")
+            with open(pkl_path, "wb") as f:
+                pickle.dump(model, f)
+            mlflow.log_artifact(pkl_path, artifact_path=f"Prophet_{komoditas.replace(' ', '_')}")
         active_run = mlflow.active_run()
         run_id     = active_run.info.run_id if active_run else ""
         model_uri  = f"runs:/{run_id}/model" if run_id else ""
+
+        if not run_id:
+            log.error(f"  run_id kosong untuk {komoditas} — model tidak ter-log!")
 
     return {
         "komoditas"    : komoditas,

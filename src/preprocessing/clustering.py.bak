@@ -192,14 +192,14 @@ def log_to_mlflow(feat_df: pd.DataFrame, output_dir: Path,
     # Cek koneksi dulu — hindari retry 4 menit kalau MLflow mati
     try:
         import requests
-        requests.get(uri.rstrip("/") + "/api/2.0/mlflow/experiments/list", timeout=5)
+        requests.get(f"{uri}/health", timeout=3)
     except Exception:
         log.warning(f"⚠️ MLflow tidak dapat dijangkau di {uri} — skip logging")
         return
 
     try:
-        import mlflow, dagshub
-        dagshub.init('MarketCast', 'kadeksavitady', mlflow=True)
+        import mlflow
+        mlflow.set_tracking_uri(uri)
         mlflow.set_experiment("siskaperbapo-clustering")
 
         with mlflow.start_run(run_name="KMeans-Final"):
@@ -251,7 +251,7 @@ def main():
     parser.add_argument("--csv-path", default="data/processed/harga_historis.csv")
     parser.add_argument("--output-dir", default="outputs/clustering")
     parser.add_argument("--k", type=int, default=3)
-    parser.add_argument("--mlflow-uri", default="https://dagshub.com/kadeksavitady/MarketCast.mlflow")
+    parser.add_argument("--mlflow-uri", default="http://localhost:5000")
     args = parser.parse_args()
 
     out_dir = Path(args.output_dir)
