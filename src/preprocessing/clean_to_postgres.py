@@ -14,7 +14,10 @@ DB_HOST = "127.0.0.1"
 DB_PORT = os.getenv("DB_PORT")
 DB_NAME = os.getenv("DB_NAME")
 
-POSTGRE_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+POSTGRE_URL = os.getenv(
+    "DATABASE_URL", 
+    "postgresql://neondb_owner:npg_pSmfVRDaG4P6@ep-little-star-aokx0s6c.c-2.ap-southeast-1.aws.neon.tech/neondb?sslmode=require"
+)
 SQLITE_PATH = "data/raw/siskaperbapo.db"
 PROCESSED_PATH = "data/processed/harga_historis.csv"
 
