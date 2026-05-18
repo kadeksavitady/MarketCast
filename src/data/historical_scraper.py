@@ -111,16 +111,13 @@ def sudah_diproses(tanggal: date) -> bool:
 
 def simpan_batch(rows, tanggal_data):
     inserted = 0
-    # Mengonversi format string tanggal ke Timestamp agar tipe data di Postgres sinkron
     tgl_timestamp = pd.to_datetime(tanggal_data)
     
     with engine.begin() as conn:
-        # Hapus data tanggal ini jika sudah ada (Metode aman cegah duplikasi tanpa Primary Key)
         conn.execute(text("DELETE FROM harga_historis WHERE tanggal_data = :tgl"), {"tgl": tgl_timestamp})
         
         for row in rows:
             try:
-                # Menyesuaikan query INSERT dengan skema kolom terstandardisasi (harga_per_kg, satuan_original, faktor_konversi)
                 conn.execute(text("""
                     INSERT INTO harga_historis (tanggal_data, komoditas, kategori, harga_per_kg, satuan_original, faktor_konversi) 
                     VALUES (:tgl, :kom, :kat, :hrg_kg, :sat_orig, :faktor)
@@ -136,7 +133,6 @@ def simpan_batch(rows, tanggal_data):
             except Exception as e:
                 log.warning(f"Gagal simpan komoditas {row['komoditas']}: {e}")
         
-        # Update Checkpoint menggunakan UPSERT khas PostgreSQL
         conn.execute(text("""
             INSERT INTO scrape_checkpoint (tanggal, status, baris_dapat) 
             VALUES (:tgl, 'done', :jum)
@@ -210,8 +206,27 @@ async def run_scraper():
                 await page.select_option("select[name='kabkota']", label="Kota Surabaya")
                 await page.click("button:has-text('Tampilkan')")
                 
-                # Jeda 5 detik karena data historis Siskaperbapo butuh waktu load lebih lama
-                await page.wait_for_timeout(5000)
+                # ==========================================
+                # 🛡️ 3 JURUS PASTI ANTI-HILANG KOMODITAS
+                # ==========================================
+                
+                # 1. Pastikan tabel benar-benar ter-render (maksimal 15 detik)
+                await page.wait_for_selector('table tbody tr', state='visible', timeout=15000)
+                
+                # 2. Paksa ubah dropdown "Show entries" ke 100 agar semua 43 komoditas masuk 1 halaman
+                try:
+                    dropdown_length = await page.query_selector('select[name$="length"]')
+                    if dropdown_length:
+                        await dropdown_length.select_option(value='100')
+                        await page.wait_for_timeout(2000) # Tunggu tabel merespon & re-render
+                except:
+                    pass # Abaikan jika dropdown tidak ditemukan
+                
+                # 3. Paksa scroll layar ke paling bawah agar elemen lazy-load ikut terpanggil
+                await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                await page.wait_for_timeout(2000) # Jeda ekstra agar aman
+                
+                # ==========================================
                 
                 rows_data = []
                 baris_html = await page.query_selector_all("table tbody tr")
@@ -228,7 +243,6 @@ async def run_scraper():
                         satuan_raw = vals[2].lower().strip()
                         
                         if harga_raw:
-                            # Hitung faktor konversi dan standarisasi harga per KG
                             faktor = SATUAN_KONVERSI.get(satuan_raw, 1.0)
                             harga_per_kg = harga_raw / faktor
                             
@@ -251,7 +265,6 @@ async def run_scraper():
             except Exception as e:
                 log.error(f"        [X] Error pada {tgl_str}: {e}")
                 
-            # Jeda sopan santun agar IP tidak di-banned
             await asyncio.sleep(4.0) 
 
         await browser.close()
