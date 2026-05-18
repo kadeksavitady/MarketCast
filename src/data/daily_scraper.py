@@ -84,7 +84,7 @@ async def scrape_harian_mandiri(page, tgl):
         await page.click("button:has-text('Tampilkan')")
         
         # Beri waktu ekstra karena data Siskaperbapo sering lambat muncul
-        await page.wait_for_timeout(5000)
+        await page.wait_for_selector('table', timeout=15000)
         
         # 4. Parsing Tabel
         # Pastikan kita mengambil baris yang ada datanya (bukan header kategori)
