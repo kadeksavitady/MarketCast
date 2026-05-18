@@ -5,6 +5,7 @@ Fitur:
 - Sistem Checkpoint (Resume otomatis jika terputus)
 - Full Whitelist 43 Komoditas
 - Output Logging ganda (Terminal & File)
+- Dual-write: SQLite (lokal) + Neon (cloud)
 """
 
 import asyncio
@@ -16,6 +17,11 @@ import argparse
 from datetime import date, timedelta
 from pathlib import Path
 from playwright.async_api import async_playwright
+from sqlalchemy import create_engine, text
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
 
 # ── FIX ENCODING WINDOWS ──
 if sys.platform == "win32":
@@ -25,28 +31,34 @@ if sys.platform == "win32":
 # ── KONFIGURASI ──
 BASE_URL   = "https://siskaperbapo.jatimprov.go.id/harga/tabel"
 DB_PATH    = Path("data/raw/siskaperbapo.db")
+NEON_CONN  = os.getenv("DATABASE_URL")
 TIMEOUT_MS = 60_000
 
-TANGGAL_AWAL  = date(2021, 5, 7)
-TANGGAL_AKHIR = date(2026, 5, 7)
+TANGGAL_AWAL  = date(2021, 5, 1)
+TANGGAL_AKHIR = date(2026, 5, 18)
 
-# Full Whitelist 43 Komoditas
-WHITELIST = {
-    'Beras Premium', 'Beras Medium', 'Gula Kristal Putih',
-    'Minyak Goreng Curah', 'Minyak Goreng Kemasan Premium',
-    'Minyak Goreng Kemasan Sederhana', 'Minyak Goreng MINYAKITA',
-    'Daging Sapi Paha Belakang', 'Daging Ayam Ras', 'Daging Ayam Kampung',
-    'Telur Ayam Ras', 'Telur Ayam Kampung',
-    'Susu Kental Manis Merk Bendera', 'Susu Kental Manis Merk Indomilk',
-    'Susu Bubuk Merk Bendera (Instant)', 'Susu Bubuk Merk Indomilk (Instant)',
-    'Jagung Pipilan Kering', 'Garam Bata', 'Garam Halus',
-    'Terigu Protein Sedang (Kemasan)', 'Kedelai Impor', 'Kedelai Lokal',
-    'Indomie Rasa Kari Ayam', 'Cabe Merah Keriting', 'Cabe Merah Besar',
-    'Cabe Rawit Merah', 'Bawang Merah', 'Bawang Putih Sinco/Honan',
-    'Ikan Asin Teri', 'Kacang Hijau', 'Kacang Tanah', 'Ketela Pohon',
-    'Kol/Kubis', 'Kentang', 'Tomat Merah', 'Wortel', 'Buncis',
-    'Ikan Bandeng', 'Ikan Kembung', 'Ikan Tuna', 'Ikan Tongkol',
-    'Ikan Cakalang', 'Gas Elpiji 3 Kg',
+WHITELIST_MAP = {
+    'Beras Premium': 'BERAS', 'Beras Medium': 'BERAS',
+    'Gula Kristal Putih': 'GULA',
+    'Minyak Goreng Curah': 'MINYAK GORENG', 'Minyak Goreng Kemasan Premium': 'MINYAK GORENG',
+    'Minyak Goreng Kemasan Sederhana': 'MINYAK GORENG', 'Minyak Goreng MINYAKITA': 'MINYAK GORENG',
+    'Daging Sapi Paha Belakang': 'DAGING', 'Daging Ayam Ras': 'DAGING', 'Daging Ayam Kampung': 'DAGING',
+    'Telur Ayam Ras': 'TELUR', 'Telur Ayam Kampung': 'TELUR',
+    'Susu Kental Manis Merk Bendera': 'SUSU', 'Susu Kental Manis Merk Indomilk': 'SUSU',
+    'Susu Bubuk Merk Bendera (Instant)': 'SUSU', 'Susu Bubuk Merk Indomilk (Instant)': 'SUSU',
+    'Jagung Pipilan Kering': 'PALAWIJA', 'Kedelai Impor': 'PALAWIJA', 'Kedelai Lokal': 'PALAWIJA',
+    'KACANG HIJAU': 'PALAWIJA', 'KACANG TANAH': 'PALAWIJA', 'KETELA POHON': 'PALAWIJA',
+    'Bata': 'GARAM', 'Halus': 'GARAM',
+    'Terigu Protein Sedang (Kemasan)': 'TEPUNG',
+    'Indomie Rasa Kari Ayam': 'MIE INSTAN',
+    'Cabe Merah Keriting': 'CABE', 'Cabe Merah Besar': 'CABE', 'Cabe Rawit Merah': 'CABE',
+    'Bawang Merah': 'BAWANG', 'Bawang Putih Sinco/Honan': 'BAWANG',
+    'Ikan Asin Teri': 'IKAN ASIN',
+    'KOL/KUBIS': 'SAYUR MAYUR', 'KENTANG': 'SAYUR MAYUR', 'Tomat Merah': 'SAYUR MAYUR',
+    'WORTEL': 'SAYUR MAYUR', 'BUNCIS': 'SAYUR MAYUR',
+    'Ikan Bandeng': 'IKAN SEGAR', 'Ikan Kembung': 'IKAN SEGAR', 'Ikan Tuna': 'IKAN SEGAR',
+    'Ikan Tongkol': 'IKAN SEGAR', 'Ikan Cakalang': 'IKAN SEGAR',
+    'GAS ELPIGI 3 Kg': 'BARANG PENTING LAINNYA'
 }
 
 # ── SETUP LOGGING ──
@@ -61,12 +73,60 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
-# ── DATABASE & CHECKPOINT ──
+# ── NEON: INIT ENGINE & TABEL ──
+def init_neon():
+    if not NEON_CONN:
+        log.warning("DATABASE_URL tidak ditemukan di .env — data hanya disimpan ke SQLite lokal.")
+        return None
+    try:
+        engine = create_engine(NEON_CONN)
+        with engine.begin() as conn:
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS harga_historis (
+                    id           SERIAL PRIMARY KEY,
+                    tanggal_data DATE NOT NULL,
+                    komoditas    TEXT NOT NULL,
+                    satuan       TEXT,
+                    harga_rp     NUMERIC,
+                    kabkota      TEXT DEFAULT 'Surabaya',
+                    created_at   TIMESTAMP DEFAULT NOW(),
+                    UNIQUE (tanggal_data, komoditas)
+                )
+            """))
+        log.info("✓ Koneksi Neon berhasil & tabel siap.")
+        return engine
+    except Exception as e:
+        log.error(f"Gagal konek ke Neon: {e} — fallback ke SQLite saja.")
+        return None
+
+# ── NEON: UPSERT BATCH ──
+def upsert_neon(engine, rows: list, tanggal_data: str):
+    if not engine:
+        return
+    try:
+        with engine.begin() as conn:
+            for row in rows:
+                conn.execute(text("""
+                    INSERT INTO harga_historis (tanggal_data, komoditas, satuan, harga_rp, kabkota)
+                    VALUES (:tanggal_data, :komoditas, :satuan, :harga_rp, :kabkota)
+                    ON CONFLICT (tanggal_data, komoditas) DO NOTHING
+                """), {
+                    "tanggal_data": tanggal_data,
+                    "komoditas": row["komoditas"],
+                    "satuan": row["satuan"],
+                    "harga_rp": row["harga_rp"],
+                    "kabkota": "Surabaya"
+                })
+        log.info(f"         [Neon] ✓ {len(rows)} baris di-upsert.")
+    except Exception as e:
+        log.error(f"         [Neon] Gagal upsert {tanggal_data}: {e}")
+
+# ── DATABASE SQLITE & CHECKPOINT ──
 def init_db():
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute("""
-            CREATE TABLE IF NOT EXISTS harga_bahan_pokok (
+            CREATE TABLE IF NOT EXISTS harga_historis (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 tanggal_data TEXT,
                 komoditas TEXT,
@@ -88,7 +148,10 @@ def init_db():
 
 def sudah_diproses(tanggal: date) -> bool:
     with sqlite3.connect(DB_PATH) as conn:
-        row = conn.execute("SELECT status FROM scrape_checkpoint WHERE tanggal = ?", (tanggal.isoformat(),)).fetchone()
+        row = conn.execute(
+            "SELECT status FROM scrape_checkpoint WHERE tanggal = ?",
+            (tanggal.isoformat(),)
+        ).fetchone()
     return row is not None and row[0] == "done"
 
 def simpan_batch(rows, tanggal_data):
@@ -97,7 +160,7 @@ def simpan_batch(rows, tanggal_data):
         for row in rows:
             try:
                 conn.execute("""
-                    INSERT OR REPLACE INTO harga_bahan_pokok 
+                    INSERT OR REPLACE INTO harga_historis  
                     (tanggal_data, komoditas, satuan, harga_rp) 
                     VALUES (?, ?, ?, ?)
                 """, (tanggal_data, row['komoditas'], row['satuan'], row['harga_rp']))
@@ -124,7 +187,8 @@ def parse_harga(text):
 # ── CORE SCRAPER ──
 async def run_scraper():
     init_db()
-    
+    neon_engine = init_neon()  # ← init Neon di sini
+
     tgl_target = []
     curr = TANGGAL_AWAL
     while curr <= TANGGAL_AKHIR:
@@ -143,10 +207,8 @@ async def run_scraper():
             timezone_id="Asia/Jakarta"
         )
         page = await context.new_page()
-        
-        # Block resource yang tidak perlu agar loading jauh lebih ringan
         await page.route("**/*.{png,jpg,jpeg,gif,svg,css,woff,woff2}", lambda r: r.abort())
-        
+
         try:
             await page.goto(BASE_URL, wait_until="domcontentloaded", timeout=TIMEOUT_MS)
         except Exception as e:
@@ -156,15 +218,14 @@ async def run_scraper():
 
         for idx, tgl in enumerate(tgl_target, 1):
             tgl_str = tgl.strftime("%Y-%m-%d")
-            
+
             if sudah_diproses(tgl):
                 log.info(f"[{idx:>3}/{total}] {tgl_str} - Dilewati (Sudah ada di DB)")
                 continue
-                
+
             log.info(f"[{idx:>3}/{total}] Memproses: {tgl_str}")
-            
+
             try:
-                # 1. Bypass Tanggal dengan JS Evaluation
                 date_input = await page.query_selector("input[name='tanggal']")
                 await date_input.evaluate(f"""
                     (el) => {{
@@ -173,29 +234,24 @@ async def run_scraper():
                         el.dispatchEvent(new Event('change', {{ bubbles: true }}));
                     }}
                 """)
-                
-                # 2. Set Area Kota Surabaya
+
                 area_el = await page.query_selector("select[name='kabkota']")
                 if area_el: await area_el.select_option(label="Kota Surabaya")
-                    
-                # 3. Eksekusi Pencarian
+
                 btn = await page.query_selector("button:has-text('Tampilkan')")
                 await btn.click()
-                
-                # Tunggu respons tabel
                 await page.wait_for_timeout(3000)
-                
-                # 4. Parsing HTML
+
                 rows_data = []
                 baris_html = await page.query_selector_all("table tbody tr")
-                
+
                 for row in baris_html:
                     cells = await row.query_selector_all("td")
                     vals = [(await c.inner_text()).strip() for c in cells]
-                    
+
                     if len(vals) >= 5:
                         nama_bersih = normalisasi_nama(vals[1])
-                        if nama_bersih in WHITELIST:
+                        if nama_bersih in WHITELIST_MAP:
                             harga = parse_harga(vals[4])
                             if harga:
                                 rows_data.append({
@@ -203,25 +259,27 @@ async def run_scraper():
                                     'satuan': vals[2],
                                     'harga_rp': harga
                                 })
-                
-                # 5. Penyimpanan Data
+
                 if rows_data:
                     jumlah_tersimpan = simpan_batch(rows_data, tgl_str)
+                    upsert_neon(neon_engine, rows_data, tgl_str)  # ← dual-write ke Neon
                     log.info(f"         [OK] Tersimpan {jumlah_tersimpan} data komoditas.")
                 else:
                     log.warning(f"         [!!] Tidak ada komoditas whitelist yang terekstrak.")
-                    # Tetap catat checkpoint agar tidak diloop berulang kali bila server memang kosong
                     with sqlite3.connect(DB_PATH) as conn:
-                        conn.execute("INSERT OR REPLACE INTO scrape_checkpoint (tanggal, status, baris_dapat) VALUES (?, 'done', 0)", (tgl_str,))
+                        conn.execute(
+                            "INSERT OR REPLACE INTO scrape_checkpoint (tanggal, status, baris_dapat) VALUES (?, 'done', 0)",
+                            (tgl_str,)
+                        )
                         conn.commit()
-                        
+
             except Exception as e:
                 log.error(f"         [X] Error pada {tgl_str}: {e}")
-                
-            await asyncio.sleep(2.0) # Jeda aman agar tidak diblokir server
+
+            await asyncio.sleep(2.0)
 
         await browser.close()
-        
+
     log.info("=" * 60)
     log.info("EKSTRAKSI SELESAI")
     log.info("=" * 60)
@@ -229,7 +287,9 @@ async def run_scraper():
 # ── VERIFIKASI CLI ──
 def verifikasi_hasil():
     with sqlite3.connect(DB_PATH) as conn:
-        rekap = conn.execute("SELECT tanggal_data, COUNT(*) FROM harga_bahan_pokok GROUP BY tanggal_data ORDER BY tanggal_data").fetchall()
+        rekap = conn.execute(
+            "SELECT tanggal_data, COUNT(*) FROM harga_bahan_pokok GROUP BY tanggal_data ORDER BY tanggal_data"
+        ).fetchall()
         print("\n📊 REKAPITULASI DATABASE:")
         for r in rekap:
             print(f"   {r[0]} : {r[1]:>2} Komoditas")
