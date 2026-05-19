@@ -1,4 +1,10 @@
 tanggal_data,komoditas,kategori,harga_per_kg,satuan_original,faktor_konversi
+2021-05-01,Bawang Merah,BAWANG,29200.0,kg,1.0
+2021-05-02,Bawang Merah,BAWANG,28800.0,kg,1.0
+2021-05-03,Bawang Merah,BAWANG,29000.0,kg,1.0
+2021-05-04,Bawang Merah,BAWANG,29200.0,kg,1.0
+2021-05-05,Bawang Merah,BAWANG,29200.0,kg,1.0
+2021-05-06,Bawang Merah,BAWANG,28600.0,kg,1.0
 2021-05-07,Bawang Merah,BAWANG,28800.0,kg,1.0
 2021-05-08,Bawang Merah,BAWANG,28800.0,kg,1.0
 2021-05-09,Bawang Merah,BAWANG,29200.0,kg,1.0
@@ -1814,6 +1820,23 @@ tanggal_data,komoditas,kategori,harga_per_kg,satuan_original,faktor_konversi
 2026-05-05,Bawang Merah,BAWANG,40166.0,kg,1.0
 2026-05-06,Bawang Merah,BAWANG,39333.0,kg,1.0
 2026-05-07,Bawang Merah,BAWANG,39333.0,kg,1.0
+2026-05-08,Bawang Merah,BAWANG,38333.0,kg,1.0
+2026-05-09,Bawang Merah,BAWANG,41333.0,kg,1.0
+2026-05-10,Bawang Merah,BAWANG,41333.0,kg,1.0
+2026-05-11,Bawang Merah,BAWANG,41333.0,kg,1.0
+2026-05-12,Bawang Merah,BAWANG,41333.0,kg,1.0
+2026-05-13,Bawang Merah,BAWANG,41333.0,kg,1.0
+2026-05-14,Bawang Merah,BAWANG,40500.0,kg,1.0
+2026-05-15,Bawang Merah,BAWANG,40500.0,kg,1.0
+2026-05-16,Bawang Merah,BAWANG,39666.0,kg,1.0
+2026-05-17,Bawang Merah,BAWANG,40500.0,kg,1.0
+2026-05-18,Bawang Merah,BAWANG,43000.0,kg,1.0
+2021-05-01,Bawang Putih Sinco/Honan,BAWANG,24600.0,kg,1.0
+2021-05-02,Bawang Putih Sinco/Honan,BAWANG,24600.0,kg,1.0
+2021-05-03,Bawang Putih Sinco/Honan,BAWANG,24600.0,kg,1.0
+2021-05-04,Bawang Putih Sinco/Honan,BAWANG,24600.0,kg,1.0
+2021-05-05,Bawang Putih Sinco/Honan,BAWANG,24600.0,kg,1.0
+2021-05-06,Bawang Putih Sinco/Honan,BAWANG,24600.0,kg,1.0
 2021-05-07,Bawang Putih Sinco/Honan,BAWANG,24600.0,kg,1.0
 2021-05-08,Bawang Putih Sinco/Honan,BAWANG,24600.0,kg,1.0
 2021-05-09,Bawang Putih Sinco/Honan,BAWANG,24600.0,kg,1.0
@@ -3629,6 +3652,23 @@ tanggal_data,komoditas,kategori,harga_per_kg,satuan_original,faktor_konversi
 2026-05-05,Bawang Putih Sinco/Honan,BAWANG,32166.0,kg,1.0
 2026-05-06,Bawang Putih Sinco/Honan,BAWANG,31333.0,kg,1.0
 2026-05-07,Bawang Putih Sinco/Honan,BAWANG,31333.0,kg,1.0
+2026-05-08,Bawang Putih Sinco/Honan,BAWANG,31333.0,kg,1.0
+2026-05-09,Bawang Putih Sinco/Honan,BAWANG,31666.0,kg,1.0
+2026-05-10,Bawang Putih Sinco/Honan,BAWANG,31333.0,kg,1.0
+2026-05-11,Bawang Putih Sinco/Honan,BAWANG,32166.0,kg,1.0
+2026-05-12,Bawang Putih Sinco/Honan,BAWANG,32000.0,kg,1.0
+2026-05-13,Bawang Putih Sinco/Honan,BAWANG,31666.0,kg,1.0
+2026-05-14,Bawang Putih Sinco/Honan,BAWANG,31666.0,kg,1.0
+2026-05-15,Bawang Putih Sinco/Honan,BAWANG,32000.0,kg,1.0
+2026-05-16,Bawang Putih Sinco/Honan,BAWANG,31666.0,kg,1.0
+2026-05-17,Bawang Putih Sinco/Honan,BAWANG,31666.0,kg,1.0
+2026-05-18,Bawang Putih Sinco/Honan,BAWANG,31333.0,kg,1.0
+2021-05-01,Beras Medium,BERAS,9450.0,kg,1.0
+2021-05-02,Beras Medium,BERAS,9450.0,kg,1.0
+2021-05-03,Beras Medium,BERAS,9450.0,kg,1.0
+2021-05-04,Beras Medium,BERAS,9450.0,kg,1.0
+2021-05-05,Beras Medium,BERAS,9450.0,kg,1.0
+2021-05-06,Beras Medium,BERAS,9450.0,kg,1.0
 2021-05-07,Beras Medium,BERAS,9450.0,kg,1.0
 2021-05-08,Beras Medium,BERAS,9450.0,kg,1.0
 2021-05-09,Beras Medium,BERAS,9450.0,kg,1.0
@@ -5444,6 +5484,23 @@ tanggal_data,komoditas,kategori,harga_per_kg,satuan_original,faktor_konversi
 2026-05-05,Beras Medium,BERAS,12750.0,kg,1.0
 2026-05-06,Beras Medium,BERAS,12750.0,kg,1.0
 2026-05-07,Beras Medium,BERAS,12750.0,kg,1.0
+2026-05-08,Beras Medium,BERAS,12750.0,kg,1.0
+2026-05-09,Beras Medium,BERAS,12750.0,kg,1.0
+2026-05-10,Beras Medium,BERAS,12750.0,kg,1.0
+2026-05-11,Beras Medium,BERAS,12666.0,kg,1.0
+2026-05-12,Beras Medium,BERAS,12666.0,kg,1.0
+2026-05-13,Beras Medium,BERAS,12666.0,kg,1.0
+2026-05-14,Beras Medium,BERAS,12666.0,kg,1.0
+2026-05-15,Beras Medium,BERAS,12666.0,kg,1.0
+2026-05-16,Beras Medium,BERAS,12666.0,kg,1.0
+2026-05-17,Beras Medium,BERAS,12666.0,kg,1.0
+2026-05-18,Beras Medium,BERAS,12666.0,kg,1.0
+2021-05-01,Beras Premium,BERAS,12620.0,kg,1.0
+2021-05-02,Beras Premium,BERAS,12620.0,kg,1.0
+2021-05-03,Beras Premium,BERAS,12620.0,kg,1.0
+2021-05-04,Beras Premium,BERAS,12620.0,kg,1.0
+2021-05-05,Beras Premium,BERAS,12620.0,kg,1.0
+2021-05-06,Beras Premium,BERAS,12620.0,kg,1.0
 2021-05-07,Beras Premium,BERAS,12620.0,kg,1.0
 2021-05-08,Beras Premium,BERAS,12620.0,kg,1.0
 2021-05-09,Beras Premium,BERAS,12620.0,kg,1.0
@@ -7259,6 +7316,23 @@ tanggal_data,komoditas,kategori,harga_per_kg,satuan_original,faktor_konversi
 2026-05-05,Beras Premium,BERAS,15583.0,kg,1.0
 2026-05-06,Beras Premium,BERAS,15583.0,kg,1.0
 2026-05-07,Beras Premium,BERAS,15583.0,kg,1.0
+2026-05-08,Beras Premium,BERAS,15583.0,kg,1.0
+2026-05-09,Beras Premium,BERAS,15583.0,kg,1.0
+2026-05-10,Beras Premium,BERAS,15583.0,kg,1.0
+2026-05-11,Beras Premium,BERAS,15583.0,kg,1.0
+2026-05-12,Beras Premium,BERAS,15583.0,kg,1.0
+2026-05-13,Beras Premium,BERAS,15583.0,kg,1.0
+2026-05-14,Beras Premium,BERAS,15583.0,kg,1.0
+2026-05-15,Beras Premium,BERAS,15583.0,kg,1.0
+2026-05-16,Beras Premium,BERAS,15583.0,kg,1.0
+2026-05-17,Beras Premium,BERAS,15583.0,kg,1.0
+2026-05-18,Beras Premium,BERAS,15583.0,kg,1.0
+2021-05-01,Cabe Merah Besar,CABE,39400.0,kg,1.0
+2021-05-02,Cabe Merah Besar,CABE,37400.0,kg,1.0
+2021-05-03,Cabe Merah Besar,CABE,39400.0,kg,1.0
+2021-05-04,Cabe Merah Besar,CABE,41000.0,kg,1.0
+2021-05-05,Cabe Merah Besar,CABE,41000.0,kg,1.0
+2021-05-06,Cabe Merah Besar,CABE,40400.0,kg,1.0
 2021-05-07,Cabe Merah Besar,CABE,42000.0,kg,1.0
 2021-05-08,Cabe Merah Besar,CABE,43000.0,kg,1.0
 2021-05-09,Cabe Merah Besar,CABE,45000.0,kg,1.0
@@ -9074,6 +9148,23 @@ tanggal_data,komoditas,kategori,harga_per_kg,satuan_original,faktor_konversi
 2026-05-05,Cabe Merah Besar,CABE,43500.0,kg,1.0
 2026-05-06,Cabe Merah Besar,CABE,41333.0,kg,1.0
 2026-05-07,Cabe Merah Besar,CABE,40666.0,kg,1.0
+2026-05-08,Cabe Merah Besar,CABE,45000.0,kg,1.0
+2026-05-09,Cabe Merah Besar,CABE,46000.0,kg,1.0
+2026-05-10,Cabe Merah Besar,CABE,47000.0,kg,1.0
+2026-05-11,Cabe Merah Besar,CABE,46166.0,kg,1.0
+2026-05-12,Cabe Merah Besar,CABE,45333.0,kg,1.0
+2026-05-13,Cabe Merah Besar,CABE,46333.0,kg,1.0
+2026-05-14,Cabe Merah Besar,CABE,44500.0,kg,1.0
+2026-05-15,Cabe Merah Besar,CABE,45333.0,kg,1.0
+2026-05-16,Cabe Merah Besar,CABE,44166.0,kg,1.0
+2026-05-17,Cabe Merah Besar,CABE,44833.0,kg,1.0
+2026-05-18,Cabe Merah Besar,CABE,46500.0,kg,1.0
+2021-05-01,Cabe Merah Keriting,CABE,38750.0,kg,1.0
+2021-05-02,Cabe Merah Keriting,CABE,37500.0,kg,1.0
+2021-05-03,Cabe Merah Keriting,CABE,40000.0,kg,1.0
+2021-05-04,Cabe Merah Keriting,CABE,43750.0,kg,1.0
+2021-05-05,Cabe Merah Keriting,CABE,43750.0,kg,1.0
+2021-05-06,Cabe Merah Keriting,CABE,42500.0,kg,1.0
 2021-05-07,Cabe Merah Keriting,CABE,41250.0,kg,1.0
 2021-05-08,Cabe Merah Keriting,CABE,45000.0,kg,1.0
 2021-05-09,Cabe Merah Keriting,CABE,45000.0,kg,1.0
@@ -10889,6 +10980,23 @@ tanggal_data,komoditas,kategori,harga_per_kg,satuan_original,faktor_konversi
 2026-05-05,Cabe Merah Keriting,CABE,41666.0,kg,1.0
 2026-05-06,Cabe Merah Keriting,CABE,40000.0,kg,1.0
 2026-05-07,Cabe Merah Keriting,CABE,40833.0,kg,1.0
+2026-05-08,Cabe Merah Keriting,CABE,43333.0,kg,1.0
+2026-05-09,Cabe Merah Keriting,CABE,44166.0,kg,1.0
+2026-05-10,Cabe Merah Keriting,CABE,45000.0,kg,1.0
+2026-05-11,Cabe Merah Keriting,CABE,48000.0,kg,1.0
+2026-05-12,Cabe Merah Keriting,CABE,47500.0,kg,1.0
+2026-05-13,Cabe Merah Keriting,CABE,47500.0,kg,1.0
+2026-05-14,Cabe Merah Keriting,CABE,46666.0,kg,1.0
+2026-05-15,Cabe Merah Keriting,CABE,46666.0,kg,1.0
+2026-05-16,Cabe Merah Keriting,CABE,45333.0,kg,1.0
+2026-05-17,Cabe Merah Keriting,CABE,45833.0,kg,1.0
+2026-05-18,Cabe Merah Keriting,CABE,47500.0,kg,1.0
+2021-05-01,Cabe Rawit Merah,CABE,44000.0,kg,1.0
+2021-05-02,Cabe Rawit Merah,CABE,43000.0,kg,1.0
+2021-05-03,Cabe Rawit Merah,CABE,45000.0,kg,1.0
+2021-05-04,Cabe Rawit Merah,CABE,46000.0,kg,1.0
+2021-05-05,Cabe Rawit Merah,CABE,44600.0,kg,1.0
+2021-05-06,Cabe Rawit Merah,CABE,45600.0,kg,1.0
 2021-05-07,Cabe Rawit Merah,CABE,46000.0,kg,1.0
 2021-05-08,Cabe Rawit Merah,CABE,48000.0,kg,1.0
 2021-05-09,Cabe Rawit Merah,CABE,48000.0,kg,1.0
@@ -12704,6 +12812,23 @@ tanggal_data,komoditas,kategori,harga_per_kg,satuan_original,faktor_konversi
 2026-05-05,Cabe Rawit Merah,CABE,61000.0,kg,1.0
 2026-05-06,Cabe Rawit Merah,CABE,58500.0,kg,1.0
 2026-05-07,Cabe Rawit Merah,CABE,61333.0,kg,1.0
+2026-05-08,Cabe Rawit Merah,CABE,66333.0,kg,1.0
+2026-05-09,Cabe Rawit Merah,CABE,67500.0,kg,1.0
+2026-05-10,Cabe Rawit Merah,CABE,67500.0,kg,1.0
+2026-05-11,Cabe Rawit Merah,CABE,65000.0,kg,1.0
+2026-05-12,Cabe Rawit Merah,CABE,65000.0,kg,1.0
+2026-05-13,Cabe Rawit Merah,CABE,65500.0,kg,1.0
+2026-05-14,Cabe Rawit Merah,CABE,64166.0,kg,1.0
+2026-05-15,Cabe Rawit Merah,CABE,64666.0,kg,1.0
+2026-05-16,Cabe Rawit Merah,CABE,63666.0,kg,1.0
+2026-05-17,Cabe Rawit Merah,CABE,64666.0,kg,1.0
+2026-05-18,Cabe Rawit Merah,CABE,65000.0,kg,1.0
+2021-05-01,Daging Ayam Kampung,DAGING,67000.0,ekor,1.0
+2021-05-02,Daging Ayam Kampung,DAGING,67000.0,ekor,1.0
+2021-05-03,Daging Ayam Kampung,DAGING,67000.0,ekor,1.0
+2021-05-04,Daging Ayam Kampung,DAGING,67000.0,ekor,1.0
+2021-05-05,Daging Ayam Kampung,DAGING,67000.0,ekor,1.0
+2021-05-06,Daging Ayam Kampung,DAGING,68000.0,ekor,1.0
 2021-05-07,Daging Ayam Kampung,DAGING,68000.0,ekor,1.0
 2021-05-08,Daging Ayam Kampung,DAGING,68000.0,ekor,1.0
 2021-05-09,Daging Ayam Kampung,DAGING,68000.0,ekor,1.0
@@ -14519,6 +14644,23 @@ tanggal_data,komoditas,kategori,harga_per_kg,satuan_original,faktor_konversi
 2026-05-05,Daging Ayam Kampung,DAGING,64166.0,ekor,1.0
 2026-05-06,Daging Ayam Kampung,DAGING,64166.0,ekor,1.0
 2026-05-07,Daging Ayam Kampung,DAGING,64166.0,ekor,1.0
+2026-05-08,Daging Ayam Kampung,DAGING,64166.0,ekor,1.0
+2026-05-09,Daging Ayam Kampung,DAGING,64166.0,ekor,1.0
+2026-05-10,Daging Ayam Kampung,DAGING,64166.0,ekor,1.0
+2026-05-11,Daging Ayam Kampung,DAGING,64166.0,ekor,1.0
+2026-05-12,Daging Ayam Kampung,DAGING,64166.0,ekor,1.0
+2026-05-13,Daging Ayam Kampung,DAGING,64166.0,ekor,1.0
+2026-05-14,Daging Ayam Kampung,DAGING,64166.0,ekor,1.0
+2026-05-15,Daging Ayam Kampung,DAGING,64166.0,ekor,1.0
+2026-05-16,Daging Ayam Kampung,DAGING,64166.0,ekor,1.0
+2026-05-17,Daging Ayam Kampung,DAGING,64166.0,ekor,1.0
+2026-05-18,Daging Ayam Kampung,DAGING,64166.0,ekor,1.0
+2021-05-01,Daging Ayam Ras,DAGING,34400.0,kg,1.0
+2021-05-02,Daging Ayam Ras,DAGING,34400.0,kg,1.0
+2021-05-03,Daging Ayam Ras,DAGING,34200.0,kg,1.0
+2021-05-04,Daging Ayam Ras,DAGING,34200.0,kg,1.0
+2021-05-05,Daging Ayam Ras,DAGING,34200.0,kg,1.0
+2021-05-06,Daging Ayam Ras,DAGING,34200.0,kg,1.0
 2021-05-07,Daging Ayam Ras,DAGING,34200.0,kg,1.0
 2021-05-08,Daging Ayam Ras,DAGING,34000.0,kg,1.0
 2021-05-09,Daging Ayam Ras,DAGING,33400.0,kg,1.0
@@ -16334,6 +16476,23 @@ tanggal_data,komoditas,kategori,harga_per_kg,satuan_original,faktor_konversi
 2026-05-05,Daging Ayam Ras,DAGING,36833.0,kg,1.0
 2026-05-06,Daging Ayam Ras,DAGING,36833.0,kg,1.0
 2026-05-07,Daging Ayam Ras,DAGING,36833.0,kg,1.0
+2026-05-08,Daging Ayam Ras,DAGING,36666.0,kg,1.0
+2026-05-09,Daging Ayam Ras,DAGING,36833.0,kg,1.0
+2026-05-10,Daging Ayam Ras,DAGING,36666.0,kg,1.0
+2026-05-11,Daging Ayam Ras,DAGING,36833.0,kg,1.0
+2026-05-12,Daging Ayam Ras,DAGING,36500.0,kg,1.0
+2026-05-13,Daging Ayam Ras,DAGING,36500.0,kg,1.0
+2026-05-14,Daging Ayam Ras,DAGING,36166.0,kg,1.0
+2026-05-15,Daging Ayam Ras,DAGING,36166.0,kg,1.0
+2026-05-16,Daging Ayam Ras,DAGING,36000.0,kg,1.0
+2026-05-17,Daging Ayam Ras,DAGING,36500.0,kg,1.0
+2026-05-18,Daging Ayam Ras,DAGING,36333.0,kg,1.0
+2021-05-01,Daging Sapi Paha Belakang,DAGING,108000.0,kg,1.0
+2021-05-02,Daging Sapi Paha Belakang,DAGING,108000.0,kg,1.0
+2021-05-03,Daging Sapi Paha Belakang,DAGING,108000.0,kg,1.0
+2021-05-04,Daging Sapi Paha Belakang,DAGING,108000.0,kg,1.0
+2021-05-05,Daging Sapi Paha Belakang,DAGING,108000.0,kg,1.0
+2021-05-06,Daging Sapi Paha Belakang,DAGING,108000.0,kg,1.0
 2021-05-07,Daging Sapi Paha Belakang,DAGING,108000.0,kg,1.0
 2021-05-08,Daging Sapi Paha Belakang,DAGING,108000.0,kg,1.0
 2021-05-09,Daging Sapi Paha Belakang,DAGING,108000.0,kg,1.0
@@ -18149,6 +18308,23 @@ tanggal_data,komoditas,kategori,harga_per_kg,satuan_original,faktor_konversi
 2026-05-05,Daging Sapi Paha Belakang,DAGING,116722.0,kg,1.0
 2026-05-06,Daging Sapi Paha Belakang,DAGING,116722.0,kg,1.0
 2026-05-07,Daging Sapi Paha Belakang,DAGING,116722.0,kg,1.0
+2026-05-08,Daging Sapi Paha Belakang,DAGING,116722.0,kg,1.0
+2026-05-09,Daging Sapi Paha Belakang,DAGING,118389.0,kg,1.0
+2026-05-10,Daging Sapi Paha Belakang,DAGING,118389.0,kg,1.0
+2026-05-11,Daging Sapi Paha Belakang,DAGING,118389.0,kg,1.0
+2026-05-12,Daging Sapi Paha Belakang,DAGING,118389.0,kg,1.0
+2026-05-13,Daging Sapi Paha Belakang,DAGING,118389.0,kg,1.0
+2026-05-14,Daging Sapi Paha Belakang,DAGING,118389.0,kg,1.0
+2026-05-15,Daging Sapi Paha Belakang,DAGING,118389.0,kg,1.0
+2026-05-16,Daging Sapi Paha Belakang,DAGING,118389.0,kg,1.0
+2026-05-17,Daging Sapi Paha Belakang,DAGING,118389.0,kg,1.0
+2026-05-18,Daging Sapi Paha Belakang,DAGING,119166.0,kg,1.0
+2021-05-01,Gula Kristal Putih,GULA,12000.0,kg,1.0
+2021-05-02,Gula Kristal Putih,GULA,12000.0,kg,1.0
+2021-05-03,Gula Kristal Putih,GULA,12000.0,kg,1.0
+2021-05-04,Gula Kristal Putih,GULA,12000.0,kg,1.0
+2021-05-05,Gula Kristal Putih,GULA,12000.0,kg,1.0
+2021-05-06,Gula Kristal Putih,GULA,12000.0,kg,1.0
 2021-05-07,Gula Kristal Putih,GULA,12000.0,kg,1.0
 2021-05-08,Gula Kristal Putih,GULA,12000.0,kg,1.0
 2021-05-09,Gula Kristal Putih,GULA,12000.0,kg,1.0
@@ -19964,6 +20140,23 @@ tanggal_data,komoditas,kategori,harga_per_kg,satuan_original,faktor_konversi
 2026-05-05,Gula Kristal Putih,GULA,17500.0,kg,1.0
 2026-05-06,Gula Kristal Putih,GULA,17500.0,kg,1.0
 2026-05-07,Gula Kristal Putih,GULA,17500.0,kg,1.0
+2026-05-08,Gula Kristal Putih,GULA,17500.0,kg,1.0
+2026-05-09,Gula Kristal Putih,GULA,17500.0,kg,1.0
+2026-05-10,Gula Kristal Putih,GULA,17500.0,kg,1.0
+2026-05-11,Gula Kristal Putih,GULA,17500.0,kg,1.0
+2026-05-12,Gula Kristal Putih,GULA,17416.0,kg,1.0
+2026-05-13,Gula Kristal Putih,GULA,17500.0,kg,1.0
+2026-05-14,Gula Kristal Putih,GULA,17500.0,kg,1.0
+2026-05-15,Gula Kristal Putih,GULA,17500.0,kg,1.0
+2026-05-16,Gula Kristal Putih,GULA,17500.0,kg,1.0
+2026-05-17,Gula Kristal Putih,GULA,17500.0,kg,1.0
+2026-05-18,Gula Kristal Putih,GULA,17500.0,kg,1.0
+2021-05-01,Ikan Asin Teri,IKAN ASIN,80000.0,kg,1.0
+2021-05-02,Ikan Asin Teri,IKAN ASIN,80000.0,kg,1.0
+2021-05-03,Ikan Asin Teri,IKAN ASIN,80000.0,kg,1.0
+2021-05-04,Ikan Asin Teri,IKAN ASIN,80000.0,kg,1.0
+2021-05-05,Ikan Asin Teri,IKAN ASIN,80000.0,kg,1.0
+2021-05-06,Ikan Asin Teri,IKAN ASIN,80000.0,kg,1.0
 2021-05-07,Ikan Asin Teri,IKAN ASIN,80000.0,kg,1.0
 2021-05-08,Ikan Asin Teri,IKAN ASIN,80000.0,kg,1.0
 2021-05-09,Ikan Asin Teri,IKAN ASIN,80000.0,kg,1.0
@@ -21779,6 +21972,23 @@ tanggal_data,komoditas,kategori,harga_per_kg,satuan_original,faktor_konversi
 2026-05-05,Ikan Asin Teri,IKAN ASIN,87800.0,kg,1.0
 2026-05-06,Ikan Asin Teri,IKAN ASIN,87800.0,kg,1.0
 2026-05-07,Ikan Asin Teri,IKAN ASIN,87800.0,kg,1.0
+2026-05-08,Ikan Asin Teri,IKAN ASIN,87800.0,kg,1.0
+2026-05-09,Ikan Asin Teri,IKAN ASIN,87800.0,kg,1.0
+2026-05-10,Ikan Asin Teri,IKAN ASIN,87800.0,kg,1.0
+2026-05-11,Ikan Asin Teri,IKAN ASIN,87800.0,kg,1.0
+2026-05-12,Ikan Asin Teri,IKAN ASIN,87800.0,kg,1.0
+2026-05-13,Ikan Asin Teri,IKAN ASIN,87800.0,kg,1.0
+2026-05-14,Ikan Asin Teri,IKAN ASIN,87800.0,kg,1.0
+2026-05-15,Ikan Asin Teri,IKAN ASIN,87800.0,kg,1.0
+2026-05-16,Ikan Asin Teri,IKAN ASIN,87800.0,kg,1.0
+2026-05-17,Ikan Asin Teri,IKAN ASIN,87800.0,kg,1.0
+2026-05-18,Ikan Asin Teri,IKAN ASIN,87800.0,kg,1.0
+2021-05-01,Ikan Bandeng,IKAN SEGAR,35000.0,kg,1.0
+2021-05-02,Ikan Bandeng,IKAN SEGAR,35600.0,kg,1.0
+2021-05-03,Ikan Bandeng,IKAN SEGAR,35600.0,kg,1.0
+2021-05-04,Ikan Bandeng,IKAN SEGAR,35600.0,kg,1.0
+2021-05-05,Ikan Bandeng,IKAN SEGAR,35600.0,kg,1.0
+2021-05-06,Ikan Bandeng,IKAN SEGAR,34600.0,kg,1.0
 2021-05-07,Ikan Bandeng,IKAN SEGAR,35000.0,kg,1.0
 2021-05-08,Ikan Bandeng,IKAN SEGAR,35000.0,kg,1.0
 2021-05-09,Ikan Bandeng,IKAN SEGAR,35400.0,kg,1.0
@@ -23594,6 +23804,23 @@ tanggal_data,komoditas,kategori,harga_per_kg,satuan_original,faktor_konversi
 2026-05-05,Ikan Bandeng,IKAN SEGAR,41800.0,kg,1.0
 2026-05-06,Ikan Bandeng,IKAN SEGAR,41400.0,kg,1.0
 2026-05-07,Ikan Bandeng,IKAN SEGAR,41800.0,kg,1.0
+2026-05-08,Ikan Bandeng,IKAN SEGAR,41400.0,kg,1.0
+2026-05-09,Ikan Bandeng,IKAN SEGAR,41800.0,kg,1.0
+2026-05-10,Ikan Bandeng,IKAN SEGAR,41400.0,kg,1.0
+2026-05-11,Ikan Bandeng,IKAN SEGAR,41800.0,kg,1.0
+2026-05-12,Ikan Bandeng,IKAN SEGAR,41400.0,kg,1.0
+2026-05-13,Ikan Bandeng,IKAN SEGAR,41800.0,kg,1.0
+2026-05-14,Ikan Bandeng,IKAN SEGAR,41400.0,kg,1.0
+2026-05-15,Ikan Bandeng,IKAN SEGAR,41800.0,kg,1.0
+2026-05-16,Ikan Bandeng,IKAN SEGAR,41400.0,kg,1.0
+2026-05-17,Ikan Bandeng,IKAN SEGAR,42600.0,kg,1.0
+2026-05-18,Ikan Bandeng,IKAN SEGAR,41833.0,kg,1.0
+2021-05-01,Ikan Cakalang,IKAN SEGAR,34500.0,kg,1.0
+2021-05-02,Ikan Cakalang,IKAN SEGAR,34500.0,kg,1.0
+2021-05-03,Ikan Cakalang,IKAN SEGAR,34500.0,kg,1.0
+2021-05-04,Ikan Cakalang,IKAN SEGAR,34500.0,kg,1.0
+2021-05-05,Ikan Cakalang,IKAN SEGAR,34500.0,kg,1.0
+2021-05-06,Ikan Cakalang,IKAN SEGAR,34500.0,kg,1.0
 2021-05-07,Ikan Cakalang,IKAN SEGAR,34500.0,kg,1.0
 2021-05-08,Ikan Cakalang,IKAN SEGAR,34500.0,kg,1.0
 2021-05-09,Ikan Cakalang,IKAN SEGAR,34500.0,kg,1.0
@@ -25409,6 +25636,23 @@ tanggal_data,komoditas,kategori,harga_per_kg,satuan_original,faktor_konversi
 2026-05-05,Ikan Cakalang,IKAN SEGAR,45000.0,kg,1.0
 2026-05-06,Ikan Cakalang,IKAN SEGAR,45000.0,kg,1.0
 2026-05-07,Ikan Cakalang,IKAN SEGAR,45000.0,kg,1.0
+2026-05-08,Ikan Cakalang,IKAN SEGAR,45000.0,kg,1.0
+2026-05-09,Ikan Cakalang,IKAN SEGAR,45000.0,kg,1.0
+2026-05-10,Ikan Cakalang,IKAN SEGAR,45000.0,kg,1.0
+2026-05-11,Ikan Cakalang,IKAN SEGAR,45000.0,kg,1.0
+2026-05-12,Ikan Cakalang,IKAN SEGAR,45000.0,kg,1.0
+2026-05-13,Ikan Cakalang,IKAN SEGAR,45000.0,kg,1.0
+2026-05-14,Ikan Cakalang,IKAN SEGAR,45000.0,kg,1.0
+2026-05-15,Ikan Cakalang,IKAN SEGAR,45000.0,kg,1.0
+2026-05-16,Ikan Cakalang,IKAN SEGAR,45000.0,kg,1.0
+2026-05-17,Ikan Cakalang,IKAN SEGAR,45000.0,kg,1.0
+2026-05-18,Ikan Cakalang,IKAN SEGAR,45000.0,kg,1.0
+2021-05-01,Ikan Kembung,IKAN SEGAR,34250.0,kg,1.0
+2021-05-02,Ikan Kembung,IKAN SEGAR,34250.0,kg,1.0
+2021-05-03,Ikan Kembung,IKAN SEGAR,34250.0,kg,1.0
+2021-05-04,Ikan Kembung,IKAN SEGAR,33750.0,kg,1.0
+2021-05-05,Ikan Kembung,IKAN SEGAR,33750.0,kg,1.0
+2021-05-06,Ikan Kembung,IKAN SEGAR,33750.0,kg,1.0
 2021-05-07,Ikan Kembung,IKAN SEGAR,33750.0,kg,1.0
 2021-05-08,Ikan Kembung,IKAN SEGAR,33750.0,kg,1.0
 2021-05-09,Ikan Kembung,IKAN SEGAR,33750.0,kg,1.0
@@ -27224,6 +27468,23 @@ tanggal_data,komoditas,kategori,harga_per_kg,satuan_original,faktor_konversi
 2026-05-05,Ikan Kembung,IKAN SEGAR,55000.0,kg,1.0
 2026-05-06,Ikan Kembung,IKAN SEGAR,55000.0,kg,1.0
 2026-05-07,Ikan Kembung,IKAN SEGAR,55000.0,kg,1.0
+2026-05-08,Ikan Kembung,IKAN SEGAR,55000.0,kg,1.0
+2026-05-09,Ikan Kembung,IKAN SEGAR,60000.0,kg,1.0
+2026-05-10,Ikan Kembung,IKAN SEGAR,60000.0,kg,1.0
+2026-05-11,Ikan Kembung,IKAN SEGAR,60000.0,kg,1.0
+2026-05-12,Ikan Kembung,IKAN SEGAR,60000.0,kg,1.0
+2026-05-13,Ikan Kembung,IKAN SEGAR,60000.0,kg,1.0
+2026-05-14,Ikan Kembung,IKAN SEGAR,60000.0,kg,1.0
+2026-05-15,Ikan Kembung,IKAN SEGAR,60000.0,kg,1.0
+2026-05-16,Ikan Kembung,IKAN SEGAR,60000.0,kg,1.0
+2026-05-17,Ikan Kembung,IKAN SEGAR,57500.0,kg,1.0
+2026-05-18,Ikan Kembung,IKAN SEGAR,57500.0,kg,1.0
+2021-05-01,Ikan Tongkol,IKAN SEGAR,34750.0,kg,1.0
+2021-05-02,Ikan Tongkol,IKAN SEGAR,35500.0,kg,1.0
+2021-05-03,Ikan Tongkol,IKAN SEGAR,35500.0,kg,1.0
+2021-05-04,Ikan Tongkol,IKAN SEGAR,35000.0,kg,1.0
+2021-05-05,Ikan Tongkol,IKAN SEGAR,35000.0,kg,1.0
+2021-05-06,Ikan Tongkol,IKAN SEGAR,35000.0,kg,1.0
 2021-05-07,Ikan Tongkol,IKAN SEGAR,34500.0,kg,1.0
 2021-05-08,Ikan Tongkol,IKAN SEGAR,34500.0,kg,1.0
 2021-05-09,Ikan Tongkol,IKAN SEGAR,34500.0,kg,1.0
@@ -29039,6 +29300,23 @@ tanggal_data,komoditas,kategori,harga_per_kg,satuan_original,faktor_konversi
 2026-05-05,Ikan Tongkol,IKAN SEGAR,41333.0,kg,1.0
 2026-05-06,Ikan Tongkol,IKAN SEGAR,41333.0,kg,1.0
 2026-05-07,Ikan Tongkol,IKAN SEGAR,41666.0,kg,1.0
+2026-05-08,Ikan Tongkol,IKAN SEGAR,41666.0,kg,1.0
+2026-05-09,Ikan Tongkol,IKAN SEGAR,41666.0,kg,1.0
+2026-05-10,Ikan Tongkol,IKAN SEGAR,41666.0,kg,1.0
+2026-05-11,Ikan Tongkol,IKAN SEGAR,41666.0,kg,1.0
+2026-05-12,Ikan Tongkol,IKAN SEGAR,41333.0,kg,1.0
+2026-05-13,Ikan Tongkol,IKAN SEGAR,41333.0,kg,1.0
+2026-05-14,Ikan Tongkol,IKAN SEGAR,41333.0,kg,1.0
+2026-05-15,Ikan Tongkol,IKAN SEGAR,41666.0,kg,1.0
+2026-05-16,Ikan Tongkol,IKAN SEGAR,41666.0,kg,1.0
+2026-05-17,Ikan Tongkol,IKAN SEGAR,40833.0,kg,1.0
+2026-05-18,Ikan Tongkol,IKAN SEGAR,40833.0,kg,1.0
+2021-05-01,Ikan Tuna,IKAN SEGAR,39500.0,kg,1.0
+2021-05-02,Ikan Tuna,IKAN SEGAR,39500.0,kg,1.0
+2021-05-03,Ikan Tuna,IKAN SEGAR,39500.0,kg,1.0
+2021-05-04,Ikan Tuna,IKAN SEGAR,39500.0,kg,1.0
+2021-05-05,Ikan Tuna,IKAN SEGAR,39500.0,kg,1.0
+2021-05-06,Ikan Tuna,IKAN SEGAR,39500.0,kg,1.0
 2021-05-07,Ikan Tuna,IKAN SEGAR,39500.0,kg,1.0
 2021-05-08,Ikan Tuna,IKAN SEGAR,39500.0,kg,1.0
 2021-05-09,Ikan Tuna,IKAN SEGAR,39500.0,kg,1.0
@@ -30852,6 +31130,23 @@ tanggal_data,komoditas,kategori,harga_per_kg,satuan_original,faktor_konversi
 2026-05-05,Ikan Tuna,IKAN SEGAR,47500.0,kg,1.0
 2026-05-06,Ikan Tuna,IKAN SEGAR,47500.0,kg,1.0
 2026-05-07,Ikan Tuna,IKAN SEGAR,47500.0,kg,1.0
+2026-05-08,Ikan Tuna,IKAN SEGAR,47500.0,kg,1.0
+2026-05-09,Ikan Tuna,IKAN SEGAR,50000.0,kg,1.0
+2026-05-10,Ikan Tuna,IKAN SEGAR,50000.0,kg,1.0
+2026-05-11,Ikan Tuna,IKAN SEGAR,50000.0,kg,1.0
+2026-05-12,Ikan Tuna,IKAN SEGAR,50000.0,kg,1.0
+2026-05-13,Ikan Tuna,IKAN SEGAR,50000.0,kg,1.0
+2026-05-14,Ikan Tuna,IKAN SEGAR,50000.0,kg,1.0
+2026-05-15,Ikan Tuna,IKAN SEGAR,50000.0,kg,1.0
+2026-05-16,Ikan Tuna,IKAN SEGAR,50000.0,kg,1.0
+2026-05-17,Ikan Tuna,IKAN SEGAR,50000.0,kg,1.0
+2026-05-18,Ikan Tuna,IKAN SEGAR,50000.0,kg,1.0
+2021-05-01,Indomie Rasa Kari Ayam,MIE INSTAN,28470.588235294115,bungkus,0.085
+2021-05-02,Indomie Rasa Kari Ayam,MIE INSTAN,28470.588235294115,bungkus,0.085
+2021-05-03,Indomie Rasa Kari Ayam,MIE INSTAN,28470.588235294115,bungkus,0.085
+2021-05-04,Indomie Rasa Kari Ayam,MIE INSTAN,28470.588235294115,bungkus,0.085
+2021-05-05,Indomie Rasa Kari Ayam,MIE INSTAN,28470.588235294115,bungkus,0.085
+2021-05-06,Indomie Rasa Kari Ayam,MIE INSTAN,28470.588235294115,bungkus,0.085
 2021-05-07,Indomie Rasa Kari Ayam,MIE INSTAN,28470.588235294115,bungkus,0.085
 2021-05-08,Indomie Rasa Kari Ayam,MIE INSTAN,28470.588235294115,bungkus,0.085
 2021-05-09,Indomie Rasa Kari Ayam,MIE INSTAN,28470.588235294115,bungkus,0.085
@@ -32667,6 +32962,23 @@ tanggal_data,komoditas,kategori,harga_per_kg,satuan_original,faktor_konversi
 2026-05-05,Indomie Rasa Kari Ayam,MIE INSTAN,37247.05882352941,bungkus,0.085
 2026-05-06,Indomie Rasa Kari Ayam,MIE INSTAN,37247.05882352941,bungkus,0.085
 2026-05-07,Indomie Rasa Kari Ayam,MIE INSTAN,37247.05882352941,bungkus,0.085
+2026-05-08,Indomie Rasa Kari Ayam,MIE INSTAN,37247.05882352941,bungkus,0.085
+2026-05-09,Indomie Rasa Kari Ayam,MIE INSTAN,37247.05882352941,bungkus,0.085
+2026-05-10,Indomie Rasa Kari Ayam,MIE INSTAN,37247.05882352941,bungkus,0.085
+2026-05-11,Indomie Rasa Kari Ayam,MIE INSTAN,37247.05882352941,bungkus,0.085
+2026-05-12,Indomie Rasa Kari Ayam,MIE INSTAN,37247.05882352941,bungkus,0.085
+2026-05-13,Indomie Rasa Kari Ayam,MIE INSTAN,37247.05882352941,bungkus,0.085
+2026-05-14,Indomie Rasa Kari Ayam,MIE INSTAN,37247.05882352941,bungkus,0.085
+2026-05-15,Indomie Rasa Kari Ayam,MIE INSTAN,37247.05882352941,bungkus,0.085
+2026-05-16,Indomie Rasa Kari Ayam,MIE INSTAN,37247.05882352941,bungkus,0.085
+2026-05-17,Indomie Rasa Kari Ayam,MIE INSTAN,37247.05882352941,bungkus,0.085
+2026-05-18,Indomie Rasa Kari Ayam,MIE INSTAN,37247.05882352941,bungkus,0.085
+2021-05-01,Jagung Pipilan Kering,PALAWIJA,8750.0,kg,1.0
+2021-05-02,Jagung Pipilan Kering,PALAWIJA,8750.0,kg,1.0
+2021-05-03,Jagung Pipilan Kering,PALAWIJA,8750.0,kg,1.0
+2021-05-04,Jagung Pipilan Kering,PALAWIJA,9150.0,kg,1.0
+2021-05-05,Jagung Pipilan Kering,PALAWIJA,9150.0,kg,1.0
+2021-05-06,Jagung Pipilan Kering,PALAWIJA,9150.0,kg,1.0
 2021-05-07,Jagung Pipilan Kering,PALAWIJA,9150.0,kg,1.0
 2021-05-08,Jagung Pipilan Kering,PALAWIJA,9150.0,kg,1.0
 2021-05-09,Jagung Pipilan Kering,PALAWIJA,9150.0,kg,1.0
@@ -34482,6 +34794,23 @@ tanggal_data,komoditas,kategori,harga_per_kg,satuan_original,faktor_konversi
 2026-05-05,Jagung Pipilan Kering,PALAWIJA,11100.0,kg,1.0
 2026-05-06,Jagung Pipilan Kering,PALAWIJA,11100.0,kg,1.0
 2026-05-07,Jagung Pipilan Kering,PALAWIJA,11100.0,kg,1.0
+2026-05-08,Jagung Pipilan Kering,PALAWIJA,11100.0,kg,1.0
+2026-05-09,Jagung Pipilan Kering,PALAWIJA,11100.0,kg,1.0
+2026-05-10,Jagung Pipilan Kering,PALAWIJA,11100.0,kg,1.0
+2026-05-11,Jagung Pipilan Kering,PALAWIJA,11100.0,kg,1.0
+2026-05-12,Jagung Pipilan Kering,PALAWIJA,11100.0,kg,1.0
+2026-05-13,Jagung Pipilan Kering,PALAWIJA,11100.0,kg,1.0
+2026-05-14,Jagung Pipilan Kering,PALAWIJA,11100.0,kg,1.0
+2026-05-15,Jagung Pipilan Kering,PALAWIJA,11100.0,kg,1.0
+2026-05-16,Jagung Pipilan Kering,PALAWIJA,11100.0,kg,1.0
+2026-05-17,Jagung Pipilan Kering,PALAWIJA,11100.0,kg,1.0
+2026-05-18,Jagung Pipilan Kering,PALAWIJA,11100.0,kg,1.0
+2021-05-01,Kedelai Impor,PALAWIJA,11000.0,kg,1.0
+2021-05-02,Kedelai Impor,PALAWIJA,11000.0,kg,1.0
+2021-05-03,Kedelai Impor,PALAWIJA,11000.0,kg,1.0
+2021-05-04,Kedelai Impor,PALAWIJA,11200.0,kg,1.0
+2021-05-05,Kedelai Impor,PALAWIJA,11200.0,kg,1.0
+2021-05-06,Kedelai Impor,PALAWIJA,11200.0,kg,1.0
 2021-05-07,Kedelai Impor,PALAWIJA,11200.0,kg,1.0
 2021-05-08,Kedelai Impor,PALAWIJA,11600.0,kg,1.0
 2021-05-09,Kedelai Impor,PALAWIJA,11600.0,kg,1.0
@@ -36297,6 +36626,23 @@ tanggal_data,komoditas,kategori,harga_per_kg,satuan_original,faktor_konversi
 2026-05-05,Kedelai Impor,PALAWIJA,16833.0,kg,1.0
 2026-05-06,Kedelai Impor,PALAWIJA,16833.0,kg,1.0
 2026-05-07,Kedelai Impor,PALAWIJA,16833.0,kg,1.0
+2026-05-08,Kedelai Impor,PALAWIJA,16833.0,kg,1.0
+2026-05-09,Kedelai Impor,PALAWIJA,16000.0,kg,1.0
+2026-05-10,Kedelai Impor,PALAWIJA,16000.0,kg,1.0
+2026-05-11,Kedelai Impor,PALAWIJA,16000.0,kg,1.0
+2026-05-12,Kedelai Impor,PALAWIJA,16166.0,kg,1.0
+2026-05-13,Kedelai Impor,PALAWIJA,16166.0,kg,1.0
+2026-05-14,Kedelai Impor,PALAWIJA,16166.0,kg,1.0
+2026-05-15,Kedelai Impor,PALAWIJA,16166.0,kg,1.0
+2026-05-16,Kedelai Impor,PALAWIJA,16166.0,kg,1.0
+2026-05-17,Kedelai Impor,PALAWIJA,16166.0,kg,1.0
+2026-05-18,Kedelai Impor,PALAWIJA,16166.0,kg,1.0
+2021-05-01,Kedelai Lokal,PALAWIJA,11500.0,kg,1.0
+2021-05-02,Kedelai Lokal,PALAWIJA,11500.0,kg,1.0
+2021-05-03,Kedelai Lokal,PALAWIJA,11500.0,kg,1.0
+2021-05-04,Kedelai Lokal,PALAWIJA,11500.0,kg,1.0
+2021-05-05,Kedelai Lokal,PALAWIJA,11500.0,kg,1.0
+2021-05-06,Kedelai Lokal,PALAWIJA,11500.0,kg,1.0
 2021-05-07,Kedelai Lokal,PALAWIJA,11500.0,kg,1.0
 2021-05-08,Kedelai Lokal,PALAWIJA,11500.0,kg,1.0
 2021-05-09,Kedelai Lokal,PALAWIJA,11500.0,kg,1.0
@@ -38101,6 +38447,23 @@ tanggal_data,komoditas,kategori,harga_per_kg,satuan_original,faktor_konversi
 2026-05-05,Kedelai Lokal,PALAWIJA,14000.0,kg,1.0
 2026-05-06,Kedelai Lokal,PALAWIJA,14000.0,kg,1.0
 2026-05-07,Kedelai Lokal,PALAWIJA,14000.0,kg,1.0
+2026-05-08,Kedelai Lokal,PALAWIJA,14000.0,kg,1.0
+2026-05-09,Kedelai Lokal,PALAWIJA,14000.0,kg,1.0
+2026-05-10,Kedelai Lokal,PALAWIJA,14000.0,kg,1.0
+2026-05-11,Kedelai Lokal,PALAWIJA,14000.0,kg,1.0
+2026-05-12,Kedelai Lokal,PALAWIJA,14000.0,kg,1.0
+2026-05-13,Kedelai Lokal,PALAWIJA,14000.0,kg,1.0
+2026-05-14,Kedelai Lokal,PALAWIJA,14000.0,kg,1.0
+2026-05-15,Kedelai Lokal,PALAWIJA,14000.0,kg,1.0
+2026-05-16,Kedelai Lokal,PALAWIJA,14000.0,kg,1.0
+2026-05-17,Kedelai Lokal,PALAWIJA,14000.0,kg,1.0
+2026-05-18,Kedelai Lokal,PALAWIJA,14000.0,kg,1.0
+2021-05-01,Minyak Goreng Curah,MINYAK GORENG,14500.0,kg,1.0
+2021-05-02,Minyak Goreng Curah,MINYAK GORENG,14500.0,kg,1.0
+2021-05-03,Minyak Goreng Curah,MINYAK GORENG,14500.0,kg,1.0
+2021-05-04,Minyak Goreng Curah,MINYAK GORENG,14500.0,kg,1.0
+2021-05-05,Minyak Goreng Curah,MINYAK GORENG,14500.0,kg,1.0
+2021-05-06,Minyak Goreng Curah,MINYAK GORENG,14500.0,kg,1.0
 2021-05-07,Minyak Goreng Curah,MINYAK GORENG,14500.0,kg,1.0
 2021-05-08,Minyak Goreng Curah,MINYAK GORENG,14700.0,kg,1.0
 2021-05-09,Minyak Goreng Curah,MINYAK GORENG,14700.0,kg,1.0
@@ -39916,6 +40279,23 @@ tanggal_data,komoditas,kategori,harga_per_kg,satuan_original,faktor_konversi
 2026-05-05,Minyak Goreng Curah,MINYAK GORENG,20500.0,kg,1.0
 2026-05-06,Minyak Goreng Curah,MINYAK GORENG,20500.0,kg,1.0
 2026-05-07,Minyak Goreng Curah,MINYAK GORENG,20500.0,kg,1.0
+2026-05-08,Minyak Goreng Curah,MINYAK GORENG,20500.0,kg,1.0
+2026-05-09,Minyak Goreng Curah,MINYAK GORENG,20500.0,kg,1.0
+2026-05-10,Minyak Goreng Curah,MINYAK GORENG,20500.0,kg,1.0
+2026-05-11,Minyak Goreng Curah,MINYAK GORENG,20500.0,kg,1.0
+2026-05-12,Minyak Goreng Curah,MINYAK GORENG,21166.0,kg,1.0
+2026-05-13,Minyak Goreng Curah,MINYAK GORENG,21166.0,kg,1.0
+2026-05-14,Minyak Goreng Curah,MINYAK GORENG,21166.0,kg,1.0
+2026-05-15,Minyak Goreng Curah,MINYAK GORENG,21166.0,kg,1.0
+2026-05-16,Minyak Goreng Curah,MINYAK GORENG,21166.0,kg,1.0
+2026-05-17,Minyak Goreng Curah,MINYAK GORENG,21166.0,kg,1.0
+2026-05-18,Minyak Goreng Curah,MINYAK GORENG,21166.0,kg,1.0
+2021-05-01,Minyak Goreng Kemasan Premium,MINYAK GORENG,15652.173913043478,1 liter,0.92
+2021-05-02,Minyak Goreng Kemasan Premium,MINYAK GORENG,15652.173913043478,1 liter,0.92
+2021-05-03,Minyak Goreng Kemasan Premium,MINYAK GORENG,15652.173913043478,1 liter,0.92
+2021-05-04,Minyak Goreng Kemasan Premium,MINYAK GORENG,15652.173913043478,1 liter,0.92
+2021-05-05,Minyak Goreng Kemasan Premium,MINYAK GORENG,15652.173913043478,1 liter,0.92
+2021-05-06,Minyak Goreng Kemasan Premium,MINYAK GORENG,15652.173913043478,1 liter,0.92
 2021-05-07,Minyak Goreng Kemasan Premium,MINYAK GORENG,15652.173913043478,1 liter,0.92
 2021-05-08,Minyak Goreng Kemasan Premium,MINYAK GORENG,15652.173913043478,1 liter,0.92
 2021-05-09,Minyak Goreng Kemasan Premium,MINYAK GORENG,15978.260869565216,1 liter,0.92
@@ -41715,6 +42095,17 @@ tanggal_data,komoditas,kategori,harga_per_kg,satuan_original,faktor_konversi
 2026-05-05,Minyak Goreng Kemasan Premium,MINYAK GORENG,19745.652173913044,1 liter,0.92
 2026-05-06,Minyak Goreng Kemasan Premium,MINYAK GORENG,19745.652173913044,1 liter,0.92
 2026-05-07,Minyak Goreng Kemasan Premium,MINYAK GORENG,19745.652173913044,1 liter,0.92
+2026-05-08,Minyak Goreng Kemasan Premium,MINYAK GORENG,19745.652173913044,1 liter,0.92
+2026-05-09,Minyak Goreng Kemasan Premium,MINYAK GORENG,19745.652173913044,1 liter,0.92
+2026-05-10,Minyak Goreng Kemasan Premium,MINYAK GORENG,19745.652173913044,1 liter,0.92
+2026-05-11,Minyak Goreng Kemasan Premium,MINYAK GORENG,19745.652173913044,1 liter,0.92
+2026-05-12,Minyak Goreng Kemasan Premium,MINYAK GORENG,19745.652173913044,1 liter,0.92
+2026-05-13,Minyak Goreng Kemasan Premium,MINYAK GORENG,19745.652173913044,1 liter,0.92
+2026-05-14,Minyak Goreng Kemasan Premium,MINYAK GORENG,19745.652173913044,1 liter,0.92
+2026-05-15,Minyak Goreng Kemasan Premium,MINYAK GORENG,19745.652173913044,1 liter,0.92
+2026-05-16,Minyak Goreng Kemasan Premium,MINYAK GORENG,19745.652173913044,1 liter,0.92
+2026-05-17,Minyak Goreng Kemasan Premium,MINYAK GORENG,19745.652173913044,1 liter,0.92
+2026-05-18,Minyak Goreng Kemasan Premium,MINYAK GORENG,19745.652173913044,1 liter,0.92
 2022-10-04,Minyak Goreng Kemasan Sederhana,MINYAK GORENG,15217.391304347826,1 liter,0.92
 2022-10-05,Minyak Goreng Kemasan Sederhana,MINYAK GORENG,15217.391304347826,1 liter,0.92
 2022-10-06,Minyak Goreng Kemasan Sederhana,MINYAK GORENG,15217.391304347826,1 liter,0.92
@@ -43747,6 +44138,23 @@ tanggal_data,komoditas,kategori,harga_per_kg,satuan_original,faktor_konversi
 2026-05-05,Minyak Goreng MINYAKITA,MINYAK GORENG,17354.347826086956,1 liter,0.92
 2026-05-06,Minyak Goreng MINYAKITA,MINYAK GORENG,17354.347826086956,1 liter,0.92
 2026-05-07,Minyak Goreng MINYAKITA,MINYAK GORENG,17354.347826086956,1 liter,0.92
+2026-05-08,Minyak Goreng MINYAKITA,MINYAK GORENG,17354.347826086956,1 liter,0.92
+2026-05-09,Minyak Goreng MINYAKITA,MINYAK GORENG,17413.043478260868,1 liter,0.92
+2026-05-10,Minyak Goreng MINYAKITA,MINYAK GORENG,17413.043478260868,1 liter,0.92
+2026-05-11,Minyak Goreng MINYAKITA,MINYAK GORENG,17413.043478260868,1 liter,0.92
+2026-05-12,Minyak Goreng MINYAKITA,MINYAK GORENG,17413.043478260868,1 liter,0.92
+2026-05-13,Minyak Goreng MINYAKITA,MINYAK GORENG,17413.043478260868,1 liter,0.92
+2026-05-14,Minyak Goreng MINYAKITA,MINYAK GORENG,17413.043478260868,1 liter,0.92
+2026-05-15,Minyak Goreng MINYAKITA,MINYAK GORENG,17413.043478260868,1 liter,0.92
+2026-05-16,Minyak Goreng MINYAKITA,MINYAK GORENG,17413.043478260868,1 liter,0.92
+2026-05-17,Minyak Goreng MINYAKITA,MINYAK GORENG,17413.043478260868,1 liter,0.92
+2026-05-18,Minyak Goreng MINYAKITA,MINYAK GORENG,17413.043478260868,1 liter,0.92
+2021-05-01,Susu Bubuk Merk Bendera (Instant),SUSU,100500.0,400 gr/dos,0.4
+2021-05-02,Susu Bubuk Merk Bendera (Instant),SUSU,100500.0,400 gr/dos,0.4
+2021-05-03,Susu Bubuk Merk Bendera (Instant),SUSU,100500.0,400 gr/dos,0.4
+2021-05-04,Susu Bubuk Merk Bendera (Instant),SUSU,100500.0,400 gr/dos,0.4
+2021-05-05,Susu Bubuk Merk Bendera (Instant),SUSU,100500.0,400 gr/dos,0.4
+2021-05-06,Susu Bubuk Merk Bendera (Instant),SUSU,100500.0,400 gr/dos,0.4
 2021-05-07,Susu Bubuk Merk Bendera (Instant),SUSU,100500.0,400 gr/dos,0.4
 2021-05-08,Susu Bubuk Merk Bendera (Instant),SUSU,100500.0,400 gr/dos,0.4
 2021-05-09,Susu Bubuk Merk Bendera (Instant),SUSU,100500.0,400 gr/dos,0.4
@@ -44720,6 +45128,12 @@ tanggal_data,komoditas,kategori,harga_per_kg,satuan_original,faktor_konversi
 2024-01-02,Susu Bubuk Merk Bendera (Instant),SUSU,105000.0,400 gr/dos,0.4
 2024-01-03,Susu Bubuk Merk Bendera (Instant),SUSU,105000.0,400 gr/dos,0.4
 2024-01-04,Susu Bubuk Merk Bendera (Instant),SUSU,105000.0,400 gr/dos,0.4
+2021-05-01,Susu Bubuk Merk Indomilk (Instant),SUSU,97500.0,400 gr/dos,0.4
+2021-05-02,Susu Bubuk Merk Indomilk (Instant),SUSU,97500.0,400 gr/dos,0.4
+2021-05-03,Susu Bubuk Merk Indomilk (Instant),SUSU,97500.0,400 gr/dos,0.4
+2021-05-04,Susu Bubuk Merk Indomilk (Instant),SUSU,97500.0,400 gr/dos,0.4
+2021-05-05,Susu Bubuk Merk Indomilk (Instant),SUSU,97500.0,400 gr/dos,0.4
+2021-05-06,Susu Bubuk Merk Indomilk (Instant),SUSU,97500.0,400 gr/dos,0.4
 2021-05-07,Susu Bubuk Merk Indomilk (Instant),SUSU,97500.0,400 gr/dos,0.4
 2021-05-08,Susu Bubuk Merk Indomilk (Instant),SUSU,97500.0,400 gr/dos,0.4
 2021-05-09,Susu Bubuk Merk Indomilk (Instant),SUSU,97500.0,400 gr/dos,0.4
@@ -45209,6 +45623,12 @@ tanggal_data,komoditas,kategori,harga_per_kg,satuan_original,faktor_konversi
 2022-09-05,Susu Bubuk Merk Indomilk (Instant),SUSU,97500.0,400 gr/dos,0.4
 2022-09-06,Susu Bubuk Merk Indomilk (Instant),SUSU,97500.0,400 gr/dos,0.4
 2022-09-07,Susu Bubuk Merk Indomilk (Instant),SUSU,97500.0,400 gr/dos,0.4
+2021-05-01,Susu Kental Manis Merk Bendera,SUSU,27027.027027027027,370 gr/kl,0.37
+2021-05-02,Susu Kental Manis Merk Bendera,SUSU,27027.027027027027,370 gr/kl,0.37
+2021-05-03,Susu Kental Manis Merk Bendera,SUSU,27027.027027027027,370 gr/kl,0.37
+2021-05-04,Susu Kental Manis Merk Bendera,SUSU,27027.027027027027,370 gr/kl,0.37
+2021-05-05,Susu Kental Manis Merk Bendera,SUSU,27027.027027027027,370 gr/kl,0.37
+2021-05-06,Susu Kental Manis Merk Bendera,SUSU,27027.027027027027,370 gr/kl,0.37
 2021-05-07,Susu Kental Manis Merk Bendera,SUSU,27027.027027027027,370 gr/kl,0.37
 2021-05-08,Susu Kental Manis Merk Bendera,SUSU,27027.027027027027,370 gr/kl,0.37
 2021-05-09,Susu Kental Manis Merk Bendera,SUSU,27027.027027027027,370 gr/kl,0.37
@@ -47024,6 +47444,23 @@ tanggal_data,komoditas,kategori,harga_per_kg,satuan_original,faktor_konversi
 2026-05-05,Susu Kental Manis Merk Bendera,SUSU,34683.78378378379,370 gr/kl,0.37
 2026-05-06,Susu Kental Manis Merk Bendera,SUSU,34683.78378378379,370 gr/kl,0.37
 2026-05-07,Susu Kental Manis Merk Bendera,SUSU,34683.78378378379,370 gr/kl,0.37
+2026-05-08,Susu Kental Manis Merk Bendera,SUSU,34683.78378378379,370 gr/kl,0.37
+2026-05-09,Susu Kental Manis Merk Bendera,SUSU,34683.78378378379,370 gr/kl,0.37
+2026-05-10,Susu Kental Manis Merk Bendera,SUSU,34683.78378378379,370 gr/kl,0.37
+2026-05-11,Susu Kental Manis Merk Bendera,SUSU,34683.78378378379,370 gr/kl,0.37
+2026-05-12,Susu Kental Manis Merk Bendera,SUSU,34683.78378378379,370 gr/kl,0.37
+2026-05-13,Susu Kental Manis Merk Bendera,SUSU,34683.78378378379,370 gr/kl,0.37
+2026-05-14,Susu Kental Manis Merk Bendera,SUSU,34683.78378378379,370 gr/kl,0.37
+2026-05-15,Susu Kental Manis Merk Bendera,SUSU,34683.78378378379,370 gr/kl,0.37
+2026-05-16,Susu Kental Manis Merk Bendera,SUSU,34683.78378378379,370 gr/kl,0.37
+2026-05-17,Susu Kental Manis Merk Bendera,SUSU,34683.78378378379,370 gr/kl,0.37
+2026-05-18,Susu Kental Manis Merk Bendera,SUSU,34683.78378378379,370 gr/kl,0.37
+2021-05-01,Susu Kental Manis Merk Indomilk,SUSU,27027.027027027027,370 gr/kl,0.37
+2021-05-02,Susu Kental Manis Merk Indomilk,SUSU,27027.027027027027,370 gr/kl,0.37
+2021-05-03,Susu Kental Manis Merk Indomilk,SUSU,27027.027027027027,370 gr/kl,0.37
+2021-05-04,Susu Kental Manis Merk Indomilk,SUSU,27027.027027027027,370 gr/kl,0.37
+2021-05-05,Susu Kental Manis Merk Indomilk,SUSU,27027.027027027027,370 gr/kl,0.37
+2021-05-06,Susu Kental Manis Merk Indomilk,SUSU,27027.027027027027,370 gr/kl,0.37
 2021-05-07,Susu Kental Manis Merk Indomilk,SUSU,27027.027027027027,370 gr/kl,0.37
 2021-05-08,Susu Kental Manis Merk Indomilk,SUSU,27027.027027027027,370 gr/kl,0.37
 2021-05-09,Susu Kental Manis Merk Indomilk,SUSU,27027.027027027027,370 gr/kl,0.37
@@ -48839,6 +49276,23 @@ tanggal_data,komoditas,kategori,harga_per_kg,satuan_original,faktor_konversi
 2026-05-05,Susu Kental Manis Merk Indomilk,SUSU,34683.78378378379,370 gr/kl,0.37
 2026-05-06,Susu Kental Manis Merk Indomilk,SUSU,34683.78378378379,370 gr/kl,0.37
 2026-05-07,Susu Kental Manis Merk Indomilk,SUSU,34683.78378378379,370 gr/kl,0.37
+2026-05-08,Susu Kental Manis Merk Indomilk,SUSU,34683.78378378379,370 gr/kl,0.37
+2026-05-09,Susu Kental Manis Merk Indomilk,SUSU,34683.78378378379,370 gr/kl,0.37
+2026-05-10,Susu Kental Manis Merk Indomilk,SUSU,34683.78378378379,370 gr/kl,0.37
+2026-05-11,Susu Kental Manis Merk Indomilk,SUSU,34683.78378378379,370 gr/kl,0.37
+2026-05-12,Susu Kental Manis Merk Indomilk,SUSU,34683.78378378379,370 gr/kl,0.37
+2026-05-13,Susu Kental Manis Merk Indomilk,SUSU,34683.78378378379,370 gr/kl,0.37
+2026-05-14,Susu Kental Manis Merk Indomilk,SUSU,34683.78378378379,370 gr/kl,0.37
+2026-05-15,Susu Kental Manis Merk Indomilk,SUSU,34683.78378378379,370 gr/kl,0.37
+2026-05-16,Susu Kental Manis Merk Indomilk,SUSU,34683.78378378379,370 gr/kl,0.37
+2026-05-17,Susu Kental Manis Merk Indomilk,SUSU,34683.78378378379,370 gr/kl,0.37
+2026-05-18,Susu Kental Manis Merk Indomilk,SUSU,34683.78378378379,370 gr/kl,0.37
+2021-05-01,Telur Ayam Kampung,TELUR,29760.0,kg,1.0
+2021-05-02,Telur Ayam Kampung,TELUR,29760.0,kg,1.0
+2021-05-03,Telur Ayam Kampung,TELUR,29760.0,kg,1.0
+2021-05-04,Telur Ayam Kampung,TELUR,29760.0,kg,1.0
+2021-05-05,Telur Ayam Kampung,TELUR,29760.0,kg,1.0
+2021-05-06,Telur Ayam Kampung,TELUR,29760.0,kg,1.0
 2021-05-07,Telur Ayam Kampung,TELUR,30080.0,kg,1.0
 2021-05-08,Telur Ayam Kampung,TELUR,30080.0,kg,1.0
 2021-05-09,Telur Ayam Kampung,TELUR,30080.0,kg,1.0
@@ -50654,6 +51108,23 @@ tanggal_data,komoditas,kategori,harga_per_kg,satuan_original,faktor_konversi
 2026-05-05,Telur Ayam Kampung,TELUR,46133.0,kg,1.0
 2026-05-06,Telur Ayam Kampung,TELUR,46133.0,kg,1.0
 2026-05-07,Telur Ayam Kampung,TELUR,46133.0,kg,1.0
+2026-05-08,Telur Ayam Kampung,TELUR,46666.0,kg,1.0
+2026-05-09,Telur Ayam Kampung,TELUR,46666.0,kg,1.0
+2026-05-10,Telur Ayam Kampung,TELUR,46666.0,kg,1.0
+2026-05-11,Telur Ayam Kampung,TELUR,46666.0,kg,1.0
+2026-05-12,Telur Ayam Kampung,TELUR,46666.0,kg,1.0
+2026-05-13,Telur Ayam Kampung,TELUR,46666.0,kg,1.0
+2026-05-14,Telur Ayam Kampung,TELUR,46666.0,kg,1.0
+2026-05-15,Telur Ayam Kampung,TELUR,46666.0,kg,1.0
+2026-05-16,Telur Ayam Kampung,TELUR,46666.0,kg,1.0
+2026-05-17,Telur Ayam Kampung,TELUR,46666.0,kg,1.0
+2026-05-18,Telur Ayam Kampung,TELUR,46666.0,kg,1.0
+2021-05-01,Telur Ayam Ras,TELUR,21400.0,kg,1.0
+2021-05-02,Telur Ayam Ras,TELUR,21300.0,kg,1.0
+2021-05-03,Telur Ayam Ras,TELUR,21800.0,kg,1.0
+2021-05-04,Telur Ayam Ras,TELUR,22000.0,kg,1.0
+2021-05-05,Telur Ayam Ras,TELUR,21400.0,kg,1.0
+2021-05-06,Telur Ayam Ras,TELUR,21400.0,kg,1.0
 2021-05-07,Telur Ayam Ras,TELUR,21400.0,kg,1.0
 2021-05-08,Telur Ayam Ras,TELUR,21200.0,kg,1.0
 2021-05-09,Telur Ayam Ras,TELUR,21200.0,kg,1.0
@@ -52469,6 +52940,23 @@ tanggal_data,komoditas,kategori,harga_per_kg,satuan_original,faktor_konversi
 2026-05-05,Telur Ayam Ras,TELUR,27666.0,kg,1.0
 2026-05-06,Telur Ayam Ras,TELUR,27583.0,kg,1.0
 2026-05-07,Telur Ayam Ras,TELUR,27583.0,kg,1.0
+2026-05-08,Telur Ayam Ras,TELUR,27416.0,kg,1.0
+2026-05-09,Telur Ayam Ras,TELUR,27250.0,kg,1.0
+2026-05-10,Telur Ayam Ras,TELUR,27416.0,kg,1.0
+2026-05-11,Telur Ayam Ras,TELUR,27333.0,kg,1.0
+2026-05-12,Telur Ayam Ras,TELUR,27333.0,kg,1.0
+2026-05-13,Telur Ayam Ras,TELUR,27333.0,kg,1.0
+2026-05-14,Telur Ayam Ras,TELUR,27333.0,kg,1.0
+2026-05-15,Telur Ayam Ras,TELUR,27166.0,kg,1.0
+2026-05-16,Telur Ayam Ras,TELUR,27166.0,kg,1.0
+2026-05-17,Telur Ayam Ras,TELUR,27166.0,kg,1.0
+2026-05-18,Telur Ayam Ras,TELUR,27166.0,kg,1.0
+2021-05-01,Terigu Protein Sedang (Kemasan),TEPUNG,9400.0,kg,1.0
+2021-05-02,Terigu Protein Sedang (Kemasan),TEPUNG,9400.0,kg,1.0
+2021-05-03,Terigu Protein Sedang (Kemasan),TEPUNG,9400.0,kg,1.0
+2021-05-04,Terigu Protein Sedang (Kemasan),TEPUNG,9400.0,kg,1.0
+2021-05-05,Terigu Protein Sedang (Kemasan),TEPUNG,9400.0,kg,1.0
+2021-05-06,Terigu Protein Sedang (Kemasan),TEPUNG,9400.0,kg,1.0
 2021-05-07,Terigu Protein Sedang (Kemasan),TEPUNG,9400.0,kg,1.0
 2021-05-08,Terigu Protein Sedang (Kemasan),TEPUNG,9400.0,kg,1.0
 2021-05-09,Terigu Protein Sedang (Kemasan),TEPUNG,9400.0,kg,1.0
@@ -54284,6 +54772,23 @@ tanggal_data,komoditas,kategori,harga_per_kg,satuan_original,faktor_konversi
 2026-05-05,Terigu Protein Sedang (Kemasan),TEPUNG,12416.0,kg,1.0
 2026-05-06,Terigu Protein Sedang (Kemasan),TEPUNG,12416.0,kg,1.0
 2026-05-07,Terigu Protein Sedang (Kemasan),TEPUNG,12416.0,kg,1.0
+2026-05-08,Terigu Protein Sedang (Kemasan),TEPUNG,12416.0,kg,1.0
+2026-05-09,Terigu Protein Sedang (Kemasan),TEPUNG,12416.0,kg,1.0
+2026-05-10,Terigu Protein Sedang (Kemasan),TEPUNG,12416.0,kg,1.0
+2026-05-11,Terigu Protein Sedang (Kemasan),TEPUNG,12416.0,kg,1.0
+2026-05-12,Terigu Protein Sedang (Kemasan),TEPUNG,12416.0,kg,1.0
+2026-05-13,Terigu Protein Sedang (Kemasan),TEPUNG,12416.0,kg,1.0
+2026-05-14,Terigu Protein Sedang (Kemasan),TEPUNG,12416.0,kg,1.0
+2026-05-15,Terigu Protein Sedang (Kemasan),TEPUNG,12416.0,kg,1.0
+2026-05-16,Terigu Protein Sedang (Kemasan),TEPUNG,12416.0,kg,1.0
+2026-05-17,Terigu Protein Sedang (Kemasan),TEPUNG,12416.0,kg,1.0
+2026-05-18,Terigu Protein Sedang (Kemasan),TEPUNG,12416.0,kg,1.0
+2021-05-01,Tomat Merah,SAYUR MAYUR,12800.0,kg,1.0
+2021-05-02,Tomat Merah,SAYUR MAYUR,12800.0,kg,1.0
+2021-05-03,Tomat Merah,SAYUR MAYUR,12800.0,kg,1.0
+2021-05-04,Tomat Merah,SAYUR MAYUR,12800.0,kg,1.0
+2021-05-05,Tomat Merah,SAYUR MAYUR,12800.0,kg,1.0
+2021-05-06,Tomat Merah,SAYUR MAYUR,12800.0,kg,1.0
 2021-05-07,Tomat Merah,SAYUR MAYUR,12400.0,kg,1.0
 2021-05-08,Tomat Merah,SAYUR MAYUR,12400.0,kg,1.0
 2021-05-09,Tomat Merah,SAYUR MAYUR,12400.0,kg,1.0
@@ -56099,3 +56604,14 @@ tanggal_data,komoditas,kategori,harga_per_kg,satuan_original,faktor_konversi
 2026-05-05,Tomat Merah,SAYUR MAYUR,15000.0,kg,1.0
 2026-05-06,Tomat Merah,SAYUR MAYUR,15000.0,kg,1.0
 2026-05-07,Tomat Merah,SAYUR MAYUR,14500.0,kg,1.0
+2026-05-08,Tomat Merah,SAYUR MAYUR,14166.0,kg,1.0
+2026-05-09,Tomat Merah,SAYUR MAYUR,15000.0,kg,1.0
+2026-05-10,Tomat Merah,SAYUR MAYUR,15000.0,kg,1.0
+2026-05-11,Tomat Merah,SAYUR MAYUR,15000.0,kg,1.0
+2026-05-12,Tomat Merah,SAYUR MAYUR,14833.0,kg,1.0
+2026-05-13,Tomat Merah,SAYUR MAYUR,14833.0,kg,1.0
+2026-05-14,Tomat Merah,SAYUR MAYUR,14833.0,kg,1.0
+2026-05-15,Tomat Merah,SAYUR MAYUR,14833.0,kg,1.0
+2026-05-16,Tomat Merah,SAYUR MAYUR,14833.0,kg,1.0
+2026-05-17,Tomat Merah,SAYUR MAYUR,13666.0,kg,1.0
+2026-05-18,Tomat Merah,SAYUR MAYUR,13666.0,kg,1.0
