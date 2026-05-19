@@ -1,40 +1,45 @@
 """
-MARKETCAST - Final Production Scraper
+MARKETCAST - Final Production Historical Scraper (CLOUD MIGRATION)
 Fitur:
 - Injeksi JS untuk Bypass UI Input Tanggal
-- Sistem Checkpoint (Resume otomatis jika terputus)
-- Full Whitelist 43 Komoditas
+- Sistem Checkpoint berbasis PostgreSQL (Neon Cloud)
+- Full Whitelist 43 Komoditas + Kategori
 - Output Logging ganda (Terminal & File)
-- Dual-write: SQLite (lokal) + Neon (cloud)
+- Standardisasi Satuan ke KG (Sinkron dengan Pipeline Harian)
 """
 
 import asyncio
 import re
 import sys
-import sqlite3
+import os
 import logging
 import argparse
 from datetime import date, timedelta
 from pathlib import Path
-from playwright.async_api import async_playwright
-from sqlalchemy import create_engine, text
 from dotenv import load_dotenv
-import os
-
-load_dotenv()
+from sqlalchemy import create_engine, text
+import pandas as pd
+from playwright.async_api import async_playwright
 
 # ── FIX ENCODING WINDOWS ──
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
-# ── KONFIGURASI ──
+# ── KONFIGURASI CLOUD & TARGET ──
+load_dotenv()
+POSTGRE_URL = os.getenv("DATABASE_URL")
+
+if not POSTGRE_URL:
+    print("❌ ERROR: DATABASE_URL tidak ditemukan di file .env!")
+    sys.exit(1)
+
+engine = create_engine(POSTGRE_URL, pool_pre_ping=True, pool_recycle=300)
+
 BASE_URL   = "https://siskaperbapo.jatimprov.go.id/harga/tabel"
-DB_PATH    = Path("data/raw/siskaperbapo.db")
-NEON_CONN  = os.getenv("DATABASE_URL")
 TIMEOUT_MS = 60_000
 
-TANGGAL_AWAL  = date(2021, 5, 1)
+TANGGAL_AWAL  = date(2021, 5, 7)
 TANGGAL_AKHIR = date(2026, 5, 18)
 
 # Full Whitelist 43 Komoditas
@@ -57,6 +62,16 @@ WHITELIST = {
     'ikan cakalang', 'gas elpigi 3 kg',
 }
 
+# ── KAMUS KONVERSI SATUAN KE KG ──
+SATUAN_KONVERSI = {
+    "kg": 1.0,
+    "1 liter": 0.92,      # Densitas minyak goreng
+    "370 gr/kl": 0.370,   # Susu kental manis
+    "400 gr/dos": 0.400,  # Susu bubuk
+    "bungkus": 0.085,     # Indomie (85gr)
+    "ekor": 1.0           # Estimasi Ayam Kampung (1kg/ekor)
+}
+
 # ── SETUP LOGGING ──
 Path("data").mkdir(parents=True, exist_ok=True)
 logging.basicConfig(
@@ -64,115 +79,69 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(message)s",
     handlers=[
         logging.StreamHandler(sys.stdout),
-        logging.FileHandler("data/scraper.log", encoding="utf-8")
+        logging.FileHandler("data/scraper_historis.log", encoding="utf-8")
     ]
 )
-log = logging.getLogger(__name__)
+log = logging.getLogger("MarketCast-Historis")
 
-# ── NEON: INIT ENGINE & TABEL ──
-def init_neon():
-    if not NEON_CONN:
-        log.warning("DATABASE_URL tidak ditemukan di .env — data hanya disimpan ke SQLite lokal.")
-        return None
-    try:
-        engine = create_engine(NEON_CONN)
-        with engine.begin() as conn:
-            conn.execute(text("""
-                CREATE TABLE IF NOT EXISTS harga_historis (
-                    id           SERIAL PRIMARY KEY,
-                    tanggal_data DATE NOT NULL,
-                    komoditas    TEXT NOT NULL,
-                    satuan       TEXT,
-                    harga_rp     NUMERIC,
-                    kabkota      TEXT DEFAULT 'Surabaya',
-                    created_at   TIMESTAMP DEFAULT NOW(),
-                    UNIQUE (tanggal_data, komoditas)
-                )
-            """))
-        log.info("✓ Koneksi Neon berhasil & tabel siap.")
-        return engine
-    except Exception as e:
-        log.error(f"Gagal konek ke Neon: {e} — fallback ke SQLite saja.")
-        return None
-
-# ── NEON: UPSERT BATCH ──
-def upsert_neon(engine, rows: list, tanggal_data: str):
-    if not engine:
-        return
-    try:
-        with engine.begin() as conn:
-            for row in rows:
-                conn.execute(text("""
-                    INSERT INTO harga_historis (tanggal_data, komoditas, satuan, harga_rp, kabkota)
-                    VALUES (:tanggal_data, :komoditas, :satuan, :harga_rp, :kabkota)
-                    ON CONFLICT (tanggal_data, komoditas) DO NOTHING
-                """), {
-                    "tanggal_data": tanggal_data,
-                    "komoditas": row["komoditas"],
-                    "satuan": row["satuan"],
-                    "harga_rp": row["harga_rp"],
-                    "kabkota": "Surabaya"
-                })
-        log.info(f"         [Neon] ✓ {len(rows)} baris di-upsert.")
-    except Exception as e:
-        log.error(f"         [Neon] Gagal upsert {tanggal_data}: {e}")
-
-# ── DATABASE SQLITE & CHECKPOINT ──
+# ── DATABASE & CHECKPOINT (NEON CLOUD) ──
 def init_db():
-    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS harga_historis (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                tanggal_data TEXT,
-                komoditas TEXT,
-                satuan TEXT,
-                harga_rp REAL,
-                kabkota TEXT DEFAULT 'Surabaya',
-                created_at TEXT DEFAULT (datetime('now','localtime')),
-                UNIQUE(tanggal_data, komoditas)
-            )
-        """)
-        conn.execute("""
+    """Memastikan tabel checkpoint ada di database Cloud."""
+    with engine.begin() as conn:
+        conn.execute(text("""
             CREATE TABLE IF NOT EXISTS scrape_checkpoint (
-                tanggal TEXT PRIMARY KEY,
-                status TEXT NOT NULL,
+                tanggal DATE PRIMARY KEY,
+                status VARCHAR(50) NOT NULL,
                 baris_dapat INTEGER DEFAULT 0
             )
-        """)
-        conn.commit()
+        """))
 
 def sudah_diproses(tanggal: date) -> bool:
-    with sqlite3.connect(DB_PATH) as conn:
+    with engine.connect() as conn:
         row = conn.execute(
-            "SELECT status FROM scrape_checkpoint WHERE tanggal = ?",
-            (tanggal.isoformat(),)
+            text("SELECT status FROM scrape_checkpoint WHERE tanggal = :tgl"), 
+            {"tgl": tanggal.isoformat()}
         ).fetchone()
     return row is not None and row[0] == "done"
 
 def simpan_batch(rows, tanggal_data):
     inserted = 0
-    with sqlite3.connect(DB_PATH) as conn:
+    tgl_timestamp = pd.to_datetime(tanggal_data)
+    
+    with engine.begin() as conn:
+        conn.execute(text("DELETE FROM harga_historis WHERE tanggal_data = :tgl"), {"tgl": tgl_timestamp})
+        
         for row in rows:
             try:
-                conn.execute("""
-                    INSERT OR REPLACE INTO harga_historis  
-                    (tanggal_data, komoditas, satuan, harga_rp) 
-                    VALUES (?, ?, ?, ?)
-                """, (tanggal_data, row['komoditas'], row['satuan'], row['harga_rp']))
+                conn.execute(text("""
+                    INSERT INTO harga_historis (tanggal_data, komoditas, kategori, harga_per_kg, satuan_original, faktor_konversi) 
+                    VALUES (:tgl, :kom, :kat, :hrg_kg, :sat_orig, :faktor)
+                """), {
+                    "tgl": tgl_timestamp,
+                    "kom": row['komoditas'],
+                    "kat": row['kategori'],
+                    "hrg_kg": row['harga_per_kg'],
+                    "sat_orig": row['satuan_original'],
+                    "faktor": row['faktor_konversi']
+                })
                 inserted += 1
             except Exception as e:
                 log.warning(f"Gagal simpan komoditas {row['komoditas']}: {e}")
-        conn.execute("""
-            INSERT OR REPLACE INTO scrape_checkpoint (tanggal, status, baris_dapat) 
-            VALUES (?, 'done', ?)
-        """, (tanggal_data, inserted))
-        conn.commit()
+        
+        conn.execute(text("""
+            INSERT INTO scrape_checkpoint (tanggal, status, baris_dapat) 
+            VALUES (:tgl, 'done', :jum)
+            ON CONFLICT (tanggal) DO UPDATE 
+            SET baris_dapat = EXCLUDED.baris_dapat, status = EXCLUDED.status
+        """), {"tgl": tanggal_data, "jum": inserted})
+        
     return inserted
 
 # ── PARSING UTILS ──
-def normalisasi_nama(nama):
-    return re.sub(r"^[\s\-–]+", "", nama).strip()
+def clean_name_daily(nama):
+    if not nama: return ""
+    cleaned = re.sub(r'^[0-9\s\.\-]+', '', str(nama)).strip()
+    return cleaned
 
 def parse_harga(text):
     if not text or text.strip() in ("-", ""): return None
@@ -183,8 +152,7 @@ def parse_harga(text):
 # ── CORE SCRAPER ──
 async def run_scraper():
     init_db()
-    neon_engine = init_neon()  # ← init Neon di sini
-
+    
     tgl_target = []
     curr = TANGGAL_AWAL
     while curr <= TANGGAL_AKHIR:
@@ -193,18 +161,19 @@ async def run_scraper():
 
     total = len(tgl_target)
     log.info("=" * 60)
-    log.info(f"Target Ekstraksi : {TANGGAL_AWAL} s/d {TANGGAL_AKHIR} ({total} hari)")
+    log.info(f"🚀 Mulai Ekstraksi Historis ke CLOUD NEON (Standardisasi KG)")
+    log.info(f"Target : {TANGGAL_AWAL} s/d {TANGGAL_AKHIR} ({total} hari)")
     log.info("=" * 60)
 
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         context = await browser.new_context(
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
             timezone_id="Asia/Jakarta"
         )
         page = await context.new_page()
         await page.route("**/*.{png,jpg,jpeg,gif,svg,css,woff,woff2}", lambda r: r.abort())
-
+        
         try:
             await page.goto(BASE_URL, wait_until="domcontentloaded", timeout=TIMEOUT_MS)
         except Exception as e:
@@ -214,13 +183,13 @@ async def run_scraper():
 
         for idx, tgl in enumerate(tgl_target, 1):
             tgl_str = tgl.strftime("%Y-%m-%d")
-
+            
             if sudah_diproses(tgl):
-                log.info(f"[{idx:>3}/{total}] {tgl_str} - Dilewati (Sudah ada di DB)")
+                log.info(f"[{idx:>4}/{total}] {tgl_str} - Dilewati (Sudah ada di Checkpoint Cloud)")
                 continue
-
-            log.info(f"[{idx:>3}/{total}] Memproses: {tgl_str}")
-
+                
+            log.info(f"[{idx:>4}/{total}] Memproses: {tgl_str}")
+            
             try:
                 date_input = await page.query_selector("input[name='tanggal']")
                 await date_input.evaluate(f"""
@@ -247,9 +216,11 @@ async def run_scraper():
                 # 4. Parsing HTML
                 rows_data = []
                 baris_html = await page.query_selector_all("table tbody tr")
-
+                
                 for row in baris_html:
                     cells = await row.query_selector_all("td")
+                    if len(cells) < 5: continue
+                    
                     vals = [(await c.inner_text()).strip() for c in cells]
 
                     if len(vals) >= 5:
@@ -265,40 +236,48 @@ async def run_scraper():
 
                 if rows_data:
                     jumlah_tersimpan = simpan_batch(rows_data, tgl_str)
-                    upsert_neon(neon_engine, rows_data, tgl_str)  # ← dual-write ke Neon
-                    log.info(f"         [OK] Tersimpan {jumlah_tersimpan} data komoditas.")
+                    log.info(f"        [OK] Tersimpan {jumlah_tersimpan} data berformat KG ke Neon Singapore.")
                 else:
-                    log.warning(f"         [!!] Tidak ada komoditas whitelist yang terekstrak.")
-                    with sqlite3.connect(DB_PATH) as conn:
-                        conn.execute(
-                            "INSERT OR REPLACE INTO scrape_checkpoint (tanggal, status, baris_dapat) VALUES (?, 'done', 0)",
-                            (tgl_str,)
-                        )
-                        conn.commit()
-
+                    log.warning(f"        [!!] Data kosong/hari libur.")
+                    with engine.begin() as conn:
+                        conn.execute(text("INSERT INTO scrape_checkpoint (tanggal, status, baris_dapat) VALUES (:tgl, 'done', 0) ON CONFLICT (tanggal) DO NOTHING"), {"tgl": tgl_str})
+                        
             except Exception as e:
-                log.error(f"         [X] Error pada {tgl_str}: {e}")
-
-            await asyncio.sleep(2.0)
+                log.error(f"        [X] Error pada {tgl_str}: {e}")
+                
+            await asyncio.sleep(4.0) 
 
         await browser.close()
-
+        
     log.info("=" * 60)
-    log.info("EKSTRAKSI SELESAI")
+    log.info("EKSTRAKSI HISTORIS SELESAI")
     log.info("=" * 60)
 
 # ── VERIFIKASI CLI ──
 def verifikasi_hasil():
-    with sqlite3.connect(DB_PATH) as conn:
-        rekap = conn.execute(
-            "SELECT tanggal_data, COUNT(*) FROM harga_bahan_pokok GROUP BY tanggal_data ORDER BY tanggal_data"
-        ).fetchall()
-        print("\n📊 REKAPITULASI DATABASE:")
-        for r in rekap:
-            print(f"   {r[0]} : {r[1]:>2} Komoditas")
+    print("\n🔍 Memeriksa Database Cloud Neon...")
+    try:
+        with engine.connect() as conn:
+            total = conn.execute(text("SELECT COUNT(*) FROM harga_historis")).scalar()
+            hari = conn.execute(text("SELECT COUNT(DISTINCT tanggal_data) FROM harga_historis")).scalar()
+            print(f"📈 TOTAL KESELURUHAN DATA: {total} baris (dari {hari} hari aktif)")
+            
+            rekap = conn.execute(text("""
+                SELECT tanggal_data, COUNT(*) 
+                FROM harga_historis 
+                GROUP BY tanggal_data 
+                ORDER BY tanggal_data DESC 
+                LIMIT 10
+            """)).fetchall()
+            
+            print("\n📊 10 TANGGAL TERAKHIR DI DATABASE:")
+            for r in rekap:
+                print(f"   {r[0]} : {r[1]:>2} Komoditas")
+    except Exception as e:
+        print(f"❌ Gagal memverifikasi: {e}")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="MarketCast Main Scraper")
+    parser = argparse.ArgumentParser(description="MarketCast Historical Scraper")
     parser.add_argument("--verify", action="store_true", help="Hanya memunculkan rekap database")
     args = parser.parse_args()
 

@@ -22,18 +22,18 @@ WHITELIST_MAP = {
     'Susu Kental Manis Merk Bendera': 'SUSU', 'Susu Kental Manis Merk Indomilk': 'SUSU',
     'Susu Bubuk Merk Bendera (Instant)': 'SUSU', 'Susu Bubuk Merk Indomilk (Instant)': 'SUSU',
     'Jagung Pipilan Kering': 'PALAWIJA', 'Kedelai Impor': 'PALAWIJA', 'Kedelai Lokal': 'PALAWIJA',
-    'Kacang Hijau': 'PALAWIJA', 'Kacang Tanah': 'PALAWIJA', 'Ketela Pohon': 'PALAWIJA',
-    'Garam Bata': 'GARAM', 'Garam Halus': 'GARAM',
+    'KACANG HIJAU': 'PALAWIJA', 'KACANG TANAH': 'PALAWIJA', 'KETELA POHON': 'PALAWIJA',
+    'Bata': 'GARAM', 'Halus': 'GARAM',
     'Terigu Protein Sedang (Kemasan)': 'TEPUNG',
     'Indomie Rasa Kari Ayam': 'MIE INSTAN',
     'Cabe Merah Keriting': 'CABE', 'Cabe Merah Besar': 'CABE', 'Cabe Rawit Merah': 'CABE',
     'Bawang Merah': 'BAWANG', 'Bawang Putih Sinco/Honan': 'BAWANG',
     'Ikan Asin Teri': 'IKAN ASIN',
-    'Kol/Kubis': 'SAYUR MAYUR', 'Kentang': 'SAYUR MAYUR', 'Tomat Merah': 'SAYUR MAYUR',
-    'Wortel': 'SAYUR MAYUR', 'Buncis': 'SAYUR MAYUR',
+    'KOL/KUBIS': 'SAYUR MAYUR', 'KENTANG': 'SAYUR MAYUR', 'Tomat Merah': 'SAYUR MAYUR',
+    'WORTEL': 'SAYUR MAYUR', 'BUNCIS': 'SAYUR MAYUR',
     'Ikan Bandeng': 'IKAN SEGAR', 'Ikan Kembung': 'IKAN SEGAR', 'Ikan Tuna': 'IKAN SEGAR',
     'Ikan Tongkol': 'IKAN SEGAR', 'Ikan Cakalang': 'IKAN SEGAR',
-    'Gas Elpiji 3 Kg': 'BARANG PENTING LAINNYA'
+    'GAS ELPIGI 3 Kg': 'BARANG PENTING LAINNYA'
 }
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -105,6 +105,77 @@ async def scrape_harian_mandiri(page, tgl):
         log.info(f"✓ {len(rows_data)} komoditas ditemukan.")
         return rows_data
 
+    except Exception as e:
+        log.error(f"❌ Detail Error Scrape: {e}")
+        return []
+
+def parse_harga(text):
+    """
+    Mengonversi format Rp 15.750,00 menjadi 15750.0.
+    Menghilangkan bagian desimal setelah koma.
+    """
+    if not text: return None
+    text = text.strip()
+    if text in ("-", "0", ""): return None
+    
+    # Ambil angka sebelum koma desimal (format Indo: 15.000,00)
+    text_main = text.split(',')[0]
+    # Buang semua karakter kecuali angka (membuang titik ribuan)
+    cleaned = re.sub(r"[^\d]", "", text_main)
+    
+    try: 
+        return float(cleaned)
+    except: 
+        return None
+
+async def scrape_harian_mandiri(page, tgl):
+    tgl_str = tgl.strftime("%Y-%m-%d")
+    rows_data = []
+    
+    try:
+        log.info(f"🌐 Membuka halaman Siskaperbapo untuk {tgl_str}...")
+        await page.goto(BASE_URL, wait_until="networkidle", timeout=60000)
+        
+        # 1. Injeksi Tanggal
+        date_input = await page.query_selector("input[name='tanggal']")
+        await date_input.evaluate(f"(el, val) => {{ el.value = val; el.dispatchEvent(new Event('change', {{ bubbles: true }})); }}", tgl_str)
+        
+        # 2. Pilih Surabaya
+        await page.select_option("select[name='kabkota']", label="Kota Surabaya")
+            
+        # 3. Klik Tampilkan
+        await page.click("button:has-text('Tampilkan')")
+        
+        # Beri waktu ekstra karena data Siskaperbapo sering lambat muncul
+        await page.wait_for_timeout(5000)
+        
+        # 4. Parsing Tabel
+        # Pastikan kita mengambil baris yang ada datanya (bukan header kategori)
+        baris_html = await page.query_selector_all("table tbody tr")
+        
+        for row in baris_html:
+            cells = await row.query_selector_all("td")
+            if len(cells) < 5: continue # Lewati baris kosong/header
+            
+            vals = [(await c.inner_text()).strip() for c in cells]
+            nama_raw = vals[1]
+            nama_bersih = clean_name_daily(nama_raw)
+            
+            if nama_bersih in WHITELIST_MAP:
+                # Kolom 3: Harga Kemarin | Kolom 4: Harga Sekarang
+                # Kita ambil Kolom 4 (Index 4)
+                harga = parse_harga(vals[4])
+                
+                if harga:
+                    rows_data.append({
+                        'tanggal_data': tgl_str,
+                        'komoditas': nama_bersih,
+                        'satuan': vals[2],
+                        'harga': harga,
+                        'kategori': WHITELIST_MAP[nama_bersih]
+                    })
+        
+        return rows_data
     except Exception as e:
         log.error(f"❌ Detail Error Scrape: {e}")
         return []
