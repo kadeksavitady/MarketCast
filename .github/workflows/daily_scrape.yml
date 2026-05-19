@@ -2,7 +2,7 @@ name: Daily Siskaperbapo Scraper
 
 on:
   schedule:
-    - cron: '0 1 * * *' # Jalan otomatis jam 8 pagi WIB (1 UTC)
+    - cron: '0 15 * * *' # Jalan otomatis jam 10 malam WIB (15 UTC)
   workflow_dispatch: # Biar bisa diklik manual kalau mau ngetes
 
 jobs:
