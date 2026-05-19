@@ -32,21 +32,22 @@ TANGGAL_AKHIR = date(2026, 5, 7)
 
 # Full Whitelist 43 Komoditas
 WHITELIST = {
-    'Beras Premium', 'Beras Medium', 'Gula Kristal Putih',
-    'Minyak Goreng Curah', 'Minyak Goreng Kemasan Premium',
-    'Minyak Goreng Kemasan Sederhana', 'Minyak Goreng MINYAKITA',
-    'Daging Sapi Paha Belakang', 'Daging Ayam Ras', 'Daging Ayam Kampung',
-    'Telur Ayam Ras', 'Telur Ayam Kampung',
-    'Susu Kental Manis Merk Bendera', 'Susu Kental Manis Merk Indomilk',
-    'Susu Bubuk Merk Bendera (Instant)', 'Susu Bubuk Merk Indomilk (Instant)',
-    'Jagung Pipilan Kering', 'Garam Bata', 'Garam Halus',
-    'Terigu Protein Sedang (Kemasan)', 'Kedelai Impor', 'Kedelai Lokal',
-    'Indomie Rasa Kari Ayam', 'Cabe Merah Keriting', 'Cabe Merah Besar',
-    'Cabe Rawit Merah', 'Bawang Merah', 'Bawang Putih Sinco/Honan',
-    'Ikan Asin Teri', 'Kacang Hijau', 'Kacang Tanah', 'Ketela Pohon',
-    'Kol/Kubis', 'Kentang', 'Tomat Merah', 'Wortel', 'Buncis',
-    'Ikan Bandeng', 'Ikan Kembung', 'Ikan Tuna', 'Ikan Tongkol',
-    'Ikan Cakalang', 'Gas Elpiji 3 Kg',
+    'beras premium', 'beras medium', 'gula kristal putih',
+    'minyak goreng curah', 'minyak goreng kemasan premium',
+    'minyak goreng kemasan sederhana', 'minyak goreng minyakita',
+    'daging sapi paha belakang', 'daging ayam ras', 'daging ayam kampung',
+    'telur ayam ras', 'telur ayam kampung',
+    'susu kental manis merk bendera', 'susu kental manis merk indomilk',
+    'susu bubuk merk bendera (instant)', 'susu bubuk merk indomilk (instant)',
+    'jagung pipilan kering', 
+    'bata', 'halus', 
+    'terigu protein sedang (kemasan)', 'kedelai impor', 'kedelai lokal',
+    'indomie rasa kari ayam', 'cabe merah keriting', 'cabe merah besar',
+    'cabe rawit merah', 'bawang merah', 'bawang putih sinco/honan',
+    'ikan asin teri', 'kacang hijau', 'kacang tanah', 'ketela pohon',
+    'kol/kubis', 'kentang', 'tomat merah', 'wortel', 'buncis',
+    'ikan bandeng', 'ikan kembung', 'ikan tuna', 'ikan tongkol',
+    'ikan cakalang', 'gas elpigi 3 kg',
 }
 
 # ── SETUP LOGGING ──
@@ -116,7 +117,7 @@ def normalisasi_nama(nama):
     return re.sub(r"^[\s\-–]+", "", nama).strip()
 
 def parse_harga(text):
-    if not text or text.strip() in ("-", "0", ""): return None
+    if not text or text.strip() in ("-", ""): return None
     cleaned = re.sub(r"[^\d]", "", text)
     try: return float(cleaned)
     except: return None
@@ -183,7 +184,11 @@ async def run_scraper():
                 await btn.click()
                 
                 # Tunggu respons tabel
-                await page.wait_for_timeout(3000)
+                try:
+                    await page.wait_for_selector("table tbody tr td", timeout=10_000)
+                except Exception:
+                    log.warning(f"[!] Tabel tidak kunjung muncul pada {tgl_str}, mencoba jeda tambahan...")
+                    await page.wait_for_timeout(3000)
                 
                 # 4. Parsing HTML
                 rows_data = []
@@ -195,9 +200,9 @@ async def run_scraper():
                     
                     if len(vals) >= 5:
                         nama_bersih = normalisasi_nama(vals[1])
-                        if nama_bersih in WHITELIST:
+                        if nama_bersih.lower() in WHITELIST:
                             harga = parse_harga(vals[4])
-                            if harga:
+                            if harga is not None:
                                 rows_data.append({
                                     'komoditas': nama_bersih,
                                     'satuan': vals[2],
