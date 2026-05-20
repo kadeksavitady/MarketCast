@@ -2,45 +2,33 @@ name: Daily Siskaperbapo Scraper
 
 on:
   schedule:
-    - cron: '0 1 * * *' # Jalan otomatis jam 8 pagi WIB (1 UTC)
-  workflow_dispatch: # Biar bisa diklik manual kalau mau ngetes
+    - cron: '0 15 * * *'
+  workflow_dispatch:
 
 jobs:
   scrape_and_push:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4  
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.9'
+          python-version: '3.12'
+
+      - name: Cache pip             # mempercepat instalasi dependencies dengan caching pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
 
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
-          pip install dvc[gdrive] # Tetap install dvc
+          playwright install chromium --with-deps
 
-      - name: Run Scraper
-        run: python src/data/historical_scraper.py
-
-      - name: Setup DVC
-        run: |
-          dvc remote add origin https://dagshub.com/kadeksavitady/MarketCast.dvc --force
-          dvc remote modify origin --local auth basic
-          dvc remote modify origin --local user kadeksavitady
-          dvc remote modify origin --local password ${{ secrets.DAGSHUB_TOKEN }}
-
-      - name: Push Data to DagsHub
-        run: |
-          dvc add data/raw/siskaperbapo.db
-          dvc push -r origin
-
-      - name: Commit DVC changes to GitHub
-        run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git add data/raw/siskaperbapo.db.dvc
-          git commit -m "auto: update database from daily scrape" || echo "No changes to commit"
-          git push
+      - name: Run Daily Scraper
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: python src/data/daily_scraper.py

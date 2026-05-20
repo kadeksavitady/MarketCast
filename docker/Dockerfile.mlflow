@@ -12,4 +12,6 @@ CMD ["mlflow", "server", \
      "--backend-store-uri", "sqlite:////mlflow/mlflow.db", \
      "--default-artifact-root", "mlflow-artifacts:/artifacts", \
      "--artifacts-destination", "/mlflow/artifacts", \
+     "--default-artifact-root", "mlflow-artifacts:/artifacts", \
+     "--artifacts-destination", "/mlflow/artifacts", \
      "--serve-artifacts"]
