@@ -1,13 +1,19 @@
+"""
+MARKETCAST - Final Production Daily Scraper (GITHUB ACTIONS READY)
+Fitur:
+- Fully Automated (Tanpa CLI Prompt) untuk CI/CD
+- 3 Jurus Pasti Anti-Buta (100 Entries, Scroll, Wait)
+- Standardisasi Skema DB (harga_per_kg, satuan_original, faktor_konversi)
+- Idempotent Delete-Insert untuk Mencegah Duplikasi
+"""
+
 import asyncio
 import logging
 import os
 import re
 import sys
-import sqlite3
 from datetime import date
-from pathlib import Path
 from sqlalchemy import create_engine, text
-import pandas as pd
 from playwright.async_api import async_playwright
 from dotenv import load_dotenv
 
@@ -19,108 +25,71 @@ if sys.platform == "win32":
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 # ── KONFIGURASI ──
-LOCAL_DB_PATH = Path("data/raw/siskaperbapo_daily.db")
-POSTGRE_URL   = os.getenv("DATABASE_URL", "postgresql://neondb_owner:npg_pSmfVRDaG4P6@ep-little-star-aokx0s6c.c-2.ap-southeast-1.aws.neon.tech/neondb?sslmode=require")
-BASE_URL      = "https://siskaperbapo.jatimprov.go.id/harga/tabel"
-TIMEOUT_MS    = 60_000 
+POSTGRE_URL = os.getenv("DATABASE_URL")
+BASE_URL    = "https://siskaperbapo.jatimprov.go.id/harga/tabel"
+TIMEOUT_MS  = 60_000 
 
-# Whitelist Menggunakan Lowercase untuk Pencocokan Bebas Case-Sensitive
-WHITELIST_KATEGORI = {
-    'beras premium': 'BERAS', 'beras medium': 'BERAS',
-    'gula kristal putih': 'GULA',
-    'minyak goreng curah': 'MINYAK GORENG', 'minyak goreng kemasan premium': 'MINYAK GORENG',
-    'minyak goreng kemasan sederhana': 'MINYAK GORENG', 'minyak goreng minyakita': 'MINYAK GORENG',
-    'daging sapi paha belakang': 'DAGING', 'daging ayam ras': 'DAGING', 'daging ayam kampung': 'DAGING',
-    'telur ayam ras': 'TELUR', 'telur ayam kampung': 'TELUR',
-    'susu kental manis merk bendera': 'SUSU', 'susu kental manis merk indomilk': 'SUSU',
-    'susu bubuk merk bendera (instant)': 'SUSU', 'susu bubuk merk indomilk (instant)': 'SUSU',
-    'jagung pipilan kering': 'PALAWIJA', 'kedelai impor': 'PALAWIJA', 'kedelai lokal': 'PALAWIJA',
-    'kacang hijau': 'PALAWIJA', 'kacang tanah': 'PALAWIJA', 'ketela pohon': 'PALAWIJA',
-    'bata': 'GARAM', 'halus': 'GARAM',
-    'terigu protein sedang (kemasan)': 'TEPUNG',
-    'indomie rasa kari ayam': 'MIE INSTAN',
-    'cabe merah keriting': 'CABE', 'cabe merah besar': 'CABE', 'cabe rawit merah': 'CABE',
-    'bawang merah': 'BAWANG', 'bawang putih sinco/honan': 'BAWANG',
-    'ikan asin teri': 'IKAN ASIN',
-    'kol/kubis': 'SAYUR MAYUR', 'kentang': 'SAYUR MAYUR', 'tomat merah': 'SAYUR MAYUR',
-    'wortel': 'SAYUR MAYUR', 'buncis': 'SAYUR MAYUR',
-    'ikan bandeng': 'IKAN SEGAR', 'ikan kembung': 'IKAN SEGAR', 'ikan tuna': 'IKAN SEGAR',
-    'ikan tongkol': 'IKAN SEGAR', 'ikan cakalang': 'IKAN SEGAR',
-    'gas elpigi 3 kg': 'BARANG PENTING LAINNYA'
+if not POSTGRE_URL:
+    print("❌ ERROR: DATABASE_URL tidak ditemukan di environment!")
+    sys.exit(1)
+
+# Skema Whitelist yang sama persis dengan Historical
+WHITELIST_MAP = {
+    'Beras Premium': 'BERAS', 'Beras Medium': 'BERAS',
+    'Gula Kristal Putih': 'GULA',
+    'Minyak Goreng Curah': 'MINYAK GORENG', 'Minyak Goreng Kemasan Premium': 'MINYAK GORENG',
+    'Minyak Goreng Kemasan Sederhana': 'MINYAK GORENG', 'Minyak Goreng MINYAKITA': 'MINYAK GORENG',
+    'Daging Sapi Paha Belakang': 'DAGING', 'Daging Ayam Ras': 'DAGING', 'Daging Ayam Kampung': 'DAGING',
+    'Telur Ayam Ras': 'TELUR', 'Telur Ayam Kampung': 'TELUR',
+    'Susu Kental Manis Merk Bendera': 'SUSU', 'Susu Kental Manis Merk Indomilk': 'SUSU',
+    'Susu Bubuk Merk Bendera (Instant)': 'SUSU', 'Susu Bubuk Merk Indomilk (Instant)': 'SUSU',
+    'Jagung Pipilan Kering': 'PALAWIJA', 'Kedelai Impor': 'PALAWIJA', 'Kedelai Lokal': 'PALAWIJA',
+    'KACANG HIJAU': 'PALAWIJA', 'KACANG TANAH': 'PALAWIJA', 'KETELA POHON': 'PALAWIJA',
+    'Bata': 'GARAM', 'Halus': 'GARAM',
+    'Terigu Protein Sedang (Kemasan)': 'TEPUNG',
+    'Indomie Rasa Kari Ayam': 'MIE INSTAN',
+    'Cabe Merah Keriting': 'CABE', 'Cabe Merah Besar': 'CABE', 'Cabe Rawit Merah': 'CABE',
+    'Bawang Merah': 'BAWANG', 'Bawang Putih Sinco/Honan': 'BAWANG',
+    'Ikan Asin Teri': 'IKAN ASIN',
+    'KOL/KUBIS': 'SAYUR MAYUR', 'KENTANG': 'SAYUR MAYUR', 'Tomat Merah': 'SAYUR MAYUR',
+    'WORTEL': 'SAYUR MAYUR', 'BUNCIS': 'SAYUR MAYUR',
+    'Ikan Bandeng': 'IKAN SEGAR', 'Ikan Kembung': 'IKAN SEGAR', 'Ikan Tuna': 'IKAN SEGAR',
+    'Ikan Tongkol': 'IKAN SEGAR', 'Ikan Cakalang': 'IKAN SEGAR',
+    'GAS ELPIGI 3 Kg': 'BARANG PENTING LAINNYA'
 }
 
-# Mapping Kosmetik Penulisan Agar Bersih Saat Masuk Database
-NAMA_MAP = {
-    'bata': 'Garam Bata',
-    'halus': 'Garam Halus',
-    'gas elpigi 3 kg': 'Gas Elpigi 3 Kg'
+WHITELIST_LOWER = {k.lower(): k for k in WHITELIST_MAP.keys()}
+
+SATUAN_KONVERSI = {
+    "kg": 1.0, "1 liter": 0.92, "370 gr/kl": 0.370,
+    "400 gr/dos": 0.400, "bungkus": 0.085, "ekor": 1.0
 }
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger("MarketCast-Daily")
 
-# ── DATABASE SEMENTARA (SQLITE LOCAL STAGING) ──
-def init_local_db():
-    LOCAL_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with sqlite3.connect(LOCAL_DB_PATH) as conn:
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS harga_historis (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                tanggal_data TEXT,
-                komoditas TEXT,
-                satuan TEXT,
-                harga_rp REAL,
-                kabkota TEXT DEFAULT 'Surabaya',
-                kategori TEXT,
-                created_at TEXT DEFAULT (datetime('now','localtime')),
-                UNIQUE(tanggal_data, komoditas)
-            )
-        """)
-        conn.commit()
-
-def simpan_lokal(rows):
-    inserted = 0
-    with sqlite3.connect(LOCAL_DB_PATH) as conn:
-        for row in rows:
-            try:
-                conn.execute("""
-                    INSERT OR REPLACE INTO harga_historis 
-                    (tanggal_data, komoditas, satuan, harga_rp, kabkota, kategori) 
-                    VALUES (?, ?, ?, ?, ?, ?)
-                """, (row['tanggal_data'], row['komoditas'], row['satuan'], row['harga_rp'], row['kabkota'], row['kategori']))
-                inserted += 1
-            except Exception as e:
-                log.warning(f"Gagal simpan lokal untuk {row['komoditas']}: {e}")
-        conn.commit()
-    return inserted
+engine = create_engine(POSTGRE_URL, pool_pre_ping=True, pool_recycle=300)
 
 # ── PARSING UTILS ──
 def normalisasi_nama(nama):
     if not nama: return ""
-    # Membersihkan whitespace hantu eksotis (\xa0 / NBSP) menjadi spasi biasa
-    nama_bersih = re.sub(r"[\s\xa0]+", " ", nama)
-    nama_bersih = re.sub(r"^[\s\-–\—\•\.]+", "", nama_bersih)
-    return nama_bersih.strip()
+    cleaned = re.sub(r'^[\d\s\.\-]+', '', str(nama)).strip()
+    return re.sub(r'\s+', ' ', cleaned)
 
-def parse_harga(text):
-    if not text or text.strip() in ("-", ""): return None
-    text_main = text.split(',')[0]
-    cleaned = re.sub(r"[^\d]", "", text_main)
-    try: 
-        return float(cleaned)
-    except: 
-        return None
+def parse_harga(teks):
+    if not teks or teks.strip() in ("-", ""): return None
+    cleaned = re.sub(r"[^\d]", "", teks.split(',')[0])
+    try: return float(cleaned)
+    except: return None
 
-# ── CORE SCRAPER ──
-async def scrape_harian_mandiri(page, tgl):
-    tgl_str = tgl.strftime("%Y-%m-%d")
+# ── CORE SCRAPER HARIAN ──
+async def scrape_harian(page, tgl_str):
     rows_data = []
-
     try:
-        log.info(f"🌐 Membuka halaman Siskaperbapo untuk {tgl_str}...")
+        log.info(f"🌐 Membuka Siskaperbapo untuk {tgl_str}...")
         await page.goto(BASE_URL, wait_until="domcontentloaded", timeout=TIMEOUT_MS)
 
-        date_input = await page.wait_for_selector("input[name='tanggal']", timeout=TIMEOUT_MS)
+        date_input = await page.wait_for_selector("input[name='tanggal']")
         await date_input.evaluate(f"""
             (el) => {{
                 el.value = '{tgl_str}';
@@ -129,18 +98,34 @@ async def scrape_harian_mandiri(page, tgl):
             }}
         """)
 
-        area_el = await page.wait_for_selector("select[name='kabkota']", timeout=TIMEOUT_MS)
-        await area_el.select_option(label="Kota Surabaya")
+        area_el = await page.query_selector("select[name='kabkota']")
+        if area_el: await area_el.select_option(label="Kota Surabaya")
 
-        btn = await page.wait_for_selector("button:has-text('Tampilkan')", timeout=TIMEOUT_MS)
+        btn = await page.query_selector("button:has-text('Tampilkan')")
         await btn.click()
 
-        # Tunggu render data aktif agar tidak mengambil tabel kosong
+        # ==========================================
+        # 🛡️ 3 JURUS PASTI ANTI-BUTA 
+        # ==========================================
+        # 1. Tunggu respons tabel
         try:
-            await page.wait_for_selector("table tbody tr td", timeout=10_000)
+            await page.wait_for_selector('table tbody tr', state='visible', timeout=15000)
         except Exception:
-            log.warning("[!] Tabel merespon lambat, bersiap menggunakan jeda tambahan...")
+            log.warning("[!] Tabel merespon lambat...")
             await page.wait_for_timeout(3000)
+            
+        # 2. Paksa "Show Entries" ke 100
+        try:
+            dropdown = await page.query_selector('select[name$="length"]')
+            if dropdown: 
+                await dropdown.select_option(value='100')
+                await page.wait_for_timeout(2000)
+        except: pass
+        
+        # 3. Paksa Scroll ke Bawah
+        await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+        await page.wait_for_timeout(1000)
+        # ==========================================
 
         baris_html = await page.query_selector_all("table tbody tr")
 
@@ -149,95 +134,93 @@ async def scrape_harian_mandiri(page, tgl):
             if len(cells) < 5: continue
 
             vals = [(await c.inner_text()).strip() for c in cells]
-            nama_bersih = normalisasi_nama(vals[1])
-            nama_key = nama_bersih.lower()
+            nama_mentah = normalisasi_nama(vals[1]).lower()
 
-            if nama_key in WHITELIST_KATEGORI:
-                harga = parse_harga(vals[4])
-                if harga is not None:  # Mengizinkan harga 0.0 masuk demi keutuhan 43 komoditas
-                    # Terapkan standardisasi nama kapitalisasi
-                    if nama_key in NAMA_MAP:
-                        nama_final = NAMA_MAP[nama_key]
-                    else:
-                        nama_final = nama_bersih.title() if not nama_bersih.isupper() else nama_bersih
-
+            if nama_mentah in WHITELIST_LOWER:
+                nama_asli = WHITELIST_LOWER[nama_mentah]
+                harga_raw = parse_harga(vals[4])
+                satuan_raw = vals[2].lower().strip()
+                
+                # Biarkan mengeksekusi biarpun harga_raw = 0 (untuk integritas 43 komoditas)
+                if harga_raw is not None: 
+                    faktor = SATUAN_KONVERSI.get(satuan_raw, 1.0)
+                    harga_per_kg = round(harga_raw / faktor, 2) if faktor > 0 else harga_raw
+                    
                     rows_data.append({
                         'tanggal_data': tgl_str,
-                        'komoditas': nama_final,
-                        'satuan': vals[2],
-                        'harga_rp': harga,  # Sinkron dengan nama kolom database utama
-                        'kabkota': 'Surabaya',
-                        'kategori': WHITELIST_KATEGORI[nama_key]
+                        'komoditas': nama_asli,
+                        'kategori': WHITELIST_MAP[nama_asli],
+                        'harga_per_kg': harga_per_kg,
+                        'satuan_original': satuan_raw,
+                        'faktor_konversi': faktor
                     })
 
         return rows_data
     except Exception as e:
-        log.error(f"❌ Detail Error Scrape: {e}")
+        log.error(f"❌ Error Scrape Harian: {e}")
         return []
 
 # ── TRANSAKSI CLOUD NEON ──
-def push_ke_neon(data_rows):
-    if not POSTGRE_URL:
-        log.error("❌ DATABASE_URL tidak dikonfigurasi di env. Sinkronisasi cloud gagal.")
-        return
-    
-    log.info("☁️ Memulai migrasi data staging ke Neon Cloud...")
-    try:
-        df = pd.DataFrame(data_rows)
-        engine = create_engine(POSTGRE_URL)
+def push_ke_neon(data_rows, tgl_str):
+    if not data_rows:
+        return 0
         
-        # Eksekusi Upsert (ON CONFLICT DO NOTHING) agar id unik tanggal+komoditas terjaga aman
+    inserted = 0
+    log.info("☁️ Memulai migrasi data harian ke Neon Cloud...")
+    try:
         with engine.begin() as conn:
-            for _, row in df.iterrows():
-                conn.execute(text("""
-                    INSERT INTO harga_historis (tanggal_data, komoditas, satuan, harga_rp, kabkota, kategori)
-                    VALUES (:tanggal_data, :komoditas, :satuan, :harga_rp, :kabkota, :kategori)
-                    ON CONFLICT (tanggal_data, komoditas) DO NOTHING
-                """), row.to_dict())
-        log.info(f"✅ SINKRONISASI SUKSES! {len(df)} data harian berhasil diunggah ke Neon Singapore.")
+            # 1. Hapus data hari ini jika sudah ada (Mencegah duplikasi saat di-run ulang)
+            conn.execute(
+                text("DELETE FROM harga_historis WHERE tanggal_data = :tgl"),
+                {"tgl": tgl_str}
+            )
+            
+            # 2. Masukkan data baru yang sudah terstandardisasi
+            for row in data_rows:
+                try:
+                    conn.execute(text("""
+                        INSERT INTO harga_historis 
+                            (tanggal_data, komoditas, kategori, harga_per_kg, satuan_original, faktor_konversi)
+                        VALUES 
+                            (:tanggal_data, :komoditas, :kategori, :harga_per_kg, :satuan_original, :faktor_konversi)
+                    """), row)
+                    inserted += 1
+                except Exception as e:
+                    log.warning(f"Gagal upload {row['komoditas']}: {e}")
+                    
+        log.info(f"✅ SINKRONISASI SUKSES! {inserted} data harian mendarat di Neon Singapore.")
+        return inserted
     except Exception as e:
-        log.error(f"❌ Gagal mengirim data ke Neon: {e}")
+        log.error(f"❌ Transaksi Neon Gagal: {e}")
+        return 0
 
 async def job_update_harian():
-    hari_ini = date.today()
-    log.info(f"🚀 Memulai Pipeline Harian: {hari_ini}")
-    init_local_db()
+    hari_ini = date.today().strftime("%Y-%m-%d")
+    log.info(f"🚀 Memulai Pipeline Otomatis Harian: {hari_ini}")
 
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         context = await browser.new_context(
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            viewport={'width': 1920, 'height': 1080}
         )
         page = await context.new_page()
         await page.route("**/*.{png,jpg,jpeg,gif,svg,css,woff,woff2}", lambda r: r.abort())
 
         try:
-            data_rows = await scrape_harian_mandiri(page, hari_ini)
+            data_rows = await scrape_harian(page, hari_ini)
 
             if data_rows:
-                # 1. Isolasi Tahap Staging: Simpan ke SQLite Lokal
-                jumlah_lokal = simpan_lokal(data_rows)
-                log.info("-" * 60)
-                log.info(f"📊 [STAGING] Sukses mencatat {jumlah_lokal} data di SQLite Lokal ({LOCAL_DB_PATH.name})")
-                log.info("-" * 60)
-
-                # 2. Interaksi CLI untuk Validasi Sebelum Push Cloud
-                print(f"\n💡 Data hari ini ({hari_ini.isoformat()}) berhasil disimpan di database lokal.")
-                pilihan = input("👉 Apakah Anda ingin mengunggah data ini ke Neon Cloud sekarang? (y/n): ").strip().lower()
-                
-                if pilihan == 'y':
-                    push_ke_neon(data_rows)
-                else:
-                    log.info("⏸️ Sinkronisasi ditunda. Data harian tetap aman tersimpan di staging lokal.")
+                log.info(f"📊 Berhasil menarik {len(data_rows)} data. Langsung memompa ke Cloud...")
+                # LANGSUNG DI-PUSH KE NEON TANPA BERTANYA (Otomatisasi Penuh)
+                push_ke_neon(data_rows, hari_ini)
             else:
-                log.warning("⚠️ Tidak ada data valid yang berhasil diekstrak hari ini.")
+                log.warning("⚠️ Data kosong hari ini (kemungkinan server siskaperbapo error/libur).")
 
         except Exception as e:
-            log.error(f"❌ Gagal Menjalankan Pipeline Harian: {e}")
+            log.error(f"❌ Pipeline Gagal: {e}")
         finally:
             await browser.close()
 
 if __name__ == "__main__":
-    # Menghindari blocking event loop async akibat fungsi input() CLI
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(job_update_harian())
+    asyncio.run(job_update_harian())
