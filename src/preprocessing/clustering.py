@@ -1,6 +1,5 @@
 import argparse
 import logging
-import shutil
 import sys
 import warnings
 from pathlib import Path
@@ -38,24 +37,12 @@ def load_data(args):
             sys.exit(1)
         df = pd.read_csv(path)
     else:
-        import os
-        from dotenv import load_dotenv
         from sqlalchemy import create_engine
-        
-        # Load environment variables dari file .env
-        load_dotenv()
-        db_url = os.getenv("DATABASE_URL")
-        
-        if not db_url:
-            log.error("DATABASE_URL tidak ditemukan di .env!")
-            sys.exit(1)
-            
-        log.info("Menghubungkan ke PostgreSQL (Neon)...")
-        engine = create_engine(db_url)
-        
-        # Mengambil kolom yang spesifik agar lebih ringan dan cepat
-        query = "SELECT tanggal_data, komoditas, harga_per_kg FROM harga_historis ORDER BY tanggal_data"
-        df = pd.read_sql(query, engine)
+        engine = create_engine(
+            f"postgresql://{args.pg_user}:{args.pg_password}"
+            f"@{args.pg_host}:{args.pg_port}/{args.pg_db}"
+        )
+        df = pd.read_sql("SELECT * FROM harga_historis", engine)
 
     log.info(f"Loaded {len(df):,} rows. Siap untuk clustering.")
     return df
@@ -260,8 +247,8 @@ def main():
     parser = argparse.ArgumentParser(
         description="Clustering pipeline PBL-MarketCast"
     )
-    parser.add_argument("--source", choices=["csv", "postgres"], default="postgres")
-    parser.add_argument("--csv-path", default="data/processed/harga_historis.csv")
+    parser.add_argument("--source", choices=["csv", "postgres"], default="csv")
+    parser.add_argument("--csv-path", default="data/processed/harga_historis_clean.csv")
     parser.add_argument("--output-dir", default="outputs/clustering")
     parser.add_argument("--k", type=int, default=3)
     parser.add_argument("--mlflow-uri", default="https://dagshub.com/kadeksavitady/MarketCast.mlflow")
