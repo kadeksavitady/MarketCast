@@ -1,16 +1,6 @@
 """
 src/preprocessing/data_cleaning.py
 ====================================
-Preprocessing data harga bahan pokok dari Neon PostgreSQL.
-Alur:
-    1. Load dari Neon (harga_historis)
-    2. Drop komoditas invalid
-    3. Konversi harga 0 → NaN
-    4. Fill NaN berdasarkan kategori:
-       - Barang segar/musiman  → interpolasi linear
-       - Barang pabrikan/stabil → forward fill (+ backward fill ujung)
-    5. Drop outlier dengan IQR clipping
-    6. Export ke data/processed/harga_historis_clean.csv
 """
 
 import os
@@ -22,6 +12,7 @@ import numpy as np
 import pandas as pd
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
+from sklearn.preprocessing import RobustScaler
 
 warnings.filterwarnings("ignore")
 logging.basicConfig(
@@ -197,6 +188,26 @@ def iqr_clip(df: pd.DataFrame) -> pd.DataFrame:
 # ─────────────────────────────────────────────────────────────
 # 6. EXPORT
 # ─────────────────────────────────────────────────────────────
+
+def robust_scale(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Scale harga_per_kg per komoditas dengan RobustScaler.
+    RobustScaler pakai median dan IQR — robust terhadap outlier
+    yang lolos dari clipping (lebih cocok dari MinMaxScaler untuk data harga).
+    Hasil disimpan di kolom baru 'harga_scaled', kolom asli tetap ada.
+    """
+    df = df.copy()
+    scaled_list = []
+    for komoditas, group in df.groupby("komoditas"):
+        group   = group.copy()
+        scaler  = RobustScaler()
+        values  = group["harga_per_kg"].values.reshape(-1, 1)
+        group["harga_scaled"] = scaler.fit_transform(values).flatten()
+        scaled_list.append(group)
+    df_scaled = pd.concat(scaled_list, ignore_index=True)
+    log.info(f"  RobustScaler: harga_scaled ditambahkan untuk {df_scaled['komoditas'].nunique()} komoditas")
+    return df_scaled
+
 
 def export(df: pd.DataFrame, output_path: Path) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
