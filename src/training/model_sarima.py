@@ -24,7 +24,7 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 
 import pmdarima as pm
-from pmdarima.arima import auto_arima
+from pmdarima.arima import ARIMA
 
 from config import (MLFLOW_TRACKING_URI, init_mlflow,
                     FORECAST_DAYS, get_logger, compute_metrics,
@@ -81,41 +81,25 @@ def train_sarima(komoditas: str, data: dict,
             "project"   : "PBL-MarketCast",
         })
 
-        # ── Step 1: auto_arima ────────────────────────────
-        log.info(f"  auto_arima fitting (m=7, stepwise) max_p={max_p} max_q={max_q} ...")
+        # ── Step 1: SARIMA Statis (Baseline Polosan) ────────────────────────────
+        log.info(f"  SARIMA fitting (statis: order=(1,1,1), seasonal=(1,0,0,7)) ...")
         try:
-            auto_model = auto_arima(
-                train,
-                start_p=0, max_p=3,
-                start_q=0, max_q=3,
-                d=None,              # auto-detect differencing
-                start_P=0, max_P=2,
-                start_Q=0, max_Q=2,
-                D=None,
-                m=7,                 # seasonality mingguan
-                seasonal=True,
-                information_criterion="aic",
-                stepwise=True,       # stepwise=True lebih cepat, cukup untuk jurnal
-                suppress_warnings=True,
-                error_action="ignore",
-                trace=False,
-            )
-            order         = auto_model.order
-            seasonal_order = (auto_model.seasonal_order)
-            log.info(f"  Best order: SARIMA{order}x{seasonal_order}")
+            # Gunakan parameter statis (out-of-the-box baseline)
+            # Tetap gunakan m=7 agar identitas SARIMA (Seasonality Mingguan) tidak hilang
+            base_model = ARIMA(order=(1, 1, 1), seasonal_order=(1, 0, 0, 7), suppress_warnings=True)
+            auto_model = base_model.fit(train)
+            
+            order = auto_model.order
+            seasonal_order = auto_model.seasonal_order
+            log.info(f"  Model order: SARIMA{order}x{seasonal_order}")
 
         except Exception as e:
-            log.warning(f"  SARIMA m=7 gagal ({e}), fallback ke ARIMA (m=1)")
-            auto_model = auto_arima(
-                train,
-                seasonal=False,
-                information_criterion="aic",
-                stepwise=True,
-                suppress_warnings=True,
-                error_action="ignore",
-            )
-            order          = auto_model.order
-            seasonal_order = (0, 0, 0, 0)
+            log.warning(f"  SARIMA statis gagal ({e}), fallback ke Naive SARIMA (0,1,0)x(0,0,0,7)")
+            base_model = ARIMA(order=(0, 1, 0), seasonal_order=(0, 0, 0, 7), suppress_warnings=True)
+            auto_model = base_model.fit(train)
+            
+            order = auto_model.order
+            seasonal_order = auto_model.seasonal_order
 
         # ── Step 2: Log params ────────────────────────────
         mlflow.log_params({
@@ -126,14 +110,10 @@ def train_sarima(komoditas: str, data: dict,
             "D"       : seasonal_order[1],
             "Q"       : seasonal_order[2],
             "m"       : seasonal_order[3],
-            "aic"     : round(auto_model.aic(), 4),
-            # Search space — dicatat agar bisa dibandingkan antar run di MLflow
-            "max_p"  : max_p,
-            "max_q"  : max_q,
-            "max_P"  : max_P,
-            "max_Q"  : max_Q,
-            "n_train": len(train),
-            "n_test" : len(test),
+            "aic"     : round(auto_model.aic(), 4) if hasattr(auto_model, 'aic') else 0,
+            "n_train" : len(train),
+            "n_test"  : len(test),
+            "note"    : "Baseline SARIMA statis tanpa hyperparameter tuning"
         })
 
         # ── Step 3: Forecast test set ─────────────────────
