@@ -71,17 +71,48 @@ SUBSTITUTION_MAP: Dict[str, str] = {
     "ikan_tuna": "ikan_tongkol", "ikan_tongkol": "ikan_kembung", "ikan_kembung": "ikan_bandeng",
 }
 
+# Tambahkan fungsi ini sebelum lifespan
+def load_harga_terkini():
+    """Ambil harga terbaru per komoditas dari Neon saat startup"""
+    if not engine:
+        return
+    try:
+        with engine.connect() as conn:
+            rows = conn.execute(text("""
+                SELECT DISTINCT ON (komoditas) 
+                    komoditas, harga_per_kg
+                FROM harga_historis
+                ORDER BY komoditas, tanggal_data DESC
+            """)).fetchall()
+        
+        for row in rows:
+            nama = row[0]
+            harga = float(row[1])
+            # Cari slug yang match
+            for slug, info in COMMODITY_CATALOG.items():
+                if info["nama"] == nama:
+                    COMMODITY_CATALOG[slug]["harga_ref"] = int(harga)
+                    break
+        
+        logger.info(f"Harga terkini berhasil dimuat untuk {len(rows)} komoditas")
+    except Exception as e:
+        logger.warning(f"Gagal load harga terkini: {e}")
+
 # ── Lifespan & Model ──
 model = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global model
+
+    # Load harga terkini dari Neon
+    load_harga_terkini()  # ← tambahkan ini
+
     try:
         model_uri = f"models:/{MODEL_NAME}/latest"
-        logger.info(f"🚚 Memuat model {MODEL_NAME} dari DagsHub...")
+        logger.info(f"Memuat model {MODEL_NAME} dari DagsHub...")
         model = mlflow.pyfunc.load_model(model_uri)
-        logger.info("✅ Model berhasil dimuat!")
+        logger.info("Model berhasil dimuat!")
     except Exception as e:
         logger.error(f"Gagal memuat model: {e}")
     yield
@@ -241,12 +272,22 @@ def tren_komoditas_list(kategori: Optional[str] = None):
     return list_commodities(kategori)
 
 @app.get("/tren/{komoditas_id}", response_model=TrenResponse)
-def get_tren(komoditas_id: str):
+def get_tren(komoditas_id: str, hari: int = 90):
     info = COMMODITY_CATALOG.get(komoditas_id)
     if not info: raise HTTPException(404, detail="Komoditas tidak ditemukan")
     if not engine: raise HTTPException(503, detail="Database tidak terhubung")
 
-    df = pd.read_sql(text("SELECT tanggal_data, harga_per_kg FROM harga_historis WHERE komoditas = :nama ORDER BY tanggal_data DESC LIMIT 30"), engine, params={"nama": info["nama"]}).sort_values("tanggal_data")
+    df = pd.read_sql(
+    text("""
+        SELECT tanggal_data, harga_per_kg 
+        FROM harga_historis 
+        WHERE komoditas = :nama 
+        ORDER BY tanggal_data DESC 
+        LIMIT :hari
+    """),
+    engine,
+    params={"nama": info["nama"], "hari": hari}
+).sort_values("tanggal_data")
     historis = [TitikData(tanggal=row["tanggal_data"].strftime("%Y-%m-%d"), harga=round(float(row["harga_per_kg"]), 2)) for _, row in df.iterrows()]
     last_harga = float(df["harga_per_kg"].iloc[-1]) if not df.empty else float(info["harga_ref"])
     
