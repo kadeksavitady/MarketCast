@@ -125,25 +125,19 @@ def export_pipeline_inputs(df_clean: pd.DataFrame, feat_final: pd.DataFrame,
                             output_dir: Path) -> None:
     """
     Export semua file yang dibutuhkan pipeline selanjutnya:
-        1. data_preprocessed.csv       → outputs/clustering/ + data/processed/
         2. cluster_assignments.csv     → outputs/clustering/
         3. centroid_representatives.csv→ outputs/clustering/
-        4. cluster_features.csv        → outputs/clustering/ + data/processed/
            (CV, mean_harga, trend_slope, cluster per komoditas)
            ↑ dipakai substitution engine untuk cari komoditas serupa
     """
-    processed_dir = Path("data/processed")
-    processed_dir.mkdir(parents=True, exist_ok=True)
 
     # ── 1. data_preprocessed.csv ─────────────────────────────────────────────
     df_export = (df_clean
                  .rename(columns={"tanggal_data": "tanggal"})
                  [["tanggal", "komoditas", "harga_per_kg"]])
     df_export.to_csv(output_dir / "data_preprocessed.csv", index=False)
-    df_export.to_csv(processed_dir / "data_preprocessed.csv", index=False)
     log.info(f"✅ data_preprocessed.csv  — {len(df_export):,} baris, "
              f"{df_export['komoditas'].nunique()} komoditas")
-    log.info(f"   → outputs/clustering/ + data/processed/")
 
     # ── 2. cluster_assignments.csv ───────────────────────────────────────────
     assignments = feat_final[["cluster"]].copy()
@@ -168,10 +162,7 @@ def export_pipeline_inputs(df_clean: pd.DataFrame, feat_final: pd.DataFrame,
     feat_export["cluster_label"] = feat_export["cluster"].map(CLUSTER_LABEL_MAP)
     feat_export.index.name = "komoditas"
     feat_export.to_csv(output_dir / "cluster_features.csv")
-    shutil.copy(output_dir / "cluster_features.csv",
-                processed_dir / "cluster_features.csv")
     log.info(f"✅ cluster_features.csv — CV, mean_harga, trend_slope per komoditas")
-    log.info(f"   → outputs/clustering/ + data/processed/")
 
 
 def export_centroid_timeseries(df_clean: pd.DataFrame, feat_final: pd.DataFrame,
@@ -202,14 +193,14 @@ def log_to_mlflow(feat_df: pd.DataFrame, output_dir: Path,
     # Cek koneksi dulu — hindari retry 4 menit kalau MLflow mati
     try:
         import requests
-        requests.get(f"{uri}/health", timeout=3)
+        requests.get(uri.rstrip("/") + "/api/2.0/mlflow/experiments/list", timeout=5)
     except Exception:
         log.warning(f"⚠️ MLflow tidak dapat dijangkau di {uri} — skip logging")
         return
 
     try:
-        import mlflow
-        mlflow.set_tracking_uri(uri)
+        import mlflow, dagshub
+        dagshub.init('MarketCast', 'kadeksavitady', mlflow=True)
         mlflow.set_experiment("siskaperbapo-clustering")
 
         with mlflow.start_run(run_name="KMeans-Final"):
@@ -261,7 +252,7 @@ def main():
     parser.add_argument("--csv-path", default="data/processed/harga_historis.csv")
     parser.add_argument("--output-dir", default="outputs/clustering")
     parser.add_argument("--k", type=int, default=3)
-    parser.add_argument("--mlflow-uri", default="http://localhost:5000")
+    parser.add_argument("--mlflow-uri", default="https://dagshub.com/kadeksavitady/MarketCast.mlflow")
     args = parser.parse_args()
 
     out_dir = Path(args.output_dir)
