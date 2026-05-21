@@ -170,9 +170,9 @@ def train_xgboost(komoditas: str,
                            "strategy" : "recursive_forecast"})
 
         # ── Forecast test set (recursive) ────────────────────
-        forecast_test = _recursive_forecast(
-            model, series_full, dates_full,
-            n_steps=len(test), feature_cols=feature_cols
+        forecast_test = _direct_forecast(
+            model, train, dates_train,
+            test_dates=dates_test, feature_cols=feature_cols
         )
 
         # ── Metrics ───────────────────────────────────────────
@@ -340,6 +340,35 @@ def tune_xgboost_optuna(
         "best_mape"  : best_mape,
         "best_run_id": best_run_id,
     }
+
+def _direct_forecast(model, train_series, dates_train,
+                     test_dates, feature_cols: list) -> np.ndarray:
+    """
+    Direct multi-step forecast untuk test set:
+    Setiap titik test diprediksi langsung dari lag data TRAIN asli,
+    bukan dari prediksi sebelumnya — setara dengan SARIMA & Prophet.
+    Tidak ada error akumulasi.
+    """
+    preds = []
+    train_arr = np.array(train_series)
+    for i, date in enumerate(test_dates):
+        # Bangun feature dari train asli + prediksi sebelumnya (hanya untuk rolling)
+        # Tapi lag utama tetap dari train asli
+        temp_series = np.concatenate([train_arr, np.array(preds)]) if preds else train_arr
+        temp_dates  = pd.date_range(
+            end=date,
+            periods=len(temp_series),
+            freq="D"
+        )
+        feat_df = build_features(temp_series, temp_dates)
+        if len(feat_df) == 0:
+            preds.append(float(train_arr[-1]))
+            continue
+        last_row = feat_df.iloc[[-1]][feature_cols].values
+        pred     = float(model.predict(last_row)[0])
+        preds.append(pred)
+    return np.array(preds)
+
 
 def _recursive_forecast(model, series_full, dates_full,
                          n_steps: int, feature_cols: list) -> np.ndarray:
