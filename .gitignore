@@ -23,3 +23,5 @@ __pycache__/
 .env
 *.log
 cek_sinkron.py
+node_modules/
+*.bak
