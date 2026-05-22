@@ -12,9 +12,17 @@ logger = logging.getLogger(__name__)
 DAGSHUB_REPO_OWNER = os.getenv("DAGSHUB_USER")
 DAGSHUB_REPO_NAME  = os.getenv("DAGSHUB_REPO")
 DATABASE_URL       = os.getenv("DATABASE_URL")
-MODEL_NAME         = "cluster 1"
+MODEL_REGISTRY = {
+    "cluster_1": "cluster 1",
+    "cluster_2": "cluster 2",
+    "cluster_3": "cluster 3"
+}
 
-engine = create_engine(DATABASE_URL) if DATABASE_URL else None
+engine = create_engine(
+    DATABASE_URL, 
+    pool_pre_ping=True,  # 🆕 Selalu tes "Halo?" sebelum mengeksekusi SQL
+    pool_recycle=300     # 🆕 Paksa tutup dan buka koneksi baru setiap 300 detik (5 menit)
+) if DATABASE_URL else None
 
 try:
     if DAGSHUB_REPO_OWNER and DAGSHUB_REPO_NAME:
