@@ -366,6 +366,9 @@ def train_sarima(
     split_weights = SPLIT_WEIGHTS[:n_splits]
     total_w       = sum(split_weights)
     split_weights = [w / total_w for w in split_weights]
+    
+    run_id    = ""
+    model_uri = ""
  
     with mlflow.start_run(run_name=f"{MODEL_NAME}__{komoditas}") as parent_run:
  

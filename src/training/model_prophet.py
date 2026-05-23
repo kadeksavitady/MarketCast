@@ -369,9 +369,7 @@ def train_prophet(
     run_id    = ""
     model_uri = ""
  
-    with mlflow.start_run(
-        run_name=f"{MODEL_NAME}__{komoditas}"
-    ) as parent_run:
+    with mlflow.start_run(run_name=f"{MODEL_NAME}__{komoditas}") as parent_run:
  
         mlflow.set_tags({
             "model"     : MODEL_NAME,
@@ -554,15 +552,10 @@ def train_prophet(
         mlflow.log_artifact(comp_path, artifact_path="plots")
         
         mlflow.prophet.log_model(final_model, artifact_path="model")
- 
-        # Capture run_id SETELAH log_model selesai upload
-        active_run = mlflow.active_run()
-        run_id     = active_run.info.run_id if active_run else ""
-        model_uri  = f"runs:/{run_id}/model" if run_id else ""
- 
-        if not run_id:
-            log.error(f"  run_id kosong untuk {komoditas} — model tidak ter-log!")
- 
+
+        run_id    = parent_run.info.run_id
+        model_uri  = f"runs:/{run_id}/model"
+
         mlflow.log_params({
             "final_cps"           : best_cps,
             "final_sps"           : best_sps,
