@@ -537,7 +537,19 @@ def train_sarima(
         mlflow.log_artifact(plot_path, artifact_path="plots")
  
         # ── Log model ─────────────────────────────────────────────────────────
-        mlflow.sklearn.log_model(final_model, artifact_path="model")
+        # Retry logic untuk upload artifact ke DagHub (antisipasi timeout)
+        import time
+        for attempt in range(3):
+            try:
+                mlflow.sklearn.log_model(final_model, artifact_path="model")
+                log.info(f"  Model artifact ter-upload (attempt {attempt+1})")
+                break
+            except Exception as e:
+                if attempt < 2:
+                    log.warning(f"  Upload gagal attempt {attempt+1}: {e} — retry dalam 5 detik")
+                    time.sleep(5)
+                else:
+                    log.error(f"  Upload gagal setelah 3 attempt: {e}")
  
         run_id    = parent_run.info.run_id
         model_uri = f"runs:/{run_id}/model"
