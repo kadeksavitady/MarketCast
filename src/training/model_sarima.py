@@ -30,7 +30,7 @@ import pmdarima as pm
 from pmdarima.arima import auto_arima, ARIMA
  
 from config import (
-    MLFLOW_TRACKING_URI,
+    init_mlflow,
     FORECAST_DAYS,
     get_logger,
     compute_metrics,
@@ -344,7 +344,7 @@ def train_sarima(
  
     Returns dict: model, metrics, forecast, run_id, model_uri
     """
-    mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
+    init_mlflow
     mlflow.set_experiment(mlflow_experiment or "MarketCast-Tournament")
  
     series_full  = data["series_full"]
