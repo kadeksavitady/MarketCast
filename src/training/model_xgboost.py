@@ -27,7 +27,7 @@ from scipy.stats import randint, uniform, loguniform
 from typing import List, Dict, Tuple
 
 from config import (
-    MLFLOW_TRACKING_URI,
+    init_mlflow,
     FORECAST_DAYS,
     get_logger,
     compute_metrics,
@@ -335,7 +335,7 @@ def train_xgboost(
         - Best params dipakai untuk semua split berikutnya
         - Log tuning sebagai nested runs
     """
-    mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
+    init_mlflow()
     mlflow.set_experiment(mlflow_experiment or "MarketCast-Tournament")
 
     series_full  = data["series_full"]

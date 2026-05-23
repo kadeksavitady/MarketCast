@@ -344,7 +344,7 @@ def train_sarima(
  
     Returns dict: model, metrics, forecast, run_id, model_uri
     """
-    init_mlflow
+    init_mlflow()
     mlflow.set_experiment(mlflow_experiment or "MarketCast-Tournament")
  
     series_full  = data["series_full"]
