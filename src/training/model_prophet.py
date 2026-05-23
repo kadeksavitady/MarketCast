@@ -386,9 +386,10 @@ def train_prophet(
         # ── Optuna tuning pada split terakhir (mode=specialize) ──
         # Dilakukan SEBELUM loop split agar best_params dipakai
         # konsisten di semua split (bukan hanya split terakhir)
-        best_cps   = changepoint_prior_scale
-        best_sps   = seasonality_prior_scale
-        best_fo    = 5
+        # Resolve None ke nilai default cluster — agar log tidak tampil None
+        best_cps    = changepoint_prior_scale or CLUSTER_CPS_DEFAULT.get(cluster, 0.05)
+        best_sps    = seasonality_prior_scale or 10.0
+        best_fo     = 5
         tune_params = {}
  
         if mode == "specialize":
