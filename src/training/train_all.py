@@ -13,13 +13,16 @@ POSISI DALAM PIPELINE KESELURUHAN:
 DUA MODE EKSEKUSI:
     --mode tournament  (Tahap 2)
         Semua centroid × 3 model = 9 runs
-        SARIMA training_mode = "tournament" → auto_arima AIC stepwise
+        Semua model pakai parameter default per cluster
         Experiment: MarketCast-Tournament
         Output: leaderboard → pilih 1 juara per cluster di DagsHub MLflow UI
 
     --mode specialize  (Tahap 3a)
         SEMUA komoditas (centroid + non-centroid) × model juara cluster masing-masing
-        SARIMA training_mode = "specialize" → GridSearch 36 kombinasi + prior cluster
+        Hyperparameter tuning diaktifkan per model:
+            SARIMA   → GridSearch 36 kombinasi + prior knowledge cluster
+            Prophet  → Optuna TPE 15 trial + early stopping (patience=5)
+            XGBoost  → Optuna TPE 30 trial + early stopping (patience=5)
         Experiment: MarketCast-Specialization
         Output: model_registry_map.yaml → dipakai FastAPI & business logic
         Catatan: centroid di-retrain ulang di sini (bukan skip) agar semua
@@ -27,18 +30,14 @@ DUA MODE EKSEKUSI:
 
 ARSITEKTUR PEMANGGILAN MODEL:
     Semua model dipanggil via _call_model() — satu titik dispatch yang
-    meneruskan training_mode ke model yang mendukungnya (SARIMA).
-    Prophet dan XGBoost tidak terpengaruh oleh training_mode.
+    meneruskan training_mode ke semua model:
+        tournament → semua model pakai parameter default
+        specialize → semua model aktifkan hyperparameter tuning
+    Keputusan mode ada di train_all.py, bukan di masing-masing model.
 
 CARA PAKAI:
     # Tahap 2 — turnamen baseline (jalankan dari root repo)
     python src/training/train_all.py --mode tournament
-
-    # Tahap 3a — setelah pilih juara di DagsHub MLflow UI
-    python src/training/train_all.py --mode specialize \
-        --champion C0_LabilDatar=sarima \
-        --champion C1_LabilInflasi=prophet \
-        --champion C2_StabilMahal=xgboost
 
     # Tahap 3a — tanpa --champion (auto-load dari MLflow Registry @champion alias)
     python src/training/train_all.py --mode specialize
