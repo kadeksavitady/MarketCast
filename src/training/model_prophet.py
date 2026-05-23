@@ -39,16 +39,12 @@ MIN_TRAIN     = 1095    # 3 tahun
 SPLIT_WEIGHTS = [0.10, 0.15, 0.20, 0.25, 0.30]
  
 # Default changepoint_prior_scale per cluster
-# Sesuai karakteristik volatilitas dari hasil clustering:
-#   C0 (volatile, spike tinggi)  → 0.30: tren boleh berubah tajam
-#   C1 (inflasi moderat)         → 0.05: tren smooth, inflasi konsisten
-#   C2 (stabil, harga tinggi)    → 0.05: tren sangat smooth
 CLUSTER_CPS_DEFAULT = {
-    "C0_LabilDatar"  : 0.30,
-    "C1_LabilInflasi": 0.05,
-    "C2_StabilMahal" : 0.05,
+    "C0_LabilDatar"  : 0.30, # tren boleh berubah tajam (volatile, spike tinggi)
+    "C1_LabilInflasi": 0.05, # tren smooth, inflasi konsisten (inflasi moderat) 
+    "C2_StabilMahal" : 0.05, # tren sangat smooth (stabil, harga tinggi)
 }
- 
+
 # Kalender hari besar Indonesia
 # Dampak ke harga pangan terdokumentasi (BPS Jatim 2021-2025)
 INDONESIAN_HOLIDAYS = pd.DataFrame({
@@ -65,7 +61,6 @@ INDONESIAN_HOLIDAYS = pd.DataFrame({
     "lower_window": [-7,-7,-7,-7,-7, -3,-3,-3,-3,-3, -3,-3,-3,-3,-3],
     "upper_window": [ 3, 3, 3, 3, 3,  1, 1, 1, 1, 1,  1, 1, 1, 1, 1],
 })
- 
  
 # ══════════════════════════════════════════════════════════════
 # 1. SPLIT GENERATOR — sama persis dengan model_sarima.py
