@@ -74,10 +74,6 @@ def init_mlflow() -> str:
         Dengan flag _MLFLOW_INITIALIZED: pemanggilan pertama melakukan setup,
         pemanggilan berikutnya langsung return URI yang sudah aktif.
 
-    CARA PAKAI:
-        from config import init_mlflow
-        init_mlflow()  # panggil sekali di awal, aman dipanggil lagi
-
     Returns:
         str: URI aktif (DagsHub atau lokal)
     """
