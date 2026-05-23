@@ -621,4 +621,3 @@ def _plot_sarima_cv(
     ax.grid(alpha=0.2)
     plt.tight_layout()
     return fig
- 
