@@ -83,7 +83,6 @@ MODEL_REGISTRY = {
     "xgboost" : train_xgboost,
 }
  
- 
 # ══════════════════════════════════════════════════════════════
 # HELPER: pemanggilan model dengan training_mode
 # ══════════════════════════════════════════════════════════════
@@ -224,8 +223,10 @@ def run_specialize(champion_map: dict, all_data: dict,
         punya model yang lebih optimal untuk production serving.
     """
     import mlflow
+    from mlflow.tracking import MlflowClient
     init_mlflow()
  
+    client = MlflowClient()
     TRAINING_MODE = "specialize"   # ← deklarasi eksplisit di sini
  
     centroid_list   = load_centroid_list()
@@ -288,6 +289,21 @@ def run_specialize(champion_map: dict, all_data: dict,
                 n_failed += 1
                 continue
  
+            # Buat nama standar yang aman untuk URL
+            safe_name = komoditas.replace(" ", "_").replace("/", "_")
+            reg_name  = f"MarketCast_{safe_name}"
+
+            # Daftarkan model ke tab "Models" di DagsHub UI
+            log.info(f"  Mendaftarkan ke DagsHub Registry sebagai '{reg_name}'...")
+            mv = mlflow.register_model(model_uri=model_uri, name=reg_name)
+
+            # Beri alias 'production' ke versi model yang baru saja masuk
+            client.set_registered_model_alias(
+                name=reg_name,
+                alias="production",
+                version=mv.version
+            )
+
             registry[komoditas] = {
                 "cluster"      : cluster_short,
                 "model"        : model_name,
@@ -296,8 +312,10 @@ def run_specialize(champion_map: dict, all_data: dict,
                 "mape"         : result["metrics"]["mape"],
                 "mae"          : result["metrics"]["mae"],
                 "is_centroid"  : is_centroid,
+                "registry_name" : reg_name,    # ── Menyimpan nama registry untuk backup
+                "version"       : mv.version, # ── Menyimpan versi model
             }
-            log.info(f"  ✓ MAPE={result['metrics']['mape']:.2f}%  uri={model_uri}")
+            log.info(f"  ✓ MAPE={result['metrics']['mape']:.2f}%  uri={model_uri} | Registry: {reg_name}@production (v{mv.version})")
  
         except Exception as e:
             n_failed += 1
