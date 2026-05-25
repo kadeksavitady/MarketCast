@@ -1,10 +1,11 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { getKomoditas, getKategori, predictBelanja } from "../services/api";
 import {
   ShoppingCart, Wallet, Lightbulb, X, Plus, Minus,
   ChevronRight, Package, Beef, Droplets, Egg,
   Leaf, Fish, Wheat, Cookie, FlameKindling
 } from "lucide-react";
+import SmartSubstitution from "../components/SmartSubstitution";
 
 // Icon mapping per kategori
 const KATEGORI_ICON = {
@@ -106,9 +107,14 @@ export default function Dashboard() {
   };
 
   // Kalkulasi lokal kalau belum ada hasil predict
-  const totalPrediksi = hasilPredict
-    ? hasilPredict.total_prediksi
-    : keranjang.reduce((s, i) => s + i.harga_ref * i.qty, 0);
+  const totalPrediksi = useMemo(() => {
+    if (hasilPredict && keranjang.length > 0) return hasilPredict.total_prediksi;
+    return keranjang.reduce((s, i) => s + i.harga_ref * i.qty, 0);
+  }, [keranjang, hasilPredict]);
+
+  useEffect(() => {
+    if (keranjang.length === 0) setHasilPredict(null);
+  }, [keranjang]);
 
   const sisaBudget = budget - totalPrediksi;
   const persen = budget > 0 ? Math.min(100, (totalPrediksi / budget) * 100) : 0;
@@ -320,45 +326,18 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* SMART SUBSTITUTION */}
-        {substitutions.length > 0 && (
-          <div style={card}>
-            <CardHeader icon={<Lightbulb size={16} color="#ca8a04" />}
-              bg="#fef9c3" title="Smart Substitution" />
-            <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
-              {substitutions.map((sub, i) => (
-                <div key={i} style={{ border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", overflow: "hidden" }}>
-                  <div style={{ padding: "12px 14px" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-                      <span style={{ ...subBadge, background: "var(--accent)" }}>Current</span>
-                      <span style={{ fontSize: 13.5, fontWeight: 700 }}>{sub.current_nama}</span>
-                    </div>
-                    <div style={{ fontSize: 12, fontFamily: "DM Mono,monospace", fontWeight: 600, color: "var(--red)" }}>
-                      Predicted: {formatRp(sub.current_harga)}/kg
-                    </div>
-                    <div style={{ textAlign: "center", padding: "6px 0", color: "var(--primary)", fontSize: 16 }}>↓</div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-                      <span style={{ ...subBadge, background: "var(--primary)" }}>Substitute</span>
-                      <span style={{ fontSize: 13.5, fontWeight: 700 }}>{sub.substitute_nama}</span>
-                    </div>
-                    <div style={{ fontSize: 12, fontFamily: "DM Mono,monospace", fontWeight: 600, color: "var(--primary-dark)" }}>
-                      Predicted: {formatRp(sub.substitute_harga)}/kg
-                    </div>
-                  </div>
-                  <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 14px", background: "var(--primary-light)", borderTop: "1px solid #a7f3d0" }}>
-                    <span style={{ fontSize: 12.5, color: "var(--text-sub)" }}>Savings:</span>
-                    <span style={{ fontSize: 12.5, fontFamily: "DM Mono,monospace", fontWeight: 800, color: "var(--primary-dark)" }}>
-                      ↘ {formatRp(sub.potensi_hemat)}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div style={{ margin: "0 16px 16px", background: "linear-gradient(135deg, var(--primary-dark), var(--primary))", borderRadius: "var(--radius-sm)", padding: "14px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", color: "white" }}>
-              <span style={{ fontSize: 13, fontWeight: 600, opacity: 0.9 }}>Total Potensi Penghematan</span>
-              <span style={{ fontSize: 18, fontWeight: 800, fontFamily: "DM Mono,monospace" }}>{formatRp(totalHemat)}</span>
-            </div>
-          </div>
+        {/* SMART SUBSTITUTION — semua skenario */}
+        {hasilPredict && keranjang.length > 0 && (
+          <SmartSubstitution
+            status={hasilPredict?.status || status}
+            keranjang={keranjang}
+            substitutions={substitutions}
+            totalHemat={totalHemat}
+            totalPrediksi={totalPrediksi}
+            budget={budget}
+            hasilPredict={hasilPredict}
+            onRemoveItem={removeItem}
+          />
         )}
       </div>
 

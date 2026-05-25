@@ -1,8 +1,20 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Search } from "lucide-react";
 
 export default function Topbar({ onSearch }) {
   const [query, setQuery] = useState("");
+  const [tanggal, setTanggal] = useState("");
+
+  useEffect(() => {
+    const now = new Date();
+    const formatted = now.toLocaleDateString("id-ID", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
+    setTanggal(formatted);
+  }, []);
 
   const handleChange = (e) => {
     setQuery(e.target.value);
@@ -20,12 +32,8 @@ export default function Topbar({ onSearch }) {
           onChange={handleChange}
         />
       </div>
-      <div style={styles.userChip}>
-        <div style={styles.userInfo}>
-          <div style={styles.userName}>MarketCast</div>
-          <div style={styles.userRole}>Kota Surabaya</div>
-        </div>
-        <div style={styles.avatar}>MC</div>
+      <div style={styles.dateChip}>
+        <span style={styles.dateText}>{tanggal}</span>
       </div>
     </header>
   );
@@ -63,19 +71,18 @@ const styles = {
     outline: "none",
     width: "100%",
   },
-  userChip: {
+  dateChip: {
     display: "flex",
     alignItems: "center",
-    gap: 10,
+    gap: 8,
+    background: "var(--bg)",
+    border: "1px solid var(--border)",
+    borderRadius: 10,
+    padding: "6px 14px",
   },
-  userInfo: { textAlign: "right" },
-  userName: { fontSize: 13.5, fontWeight: 700 },
-  userRole: { fontSize: 11.5, color: "var(--text-sub)" },
-  avatar: {
-    width: 36, height: 36,
-    borderRadius: "50%",
-    background: "linear-gradient(135deg, var(--primary), #00a8ff)",
-    display: "flex", alignItems: "center", justifyContent: "center",
-    color: "white", fontWeight: 700, fontSize: 13,
+  dateText: {
+    fontSize: 13,
+    color: "var(--text-sub)",
+    fontWeight: 500,
   },
 };
