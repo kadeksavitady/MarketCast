@@ -2,6 +2,7 @@ from typing import List, Tuple
 from src.business_logic.katalog import COMMODITY_CATALOG
 from src.business_logic.ml_service import predict_harga_satuan
 from src.api.schemas import CartItem, ItemResult, SubstitusiItem
+from src.core.config import logger
 
 def build_substitution_dynamic(keranjang: List[CartItem], detail: List[ItemResult]) -> Tuple[List[SubstitusiItem], float]:
     subs = []
@@ -17,7 +18,19 @@ def build_substitution_dynamic(keranjang: List[CartItem], detail: List[ItemResul
 
         for slug, info in COMMODITY_CATALOG.items():
             if info["kategori"] == kategori_target and slug != current_id:
-                sub_harga = predict_harga_satuan(slug)
+                # 🚨 PERBAIKAN 1: Gunakan info["nama"]
+                # 🚨 PERBAIKAN 2: Gunakan try-except agar tidak crash jika model rusak
+                try:
+                    sub_harga = predict_harga_satuan(info["nama"])
+                except Exception as e:
+                    logger.warning(f"Melewati {info['nama']} untuk substitusi karena gagal prediksi: {e}")
+                    # Gunakan harga referensi dari katalog jika MLflow gagal
+                    sub_harga = float(info.get("harga_ref", 0.0))
+                
+                # Jangan hitung hemat jika harga pengganti 0 (data tidak valid)
+                if sub_harga == 0:
+                    continue
+
                 hemat = (result.harga_per_satuan - sub_harga) * item.jumlah
 
                 if hemat > max_hemat:
@@ -33,4 +46,4 @@ def build_substitution_dynamic(keranjang: List[CartItem], detail: List[ItemResul
             ))
             total_hemat += max_hemat
 
-    return subs, round(total_hemat, 2)  
+    return subs, round(total_hemat, 2)

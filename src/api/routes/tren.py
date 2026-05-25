@@ -27,8 +27,23 @@ def get_tren(komoditas_id: str, hari: int = 90):
     historis = [TitikData(tanggal=row["tanggal_data"].strftime("%Y-%m-%d"), harga=round(float(row["harga_per_kg"]), 2)) for _, row in df.iterrows()]
     last_harga = float(df["harga_per_kg"].iloc[-1]) if not df.empty else float(info["harga_ref"])
     
-    forecast_data = generate_forecast(info["nama"], last_harga)
-    forecast_models = [TitikData(**item) for item in forecast_data]
+    # 🚨 PERBAIKAN 1: Tangkap error dari MLflow
+    try:
+        forecast_prices = generate_forecast(info["nama"], last_harga)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Gagal menyusun ramalan: {str(e)}")
+    
+    # 🚨 PERBAIKAN 2: Rakit tanggal kalender untuk angka ramalan
+    forecast_models = []
+    if historis:
+        last_date_obj = pd.to_datetime(historis[-1].tanggal)
+    else:
+        last_date_obj = pd.Timestamp.today()
+        
+    for i, price in enumerate(forecast_prices):
+        # Tambahkan hari (1 sampai 30) dari tanggal terakhir
+        next_date = (last_date_obj + pd.Timedelta(days=i+1)).strftime("%Y-%m-%d")
+        forecast_models.append(TitikData(tanggal=next_date, harga=round(price, 2)))
     
     return TrenResponse(
         komoditas_id=komoditas_id, nama_komoditas=info["nama"], 
