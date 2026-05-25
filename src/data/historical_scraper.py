@@ -6,12 +6,6 @@ Fitur:
 - Full Whitelist 43 Komoditas + Kategori
 - Output Logging ganda (Terminal & File)
 - Standardisasi Satuan ke KG (Sinkron dengan Pipeline Harian)
-
-CHANGELOG (BUG FIX):
-- [FIX] Fungsi normalisasi_nama didefinisikan (sebelumnya dipanggil tapi tidak ada)
-- [FIX] simpan_batch sekarang menghitung harga_per_kg & faktor_konversi sebelum INSERT
-- [FIX] Kolom kategori sekarang di-extract dari kolom ke-0 tabel HTML
-- [FIX] WHITELIST 'bata' & 'halus' diperbaiki menjadi 'garam bata' & 'garam halus'
 """
 
 import asyncio
@@ -46,40 +40,26 @@ BASE_URL   = "https://siskaperbapo.jatimprov.go.id/harga/tabel"
 TIMEOUT_MS = 60_000
 
 TANGGAL_AWAL  = date(2021, 5, 7)
-TANGGAL_AKHIR = date(2026, 5, 18)
+TANGGAL_AKHIR = date(2026, 5, 24)
 
-# Full Whitelist 43 Komoditas
-# [FIX] 'bata' & 'halus' diperbaiki menjadi 'garam bata' & 'garam halus'
-WHITELIST_MAP = {
-    'Beras Premium': 'BERAS', 'Beras Medium': 'BERAS',
-    'Gula Kristal Putih': 'GULA',
-    'Minyak Goreng Curah': 'MINYAK GORENG', 'Minyak Goreng Kemasan Premium': 'MINYAK GORENG',
-    'Minyak Goreng Kemasan Sederhana': 'MINYAK GORENG', 'Minyak Goreng MINYAKITA': 'MINYAK GORENG',
-    'Daging Sapi Paha Belakang': 'DAGING', 'Daging Ayam Ras': 'DAGING', 'Daging Ayam Kampung': 'DAGING',
-    'Telur Ayam Ras': 'TELUR', 'Telur Ayam Kampung': 'TELUR',
-    'Susu Kental Manis Merk Bendera': 'SUSU', 'Susu Kental Manis Merk Indomilk': 'SUSU',
-    'Susu Bubuk Merk Bendera (Instant)': 'SUSU', 'Susu Bubuk Merk Indomilk (Instant)': 'SUSU',
-    'Jagung Pipilan Kering': 'PALAWIJA', 'Kedelai Impor': 'PALAWIJA', 'Kedelai Lokal': 'PALAWIJA',
-    'KACANG HIJAU': 'PALAWIJA', 'KACANG TANAH': 'PALAWIJA', 'KETELA POHON': 'PALAWIJA',
-    'Bata': 'GARAM', 'Halus': 'GARAM',
-    'Terigu Protein Sedang (Kemasan)': 'TEPUNG',
-    'Indomie Rasa Kari Ayam': 'MIE INSTAN',
-    'Cabe Merah Keriting': 'CABE', 'Cabe Merah Besar': 'CABE', 'Cabe Rawit Merah': 'CABE',
-    'Bawang Merah': 'BAWANG', 'Bawang Putih Sinco/Honan': 'BAWANG',
-    'Ikan Asin Teri': 'IKAN ASIN',
-    'KOL/KUBIS': 'SAYUR MAYUR', 'KENTANG': 'SAYUR MAYUR', 'Tomat Merah': 'SAYUR MAYUR',
-    'WORTEL': 'SAYUR MAYUR', 'BUNCIS': 'SAYUR MAYUR',
-    'Ikan Bandeng': 'IKAN SEGAR', 'Ikan Kembung': 'IKAN SEGAR', 'Ikan Tuna': 'IKAN SEGAR',
-    'Ikan Tongkol': 'IKAN SEGAR', 'Ikan Cakalang': 'IKAN SEGAR',
-    'GAS ELPIGI 3 Kg': 'BARANG PENTING LAINNYA'
-}
-
-WHITELIST_LOWER = {k.lower(): k for k in WHITELIST_MAP.keys()}
-
-# ── RENAME DISPLAY NAME ──
-RENAME_KOMODITAS = {
-    "Bata":  "Garam Bata",
-    "Halus": "Garam Halus",
+# Whitelist 43 Komoditas
+WHITELIST = {
+    'beras premium', 'beras medium', 'gula kristal putih',
+    'minyak goreng curah', 'minyak goreng kemasan premium',
+    'minyak goreng kemasan sederhana', 'minyak goreng minyakita',
+    'daging sapi paha belakang', 'daging ayam ras', 'daging ayam kampung',
+    'telur ayam ras', 'telur ayam kampung',
+    'susu kental manis merk bendera', 'susu kental manis merk indomilk',
+    'susu bubuk merk bendera (instant)', 'susu bubuk merk indomilk (instant)',
+    'jagung pipilan kering',
+    'bata', 'halus',
+    'terigu protein sedang (kemasan)', 'kedelai impor', 'kedelai lokal',
+    'indomie rasa kari ayam', 'cabe merah keriting', 'cabe merah besar',
+    'cabe rawit merah', 'bawang merah', 'bawang putih sinco/honan',
+    'ikan asin teri', 'kacang hijau', 'kacang tanah', 'ketela pohon',
+    'kol/kubis', 'kentang', 'tomat merah', 'wortel', 'buncis',
+    'ikan bandeng', 'ikan kembung', 'ikan tuna', 'ikan tongkol',
+    'ikan cakalang', 'gas elpigi 3 kg',
 }
 
 # ── KAMUS KONVERSI SATUAN KE KG ──
@@ -143,7 +123,7 @@ def simpan_batch(rows, tanggal_data):
 
         for row in rows:
             try:
-                # [FIX] Hitung faktor konversi & harga per kg di sini
+                # Hitung faktor konversi & harga per kg di sini
                 satuan_raw = row['satuan'].strip().lower()
                 faktor = SATUAN_KONVERSI.get(satuan_raw, 1.0)
                 harga_per_kg = round(row['harga_rp'] / faktor, 2) if faktor > 0 else row['harga_rp']
@@ -156,7 +136,7 @@ def simpan_batch(rows, tanggal_data):
                 """), {
                     "tgl": tgl_timestamp,
                     "kom": row['komoditas'],
-                    "kat": row.get('kategori', ''),   # [FIX] pakai .get() agar tidak KeyError
+                    "kat": row.get('kategori', ''),   # pakai .get() agar tidak KeyError
                     "hrg_kg": harga_per_kg,
                     "sat_orig": row['satuan'],
                     "faktor": faktor
@@ -177,11 +157,6 @@ def simpan_batch(rows, tanggal_data):
 
 # ── PARSING UTILS ──
 def normalisasi_nama(nama):
-    """
-    [FIX] Fungsi ini sebelumnya dipanggil di scraper tapi tidak pernah didefinisikan
-    (yang ada hanya clean_name_daily). Ini penyebab utama NameError dan data hilang.
-    Membersihkan nama komoditas dari nomor urut, strip spasi, dan normalisasi.
-    """
     if not nama:
         return ""
     # Hapus angka & simbol di awal (misal: "1. Beras Premium" → "Beras Premium")

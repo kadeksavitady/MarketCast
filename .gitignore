@@ -1,7 +1,11 @@
 # --- DATABASE & DATA STORAGE ---
 postgres_data/
 data/raw/siskaperbapo.db
-
+mlflow_data/
+outputs/
+data/processed/
+*.csv
+*.joblib
 *.db
 *.sqlite3
 
@@ -14,8 +18,17 @@ venv_py310/
 # Blokir cache Python
 __pycache__/
 *.py[cod]
+*$py.class
 
 # --- CREDENTIALS & LOGS ---
 .env
 *.log
 cek_sinkron.py
+node_modules/
+*.bak
+
+# Frontend
+src/frontend/.vite/
+
+# DVC Local Config
+.dvc/config.local

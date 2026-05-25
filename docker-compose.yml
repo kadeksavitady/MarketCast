@@ -1,33 +1,7 @@
 name: marketcast-app
 
 services:
-  # Database PostgreSQL
-  db:
-    image: postgres:15
-    container_name: marketcast_db_container
-    restart: always
-    environment:
-      POSTGRES_USER: ${DB_USER:-postgres}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-password123}
-      POSTGRES_DB: ${DB_NAME:-marketcast_dw}
-    ports:
-      - "5433:5432"
-    volumes:
-      - ./data/postgres_data:/var/lib/postgresql/data
-    networks:
-      - marketcast_network
-
-  # Adminer
-  adminer:
-    image: adminer
-    container_name: marketcast_adminer
-    restart: always
-    ports:
-      - "8080:8080"
-    networks:
-      - marketcast_network
-
-  # MLflow
+  # ── 1. MLOps Tracker (MLflow) ───────────────────────────────────────────────
   mlflow:
     build:
       context: .
@@ -37,10 +11,45 @@ services:
       - "5000:5000"
     volumes:
       - ./mlflow_data:/mlflow
+    env_file:
+      - .env  # Menggunakan Neon Cloud
     networks:
       - marketcast_network
 
-# Definisi Network diletakkan di paling bawah, sejajar dengan services
+  # ── 2. Backend FastAPI (Otak Aplikasi) ───────────────────────────────────────
+  backend-api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    container_name: marketcast_api
+    ports:
+      - "8000:8000"
+    volumes:
+      # Konsep shared volume dari file baru, tapi diubah ke struktur folder kita
+      - ./models:/app/models 
+      - ./src/api:/app/src/api
+    env_file:
+      - .env  # Menggunakan Neon Cloud, TIDAK ADA database lokal!
+    networks:
+      - marketcast_network
+    restart: unless-stopped
+
+  # ── 3. Frontend Streamlit (UI Interaktif) ───────────────────────────────────────────────
+  # frontend:
+  #   build:
+  #     context: .
+  #     dockerfile: docker/Dockerfile.frontend
+  #   container_name: marketcast_frontend
+  #   ports:
+  #     - "8501:8501"
+  #   environment:
+  #     - BACKEND_URL=http://backend-api:8000
+  #   depends_on:
+  #     - backend-api
+  #   networks:
+  #     - marketcast_network
+  #   restart: unless-stopped
+
 networks:
   marketcast_network:
     name: marketcast_network

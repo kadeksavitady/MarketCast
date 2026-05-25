@@ -111,8 +111,6 @@ async def scrape_harian(page, tgl_str):
         await btn.click()
 
         # ==========================================
-        # 🛡️ 3 JURUS PASTI ANTI-BUTA 
-        # ==========================================
         # 1. Tunggu respons tabel
         try:
             await page.wait_for_selector('table tbody tr', state='visible', timeout=15000)
@@ -218,7 +216,7 @@ async def job_update_harian():
 
             if data_rows:
                 log.info(f"📊 Berhasil menarik {len(data_rows)} data. Langsung memompa ke Cloud...")
-                # LANGSUNG DI-PUSH KE NEON TANPA BERTANYA (Otomatisasi Penuh)
+                # LANGSUNG DI-PUSH KE NEON TANPA VALIDASI (Otomatisasi Penuh)
                 push_ke_neon(data_rows, hari_ini)
             else:
                 log.warning("⚠️ Data kosong hari ini (kemungkinan server siskaperbapo error/libur).")
