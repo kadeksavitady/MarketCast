@@ -19,6 +19,8 @@ INFRASTRUKTUR DOCKER (docker-compose.yml):
 
 import os
 import logging
+from dotenv import load_dotenv
+load_dotenv()
 import numpy as np
 import pandas as pd
 from pathlib import Path
@@ -71,10 +73,6 @@ def init_mlflow() -> str:
 
         Dengan flag _MLFLOW_INITIALIZED: pemanggilan pertama melakukan setup,
         pemanggilan berikutnya langsung return URI yang sudah aktif.
-
-    CARA PAKAI:
-        from config import init_mlflow
-        init_mlflow()  # panggil sekali di awal, aman dipanggil lagi
 
     Returns:
         str: URI aktif (DagsHub atau lokal)

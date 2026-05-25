@@ -14,7 +14,6 @@ from config import (
 
 log = get_logger("data_loader")
 
-
 def load_preprocessed(csv_path: Path = CSV_PREPROCESSED) -> pd.DataFrame:
     path = Path(csv_path)
     if not path.exists():
@@ -24,7 +23,6 @@ def load_preprocessed(csv_path: Path = CSV_PREPROCESSED) -> pd.DataFrame:
         )
 
     df = pd.read_csv(path)
-
     date_col  = next((c for c in df.columns
                       if c.lower() in ("tanggal_data", "tanggal", "date", "ds")),
                      df.columns[0])
@@ -48,7 +46,6 @@ def load_preprocessed(csv_path: Path = CSV_PREPROCESSED) -> pd.DataFrame:
     log.info(f"Loaded {len(df):,} rows | {n_kom} komoditas")
     log.info(f"Rentang: {df['tanggal'].min().date()} → {df['tanggal'].max().date()}")
     return df[["tanggal", "komoditas", "harga_per_kg"]]
-
 
 def prepare_series(df: pd.DataFrame, komoditas: str,
                    cluster_map: dict = None) -> dict:
@@ -74,7 +71,6 @@ def prepare_series(df: pd.DataFrame, komoditas: str,
     values = grp.values
     dates  = grp.index
     n      = len(values)
-
     split   = int(n * TRAIN_RATIO)
     n_test  = n - split
     n_train = split
@@ -85,7 +81,6 @@ def prepare_series(df: pd.DataFrame, komoditas: str,
             f"{komoditas}: train set terlalu kecil ({n_train} rows < "
             f"MIN_TRAIN_ROWS={MIN_TRAIN_ROWS}). Total data: {n} rows."
         )
-
     # FIX: guard test set kosong
     if n_test == 0:
         raise ValueError(
@@ -119,7 +114,6 @@ def prepare_series(df: pd.DataFrame, komoditas: str,
         "n_test"     : n_test,
         "train_pct"  : round(n_train / n, 4),
     }
-
 
 def load_all_series(df: pd.DataFrame,
                     komoditas_list: list,

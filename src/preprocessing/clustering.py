@@ -1,6 +1,5 @@
 import argparse
 import logging
-import shutil
 import sys
 import warnings
 from pathlib import Path
@@ -56,7 +55,7 @@ def preprocess_for_clustering(df: pd.DataFrame) -> pd.DataFrame:
     """Hanya menangani outlier karena satuan sudah kg dari hulu."""
     log.info("─── PREPROCESSING CLUSTERING ───")
     df = df.copy()
-    df["tanggal_data"] = pd.to_datetime(df["tanggal_data"])
+    df["tanggal"] = pd.to_datetime(df["tanggal"])
 
     for komoditas, group in df.groupby("komoditas"):
         q1, q3 = group["harga_per_kg"].quantile([0.25, 0.75])
@@ -75,8 +74,8 @@ def preprocess_for_clustering(df: pd.DataFrame) -> pd.DataFrame:
 def build_features(df: pd.DataFrame) -> pd.DataFrame:
     features = []
     for komoditas, group in df.groupby("komoditas"):
-        prices = group.sort_values("tanggal_data")["harga_per_kg"].values
-        days   = (group["tanggal_data"] - group["tanggal_data"].min()).dt.days.values
+        prices = group.sort_values("tanggal")["harga_per_kg"].values
+        days   = (group["tanggal"] - group["tanggal"].min()).dt.days.values
 
         mean_p = np.mean(prices)
         cv     = np.std(prices) / mean_p if mean_p > 0 else 0
@@ -133,7 +132,7 @@ def export_pipeline_inputs(df_clean: pd.DataFrame, feat_final: pd.DataFrame,
 
     # ── 1. data_preprocessed.csv ─────────────────────────────────────────────
     df_export = (df_clean
-                 .rename(columns={"tanggal_data": "tanggal"})
+                 .rename(columns={"tanggal": "tanggal"})
                  [["tanggal", "komoditas", "harga_per_kg"]])
     df_export.to_csv(output_dir / "data_preprocessed.csv", index=False)
     log.info(f"✅ data_preprocessed.csv  — {len(df_export):,} baris, "
@@ -170,7 +169,7 @@ def export_centroid_timeseries(df_clean: pd.DataFrame, feat_final: pd.DataFrame,
     for komo in feat_final[feat_final["is_centroid"]].index:
         slug   = komo.lower().replace(" ", "_")
         sub_df = (df_clean[df_clean["komoditas"] == komo]
-                  [["tanggal_data", "harga_per_kg"]]
+                  [["tanggal", "harga_per_kg"]]
                   .copy())
         sub_df.columns = ["ds", "y"]
         sub_df.to_csv(output_dir / f"ts_centroid_{slug}.csv", index=False)
@@ -249,7 +248,7 @@ def main():
         description="Clustering pipeline PBL-MarketCast"
     )
     parser.add_argument("--source", choices=["csv", "postgres"], default="csv")
-    parser.add_argument("--csv-path", default="data/processed/harga_historis.csv")
+    parser.add_argument("--csv-path", default="data/processed/harga_historis_clean.csv")
     parser.add_argument("--output-dir", default="outputs/clustering")
     parser.add_argument("--k", type=int, default=3)
     parser.add_argument("--mlflow-uri", default="https://dagshub.com/kadeksavitady/MarketCast.mlflow")
