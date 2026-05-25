@@ -1,122 +1,164 @@
 import { useLocation, useNavigate } from "react-router-dom";
+import { useSidebar } from "../context/SidebarContext";
 import {
-  LayoutDashboard,
-  TrendingUp,
-  History,
-  Settings,
-  ShoppingBasket,
+  LayoutDashboard, TrendingUp, HelpCircle,
+  Settings, ShoppingBasket, ChevronRight,
 } from "lucide-react";
 
 const navItems = [
-  { id: "/", icon: LayoutDashboard, label: "Dashboard" },
-  { id: "/tren", icon: TrendingUp, label: "Market Trends" },
-  { id: "/history", icon: History, label: "Simulation History" },
+  { id: "/",      icon: LayoutDashboard, label: "Dashboard" },
+  { id: "/tren",  icon: TrendingUp,      label: "Market Trends" },
+  { id: "/faq",   icon: HelpCircle,      label: "FAQ & Tentang" },
 ];
 
 export default function Sidebar() {
-  const location = useLocation();
-  const navigate = useNavigate();
+  const location  = useLocation();
+  const navigate  = useNavigate();
+  const { collapsed, toggle } = useSidebar();
 
   return (
-    <aside style={styles.sidebar}>
-      {/* Logo */}
-      <div style={styles.logo}>
-        <div style={styles.logoIcon}>
-          <ShoppingBasket size={20} color="white" />
+    <aside style={{
+      ...s.sidebar,
+      width: collapsed ? 64 : 230,
+    }}>
+
+      {/* Logo — klik untuk toggle */}
+      <div
+        onClick={toggle}
+        title={collapsed ? "Buka sidebar" : "Sembunyikan sidebar"}
+        style={{
+          ...s.logoRow,
+          justifyContent: collapsed ? "center" : "flex-start",
+          marginBottom: 28,
+        }}
+      >
+        <div style={s.logoIcon}>
+          <ShoppingBasket size={18} color="white" />
         </div>
-        <span style={styles.logoText}>MarketCast</span>
+        {!collapsed && (
+          <div style={{ overflow: "hidden" }}>
+            <div style={s.logoText}>MarketCast</div>
+            <div style={s.logoSub}>Kota Surabaya</div>
+          </div>
+        )}
       </div>
 
-      {/* Nav */}
-      <div style={styles.navLabel}>MENU</div>
-      {navItems.map((item) => {
-        const active = location.pathname === item.id;
-        const Icon = item.icon;
+      {/* Nav label */}
+      {!collapsed && (
+        <p style={s.navLabel}>MENU</p>
+      )}
+
+      {/* Nav items */}
+      {navItems.map(({ id, icon: Icon, label }) => {
+        const active = location.pathname === id;
         return (
           <div
-            key={item.id}
-            onClick={() => navigate(item.id)}
+            key={id}
+            onClick={() => navigate(id)}
+            title={collapsed ? label : ""}
             style={{
-              ...styles.navItem,
-              ...(active ? styles.navItemActive : {}),
+              ...s.navItem,
+              ...(active ? s.navActive : {}),
+              justifyContent: collapsed ? "center" : "flex-start",
+              padding: collapsed ? "10px 0" : "10px 12px",
             }}
           >
-            <Icon size={16} color={active ? "var(--primary-dark)" : "var(--text-sub)"} />
-            <span>{item.label}</span>
+            <Icon size={18} color={active ? "#4ADE80" : "rgba(255,255,255,0.5)"} />
+            {!collapsed && (
+              <>
+                <span style={{ marginLeft: 10, flex: 1 }}>{label}</span>
+                {active && <ChevronRight size={14} color="#4ADE80" />}
+              </>
+            )}
           </div>
         );
       })}
 
       {/* Footer */}
-      <div style={styles.sidebarFooter}>
-        <div style={styles.navItem}>
-          <Settings size={16} color="var(--text-sub)" />
-          <span>Settings</span>
+      <div style={{
+        ...s.footer,
+        alignItems: collapsed ? "center" : "flex-start",
+      }}>
+        <div
+          title={collapsed ? "Settings" : ""}
+          style={{
+            ...s.navItem,
+            justifyContent: collapsed ? "center" : "flex-start",
+            padding: collapsed ? "10px 0" : "10px 12px",
+          }}
+        >
+          <Settings size={18} color="rgba(255,255,255,0.4)" />
+          {!collapsed && (
+            <span style={{ marginLeft: 10 }}>Settings</span>
+          )}
         </div>
       </div>
     </aside>
   );
 }
 
-const styles = {
+const s = {
   sidebar: {
-    width: 230,
     minHeight: "100vh",
-    background: "var(--sidebar-bg)",
-    borderRight: "1px solid var(--border)",
+    background: "#1B4332",
     display: "flex",
     flexDirection: "column",
-    padding: "24px 16px",
+    padding: "24px 12px",
     position: "fixed",
     top: 0, left: 0, bottom: 0,
     zIndex: 100,
+    overflowX: "hidden",
+    transition: "width 0.25s cubic-bezier(0.4,0,0.2,1)",
   },
-  logo: {
+  logoRow: {
     display: "flex",
     alignItems: "center",
     gap: 10,
-    padding: "0 8px 28px",
+    cursor: "pointer",
   },
   logoIcon: {
     width: 36, height: 36,
-    background: "linear-gradient(135deg, var(--primary), var(--primary-dark))",
+    background: "rgba(255,255,255,0.15)",
     borderRadius: 10,
     display: "flex", alignItems: "center", justifyContent: "center",
+    flexShrink: 0,
   },
   logoText: {
-    fontSize: 17,
-    fontWeight: 800,
-    color: "var(--text-main)",
-    letterSpacing: "-0.3px",
+    fontSize: 15, fontWeight: 800,
+    color: "white", letterSpacing: "-0.3px",
+    whiteSpace: "nowrap",
+  },
+  logoSub: {
+    fontSize: 10,
+    color: "rgba(255,255,255,0.4)",
+    whiteSpace: "nowrap",
   },
   navLabel: {
-    fontSize: 10,
-    fontWeight: 700,
-    color: "var(--text-muted)",
-    letterSpacing: 1,
+    fontSize: 10, fontWeight: 700,
+    color: "rgba(255,255,255,0.3)",
+    letterSpacing: 1.2,
     padding: "0 10px 8px",
+    margin: 0,
   },
   navItem: {
-    display: "flex",
-    alignItems: "center",
-    gap: 10,
-    padding: "10px 12px",
-    borderRadius: "var(--radius-sm)",
+    display: "flex", alignItems: "center",
+    borderRadius: 8,
     cursor: "pointer",
-    fontSize: 14,
-    fontWeight: 500,
-    color: "var(--text-sub)",
+    fontSize: 13.5, fontWeight: 500,
+    color: "rgba(255,255,255,0.55)",
     marginBottom: 2,
     transition: "all 0.18s",
+    borderLeft: "3px solid transparent",
   },
-  navItemActive: {
-    background: "var(--primary-light)",
-    color: "var(--primary-dark)",
-    fontWeight: 700,
+  navActive: {
+    background: "rgba(255,255,255,0.1)",
+    color: "white", fontWeight: 700,
+    borderLeft: "3px solid #4ADE80",
   },
-  sidebarFooter: {
+  footer: {
     marginTop: "auto",
     paddingTop: 16,
-    borderTop: "1px solid var(--border)",
+    borderTop: "1px solid rgba(255,255,255,0.1)",
+    display: "flex", flexDirection: "column",
   },
 };
