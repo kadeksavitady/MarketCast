@@ -1,0 +1,38 @@
+name: Weekly Model Expiry Monitor
+
+on:
+  schedule:
+    - cron: '0 8 * * 1'   # Setiap Senin jam 08.00 UTC (15.00 WIB)
+  workflow_dispatch:        # Bisa dijalankan manual dari tab Actions
+
+jobs:
+  check_model_expiry:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run Model Monitor
+        env:
+          MLFLOW_TRACKING_URI:      ${{ secrets.MLFLOW_TRACKING_URI }}
+          MLFLOW_TRACKING_USERNAME: ${{ secrets.MLFLOW_TRACKING_USERNAME }}
+          MLFLOW_TRACKING_PASSWORD: ${{ secrets.MLFLOW_TRACKING_PASSWORD }}
+          GITHUB_TOKEN:             ${{ secrets.MARKETCAST_GITHUB_TOKEN }}
+          GITHUB_REPO:              ${{ secrets.GITHUB_REPO }}
+          DEVELOPER_EMAILS:         ${{ secrets.DEVELOPER_EMAILS }}
+        run: python src/monitoring/model_monitor.py
