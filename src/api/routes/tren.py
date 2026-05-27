@@ -19,12 +19,54 @@ def get_tren(komoditas_id: str, hari: int = 90):
     if not info: raise HTTPException(404, detail="Komoditas tidak ditemukan")
     if not engine: raise HTTPException(503, detail="Database tidak terhubung")
 
+    # Ambil data dalam rentang hari yang diminta
     df = pd.read_sql(
-        text("SELECT tanggal_data, harga_per_kg FROM harga_historis WHERE komoditas = :nama ORDER BY tanggal_data DESC LIMIT :hari"),
+        text("""
+            SELECT tanggal_data, harga_per_kg 
+            FROM harga_historis 
+            WHERE komoditas = :nama 
+            AND tanggal_data >= CURRENT_DATE - INTERVAL '1 day' * :hari
+            AND harga_per_kg > 0
+            ORDER BY tanggal_data ASC
+        """),
         engine, params={"nama": info["nama"], "hari": hari}
-    ).sort_values("tanggal_data")
-    
-    historis = [TitikData(tanggal=row["tanggal_data"].strftime("%Y-%m-%d"), harga=round(float(row["harga_per_kg"]), 2)) for _, row in df.iterrows()]
+    )
+
+    # Fallback: kalau rentang hari kosong, ambil N data terbaru yang valid
+    if df.empty:
+        df = pd.read_sql(
+            text("""
+                SELECT tanggal_data, harga_per_kg
+                FROM harga_historis
+                WHERE komoditas = :nama
+                AND harga_per_kg > 0
+                ORDER BY tanggal_data DESC
+                LIMIT :hari
+            """),
+            engine, params={"nama": info["nama"], "hari": hari}
+        ).sort_values("tanggal_data")
+
+    # Bangun rentang tanggal penuh lalu forward-fill harga yang kosong
+    if not df.empty:
+        df["tanggal_data"] = pd.to_datetime(df["tanggal_data"])
+        df = df.set_index("tanggal_data")
+
+        # Buat index tanggal lengkap dari tanggal pertama sampai terakhir
+        full_range = pd.date_range(start=df.index.min(), end=df.index.max(), freq="D")
+        df = df.reindex(full_range)
+
+        # Forward-fill: hari tanpa data pakai harga hari sebelumnya
+        df["harga_per_kg"] = df["harga_per_kg"].ffill()
+        df = df.reset_index().rename(columns={"index": "tanggal_data"})
+
+    historis = [
+        TitikData(
+            tanggal=row["tanggal_data"].strftime("%Y-%m-%d"),
+            harga=round(float(row["harga_per_kg"]), 2)
+        )
+        for _, row in df.iterrows()
+    ] if not df.empty else []
+
     last_harga = float(df["harga_per_kg"].iloc[-1]) if not df.empty else float(info["harga_ref"])
     
     # 🚨 PERBAIKAN 1: Tangkap error dari MLflow
