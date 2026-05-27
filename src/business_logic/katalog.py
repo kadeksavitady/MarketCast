@@ -55,7 +55,6 @@ CLUSTER_MAP = {
     'KACANG TANAH': 'cluster 2',
     'KENTANG': 'cluster 2',
     'KETELA POHON': 'cluster 2',
-    'KENTANG': 'cluster 2',
     'KOL/KUBIS': 'cluster 2',
     'Kedelai Impor': 'cluster 2',
     'Kedelai Lokal': 'cluster 2',
@@ -83,7 +82,7 @@ for nama, kategori in WHITELIST_MAP.items():
     # --- PERBAIKAN: Tentukan satuan berdasarkan nama barang ---
     nama_lower = nama.lower()
     if "elpigi" in nama_lower:
-        satuan_item = "Tabung 3kg"
+        satuan_item = "Tabung"
     elif "susu kental manis" in nama_lower:
         satuan_item = "Kaleng"
     elif "garam" in nama_lower and "bata" in nama_lower:
@@ -97,7 +96,7 @@ for nama, kategori in WHITELIST_MAP.items():
     COMMODITY_CATALOG[slug] = {
         "nama": nama, 
         "kategori": kategori,
-        "satuan": satuan_item, # 🚨 Gunakan variabel yang sudah difilter
+        "satuan": satuan_item,
         "faktor_konversi": 1.0, 
         "harga_ref": 0, 
         "cluster": id_cluster
@@ -130,11 +129,13 @@ def load_harga_terkini():
                 
                 if (katalog_clean == db_clean) or (katalog_clean in db_clean) or (db_clean in katalog_clean):
                     COMMODITY_CATALOG[slug]["harga_ref"] = int(harga_kg)
-                    COMMODITY_CATALOG[slug]["satuan"] = satuan_orig
+                    # Hanya override satuan kalau bukan satuan khusus yang sudah didefinisikan
+                    if COMMODITY_CATALOG[slug]["satuan"] == "kg":
+                        COMMODITY_CATALOG[slug]["satuan"] = satuan_orig
                     COMMODITY_CATALOG[slug]["faktor_konversi"] = faktor
                     matched_count += 1
                     break
 
-        logger.info(f"Harga terkini berhasil dimuat untuk {len(rows)} komoditas")
+        logger.info(f"Berhasil mencocokkan {matched_count} dari total {len(rows)} data komoditas terbaru dari database")
     except Exception as e:
         logger.warning(f"Gagal load harga terkini: {e}")
