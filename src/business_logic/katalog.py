@@ -85,6 +85,8 @@ for nama, kategori in WHITELIST_MAP.items():
         satuan_item = "Tabung"
     elif "susu kental manis" in nama_lower:
         satuan_item = "Kaleng"
+    elif "susu bubuk" in nama_lower:
+        satuan_item = "Dus"
     elif "garam" in nama_lower and "bata" in nama_lower:
         satuan_item = "Bata"
     elif "mie instan" in nama_lower:

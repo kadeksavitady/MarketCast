@@ -134,6 +134,32 @@ export default function SmartSubstitution({
     );
   }
 
+  // Skenario E — perhatian + tidak ada substitusi (FIX: skenario yang sebelumnya hilang)
+  if (status === "perhatian" && substitutions.length === 0) {
+    return (
+      <div style={{
+        ...card,
+        border: "1px solid #FDE68A",
+        background: "#FEF9C3",
+        padding: "16px 18px",
+        display: "flex", alignItems: "flex-start", gap: 12,
+      }}>
+        <div style={iconWrap("#FEF08A", "#92400E")}>
+          <AlertTriangle size={18} />
+        </div>
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "#92400E" }}>
+            Budget Hampir Habis
+          </div>
+          <div style={{ fontSize: 12.5, color: "#A16207", marginTop: 2, lineHeight: 1.5 }}>
+            Tidak ada alternatif substitusi yang tersedia untuk komoditas ini.
+            Pertimbangkan mengurangi jumlah item agar budget lebih terkontrol.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Skenario C — over budget + ada substitusi
   if (status === "over_budget" && substitutions.length > 0) {
     return (
@@ -172,7 +198,7 @@ export default function SmartSubstitution({
             <div style={{ fontSize: 12.5, color: "#9A3412", lineHeight: 1.6 }}>
               Setelah substitusi, total masih <strong>{formatRp(totalSetelahSub - budget)}</strong> di atas budget.
               Kurangi <strong>{saran.item.nama}</strong> sebanyak{" "}
-              <strong>{saran.qtyKurang} kg</strong> (dari {saran.item.jumlah} kg → {saran.qtyBaru} kg)
+              <strong>{saran.qtyKurang} {saran.item.satuan || 'unit'}</strong> (dari {saran.item.jumlah} → {saran.qtyBaru})
               untuk hemat <strong>{formatRp(saran.hemat)}</strong>.
             </div>
           </div>
@@ -236,7 +262,7 @@ export default function SmartSubstitution({
                 <div>
                   <div style={{ fontSize: 13.5, fontWeight: 700 }}>{termahal.nama}</div>
                   <div style={{ fontSize: 12, color: "var(--text-muted)", fontFamily: "DM Mono,monospace" }}>
-                    {termahal.jumlah} kg × {formatRp(termahal.harga_per_satuan)} = {formatRp(termahal.subtotal)}
+                    {termahal.jumlah} {termahal.satuan || 'unit'} × {formatRp(termahal.harga_per_satuan)} = {formatRp(termahal.subtotal)}
                   </div>
                 </div>
                 <button
@@ -264,8 +290,8 @@ export default function SmartSubstitution({
                 <span style={{ fontSize: 12.5, fontWeight: 700, color: "#EA580C" }}>Saran Pengurangan</span>
               </div>
               <div style={{ fontSize: 12.5, color: "#9A3412", lineHeight: 1.6 }}>
-                Kurangi <strong>{saran.item.nama}</strong> dari {saran.item.jumlah} kg menjadi{" "}
-                <strong>{saran.qtyBaru} kg</strong> untuk hemat <strong>{formatRp(saran.hemat)}</strong>.
+                Kurangi <strong>{saran.item.nama}</strong> dari {saran.item.jumlah} menjadi{" "}
+                <strong>{saran.qtyBaru} {saran.item.satuan || 'unit'}</strong> untuk hemat <strong>{formatRp(saran.hemat)}</strong>.
               </div>
             </div>
           )}
