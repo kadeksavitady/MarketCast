@@ -6,6 +6,7 @@ import {
   Leaf, Fish, Wheat, Cookie, FlameKindling
 } from "lucide-react";
 import SmartSubstitution from "../components/SmartSubstitution";
+import { ICON_CATALOG } from "../assets/iconCatalog";
 
 // Icon mapping per kategori
 const KATEGORI_ICON = {
@@ -192,9 +193,16 @@ export default function Dashboard() {
                     <div key={k.kategori} onClick={() => openKategori(k)}
                       style={{ ...kategoriCard, border: selectedKat?.kategori === k.kategori ? "1.5px solid var(--primary)" : "1.5px solid var(--border)" }}>
                       <div style={{ ...kategoriIconWrap, background: meta.bg }}>
-                        <Icon size={26} color={meta.color} />
+                        {ICON_CATALOG[k.kategori]
+                          ? <img
+                              src={ICON_CATALOG[k.kategori]}
+                              style={{ width: 28, height: 28, objectFit: "contain" }}
+                              alt={k.kategori}
+                            />
+                          : <Icon size={26} color={meta.color} />
+                        }
                       </div>
-                      <span style={{ fontSize: 13, fontWeight: 600 }}>{k.kategori}</span>
+                      <span style={{ fontSize: 13, fontWeight: 600, textAlign: "center" }}>{k.kategori}</span>
                       <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
                         {k.jumlah_komoditas} item
                       </span>

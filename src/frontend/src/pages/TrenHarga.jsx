@@ -77,25 +77,26 @@ export default function TrenHarga() {
       "beras_premium", "cabe_merah_keriting", "daging_ayam_ras",
       "bawang_merah", "minyak_goreng_curah", "telur_ayam_ras",
     ];
-    Promise.all(
-      proxyKomoditas.map(async (id) => {
+    
+    const loadSequential = async () => {
+      const results = [];
+      for (const id of proxyKomoditas) {
         try {
           const data = await getTren(id, 7);
-          // FIX: sertakan satuan dari response jika sudah tersedia (backend task)
-          return {
-            nama: data.nama_komoditas,
+          results.push({ 
+            nama: data.nama_komoditas, 
             historis: data.data_historis,
-            satuan: data.satuan || null,
-          };
+            satuan: data.satuan || null 
+          });
         } catch {
-          return null;
+          // skip kalau gagal
         }
-      })
-    ).then((results) => {
-      const valid = results.filter(Boolean);
-      setHighlights(getHighlights(valid));
+      }
+      setHighlights(getHighlights(results));
       setLoadingHL(false);
-    });
+    };
+    
+    loadSequential();
   }, []);
 
   const pilihKategori = async (kat) => {
