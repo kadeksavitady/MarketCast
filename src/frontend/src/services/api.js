@@ -19,6 +19,7 @@ export const predictBelanja = async (budget, keranjang) => {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ budget, keranjang }),
   });
+  if (!res.ok) throw new Error(`API Error: ${res.status}`);
   return res.json();
 };
 
