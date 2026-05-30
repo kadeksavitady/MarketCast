@@ -2,7 +2,7 @@ name: Daily Siskaperbapo Scraper
 
 on:
   schedule:
-    - cron: '0 15 * * *'
+    - cron: '0 5 * * *' # 12:00 WIB setiap hari
   workflow_dispatch:
 
 jobs:
@@ -28,7 +28,14 @@ jobs:
           pip install -r requirements.txt
           playwright install chromium --with-deps
 
-      - name: Run Daily Scraper
+      - name: Run Daily Scraper (with retry)
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: python src/data/daily_scraper.py
+        # Retry 3x dengan jeda 5 menit jika gagal
+        run: |
+          for i in 1 2 3; do
+            python src/data/daily_scraper.py && break
+            echo "Attempt $i failed. Retrying in 5 minutes..."
+            sleep 300
+          done
