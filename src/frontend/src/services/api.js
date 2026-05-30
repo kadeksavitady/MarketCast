@@ -1,5 +1,13 @@
 const BASE_URL = "http://localhost:8000";
 
+export const withTimeout = (promise, ms = 5000) =>
+  Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("timeout")), ms)
+    ),
+  ]);
+
 export const getKategori = async () => {
   const res = await fetch(`${BASE_URL}/katalog/categories`);
   return res.json();
@@ -23,10 +31,9 @@ export const predictBelanja = async (budget, keranjang) => {
   return res.json();
 };
 
-export const getTren = async (komoditas_id, hari = 90) => {
-  const res = await fetch(
-    `${BASE_URL}/tren/${komoditas_id}?hari=${hari}`
-  );
+export const getTren = async (id, hari) => {
+  const res = await fetch(`${BASE_URL}/tren/${id}?hari=${hari}`);
+  if (!res.ok) throw new Error(`API Error: ${res.status}`);
   return res.json();
 };
 

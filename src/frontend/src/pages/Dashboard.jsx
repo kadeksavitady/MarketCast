@@ -7,6 +7,9 @@ import {
 } from "lucide-react";
 import SmartSubstitution from "../components/SmartSubstitution";
 import { ICON_CATALOG } from "../assets/iconCatalog";
+import PredictLoading from "../components/PredictLoading";
+import ErrorCard from "../components/ErrorCard";
+import { withTimeout } from "../services/api";
 
 // Icon mapping per kategori
 const KATEGORI_ICON = {
@@ -40,15 +43,19 @@ export default function Dashboard() {
   const [loadingKomoditas, setLoadingKomoditas] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [keranjang, setKeranjang] = useState([]);
-  const [budget, setBudget] = useState(500000);
-  const [budgetDisplay, setBudgetDisplay] = useState("500000");
+  const [budget, setBudget] = useState(0);
+  const [budgetDisplay, setBudgetDisplay] = useState("");
   const [hasilPredict, setHasilPredict] = useState(null);
   const [loadingPredict, setLoadingPredict] = useState(false);
-  const [toast, setToast] = useState("");
+  const [predictError, setPredictError] = useState(false);
+  const [kategoriError, setKategoriError] = useState(false);
+  const [toast, setToast] = useState({ msg: "", type: "info" });
   const toastTimer = useRef(null);
 
   useEffect(() => {
-    getKategori().then(setKategoriList);
+    withTimeout(getKategori(), 5000)
+      .then(setKategoriList)
+      .catch(() => setKategoriError(true));
   }, []);
 
   const openKategori = async (kat) => {
@@ -86,7 +93,7 @@ export default function Dashboard() {
 
   const handlePredict = async () => {
     if (!keranjang.length) return showToastMsg("Keranjang masih kosong");
-    if (!budget) return showToastMsg("Masukkan budget dulu");
+    if (!budget) return showToastMsg("Masukkan budget dulu", "warning");
     setLoadingPredict(true);
     try {
       const payload = keranjang.map((i) => ({
@@ -96,16 +103,22 @@ export default function Dashboard() {
       const result = await predictBelanja(budget, payload);
       setHasilPredict(result);
     } catch (e) {
-      showToastMsg("Gagal menghubungi API");
+      setPredictError(true);
+      showToastMsg("Gagal menghubungi API", "error");
     }
     setLoadingPredict(false);
   };
 
-  const showToastMsg = (msg) => {
-    setToast(msg);
+  const showToastMsg = (msg, type = "success") => {
+    setToast({ msg, type });
     if (toastTimer.current) clearTimeout(toastTimer.current);
-    toastTimer.current = setTimeout(() => setToast(""), 2500);
+    toastTimer.current = setTimeout(() => setToast({ msg: "", type: "info" }), 3000);
   };
+
+  const liveTotal = useMemo(() =>
+    keranjang.reduce((s, i) => s + (i.harga_ref || 0) * i.qty, 0),
+    [keranjang]
+  );
 
   // Kalkulasi lokal kalau belum ada hasil predict
   const totalPrediksi = useMemo(() => {
@@ -113,15 +126,16 @@ export default function Dashboard() {
     if (fromPredict != null && !isNaN(fromPredict) && keranjang.length > 0) {
       return fromPredict;
     }
-    return keranjang.reduce((s, i) => s + (i.harga_ref || 0) * i.qty, 0);
-  }, [keranjang, hasilPredict]);
+    return liveTotal;
+  }, [keranjang, hasilPredict, liveTotal]);
 
   useEffect(() => {
     setHasilPredict(null);
+    setPredictError(false);
   }, [keranjang]);
 
-  const sisaBudget = budget - totalPrediksi;
-  const persen = budget > 0 ? Math.min(100, (totalPrediksi / budget) * 100) : 0;
+  const sisaBudget = budget - liveTotal;
+  const persen = budget > 0 ? Math.min(100, (liveTotal / budget) * 100) : 0;
   const status = persen < 80 ? "aman" : persen < 100 ? "perhatian" : "over_budget";
 
   const statusInfo = {
@@ -180,10 +194,30 @@ export default function Dashboard() {
           <CardHeader icon={<ShoppingCart size={16} color="#f97316" />}
             bg="#fff7ed" title="Kategori Bahan Pokok" />
           <div style={{ padding: 20 }}>
-            {kategoriList.length === 0 ? (
-              <p style={{ color: "var(--text-muted)", fontSize: 14 }}>
+            {kategoriError ? (
+              <ErrorCard
+                type="network"
+                compact
+                onRetry={async () => {
+                  setKategoriError(false);
+                  try {
+                    const data = await getKategori();
+                    setKategoriList(data);
+                  } catch {
+                    setKategoriError(true);
+                  }
+                }}
+              />
+            ) : kategoriList.length === 0 ? (
+              <div style={{ display: "flex", alignItems: "center", gap: 10,
+                color: "var(--text-muted)", fontSize: 14, padding: "8px 0" }}>
+                <span style={{
+                  width: 8, height: 8, borderRadius: "50%",
+                  background: "var(--primary)", display: "inline-block",
+                  animation: "mc-pulse-dot 1.2s ease-in-out infinite",
+                }} />
                 Memuat kategori...
-              </p>
+              </div>
             ) : (
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12 }}>
                 {kategoriList.map((k) => {
@@ -302,21 +336,23 @@ export default function Dashboard() {
           </div>
 
           {/* STATUS */}
-          <div style={{
-            margin: "0 16px 16px",
-            padding: "12px 14px",
-            borderRadius: "var(--radius-sm)",
-            display: "flex", alignItems: "flex-start", gap: 10,
-            // FIX: pakai string status yang baru
-            background: status === "aman" ? "#e6faf5" : status === "perhatian" ? "#fff7ed" : "#fef2f2",
-            border: `1px solid ${status === "aman" ? "#a7f3d0" : status === "perhatian" ? "#fed7aa" : "#fecaca"}`,
-          }}>
-            <span style={{ fontSize: 18 }}>{statusInfo.icon}</span>
-            <div>
-              <div style={{ fontSize: 13.5, fontWeight: 700 }}>{statusInfo.title}</div>
-              <div style={{ fontSize: 12, color: "var(--text-sub)", marginTop: 1 }}>{statusInfo.desc}</div>
+          {budget > 0 && keranjang.length > 0 && (
+            <div style={{
+              margin: "0 16px 16px",
+              padding: "12px 14px",
+              borderRadius: "var(--radius-sm)",
+              display: "flex", alignItems: "flex-start", gap: 10,
+              // FIX: pakai string status yang baru
+              background: status === "aman" ? "#e6faf5" : status === "perhatian" ? "#fff7ed" : "#fef2f2",
+              border: `1px solid ${status === "aman" ? "#a7f3d0" : status === "perhatian" ? "#fed7aa" : "#fecaca"}`,
+            }}>
+              <span style={{ fontSize: 18 }}>{statusInfo.icon}</span>
+              <div>
+                <div style={{ fontSize: 13.5, fontWeight: 700 }}>{statusInfo.title}</div>
+                <div style={{ fontSize: 12, color: "var(--text-sub)", marginTop: 1 }}>{statusInfo.desc}</div>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* TOMBOL PREDIKSI */}
           {keranjang.length > 0 && (
@@ -339,10 +375,26 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* SMART SUBSTITUTION */}
-        {hasilPredict && keranjang.length > 0 && (
+        {/* LOADING PREDIKSI */}
+        {loadingPredict && keranjang.length > 0 && (
+          <PredictLoading />
+        )}
+
+        {/* ERROR PREDIKSI */}
+        {predictError && !loadingPredict && keranjang.length > 0 && (
+          <ErrorCard
+            type="predict"
+            onRetry={async () => {
+              setPredictError(false);
+              await handlePredict();
+            }}
+          />
+        )}
+
+        {/* HASIL PREDIKSI */}
+        {hasilPredict && !loadingPredict && keranjang.length > 0 && (
           <SmartSubstitution
-            status={hasilPredict?.status || status}
+            status={status}
             keranjang={keranjang}
             substitutions={substitutions}
             totalHemat={totalHemat}
@@ -386,8 +438,8 @@ export default function Dashboard() {
       )}
 
       {/* TOAST */}
-      {toast && (
-        <div style={toastStyle}>✅ {toast}</div>
+      {toast.msg && (
+        <AppToast msg={toast.msg} type={toast.type} />
       )}
     </div>
   );
@@ -404,6 +456,51 @@ function StatCard({ label, value, valueColor, badge, badgeOk, accent }) {
         {badge}
       </div>
     </div>
+  );
+}
+
+function AppToast({ msg, type }) {
+  const cfg = {
+    success: { bg: "#f0fdf4", border: "#a7f3d0", color: "var(--primary-dark)", icon: "✅" },
+    warning: { bg: "#fffbeb", border: "#fde68a", color: "#92400e", icon: "⚠️" },
+    error:   { bg: "#fef2f2", border: "#fecaca", color: "#dc2626", icon: "❌" },
+    info:    { bg: "#eff6ff", border: "#bfdbfe", color: "#1d4ed8", icon: "ℹ️" },
+  }[type] || {};
+
+  return (
+    <>
+      <style>{`
+        @keyframes mc-toast-in {
+          from { opacity:0; transform: translateX(24px) scale(0.95); }
+          to   { opacity:1; transform: translateX(0)    scale(1); }
+        }
+        .mc-toast { animation: mc-toast-in 0.28s cubic-bezier(0.34,1.56,0.64,1) forwards; }
+      `}</style>
+      <div className="mc-toast" style={{
+        position: "fixed", bottom: 28, right: 28, zIndex: 999,
+        display: "flex", alignItems: "flex-start", gap: 12,
+        background: cfg.bg,
+        border: `1.5px solid ${cfg.border}`,
+        borderLeft: `4px solid ${cfg.border}`,
+        borderRadius: "var(--radius-sm)",
+        padding: "14px 18px",
+        boxShadow: "0 8px 24px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.08)",
+        maxWidth: 320, minWidth: 240,
+      }}>
+        <span style={{ fontSize: 18, lineHeight: 1.2, flexShrink: 0 }}>{cfg.icon}</span>
+        <div>
+          <div style={{ fontSize: 13.5, fontWeight: 700, color: cfg.color, marginBottom: 2 }}>
+            {type === "warning" ? "Perhatian" 
+              : type === "error" ? "Gagal" 
+              : type === "success" ? "Berhasil"
+              : "Info"}
+          </div>
+          <div style={{ fontSize: 12.5, color: cfg.color, opacity: 0.85, lineHeight: 1.5 }}>
+            {msg}
+          </div>
+        </div>
+      </div>
+    </>
   );
 }
 

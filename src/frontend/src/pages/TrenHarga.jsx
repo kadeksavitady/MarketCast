@@ -8,6 +8,9 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, ReferenceLine,
 } from "recharts";
+import ChartSkeleton from "../components/ChartSkeleton";
+import ErrorCard from "../components/ErrorCard";
+import { withTimeout } from "../services/api";
 
 function formatRp(val) {
   if (!val && val !== 0) return "Rp 0";
@@ -64,9 +67,11 @@ export default function TrenHarga() {
   const [selectedKomoditas, setSelectedKomoditas] = useState(null);
   const [trenData,          setTrenData]          = useState(null);
   const [loading,           setLoading]           = useState(false);
+  const [trenError,         setTrenError]         = useState(null);
   const [selectedHari,      setSelectedHari]      = useState(90);
   const [highlights,        setHighlights]        = useState(null);
   const [loadingHL,         setLoadingHL]         = useState(true);
+  const [apiStatus,         setApiStatus]         = useState("checking");
 
   useEffect(() => {
     getKategori().then(setKategoriList);
@@ -78,25 +83,36 @@ export default function TrenHarga() {
       "bawang_merah", "minyak_goreng_curah", "telur_ayam_ras",
     ];
     
-    const loadSequential = async () => {
+    const run = async () => {
+      // Step 1: cek apakah API hidup dulu (endpoint ringan, tanpa model)
+      try {
+        await withTimeout(getKategori(), 3000);
+        setApiStatus("online");
+      } catch {
+        setApiStatus("offline");
+        setLoadingHL(false);
+        return; // API mati, stop di sini
+      }
+
+      // Step 2: API hidup, coba load highlights
       const results = [];
       for (const id of proxyKomoditas) {
         try {
-          const data = await getTren(id, 7);
-          results.push({ 
-            nama: data.nama_komoditas, 
+          const data = await withTimeout(getTren(id, 7), 3000);
+          results.push({
+            nama: data.nama_komoditas,
             historis: data.data_historis,
-            satuan: data.satuan || null 
+            satuan: data.satuan || null,
           });
         } catch {
-          // skip kalau gagal
+          // skip komoditas ini
         }
       }
       setHighlights(getHighlights(results));
       setLoadingHL(false);
     };
-    
-    loadSequential();
+
+    run();
   }, []);
 
   const pilihKategori = async (kat) => {
@@ -115,11 +131,18 @@ export default function TrenHarga() {
     setSelectedKomoditas(item);
     setLoading(true);
     setTrenData(null);
+    setTrenError(null);
     try {
       const data = await getTren(item.id, hari);
       setTrenData(data);
-    } catch {
-      setTrenData(null);
+    } catch (err) {
+      // Cek apakah API masih hidup
+      try {
+        await withTimeout(getKategori(), 2000);
+        setTrenError("model"); // API hidup tapi model gagal
+      } catch {
+        setTrenError("network"); // API mati
+      }
     }
     setLoading(false);
   };
@@ -314,8 +337,22 @@ export default function TrenHarga() {
               </div>
 
               {loadingHL ? (
-                <div style={{ padding: 40, textAlign: "center", color: "var(--text-muted)", fontSize: 14 }}>
-                  Memuat data...
+                <div style={{ padding: 40, textAlign: "center" }}>
+                  <div style={{ color: "var(--text-muted)", fontSize: 14,
+                    display: "flex", alignItems: "center", gap: 8, justifyContent: "center" }}>
+                    <span style={{ width: 8, height: 8, borderRadius: "50%",
+                      background: "var(--primary)", display: "inline-block",
+                      animation: "mc-pulse-dot 1.2s ease-in-out infinite" }} />
+                    Memeriksa koneksi API...
+                  </div>
+                </div>
+              ) : apiStatus === "offline" ? (
+                <div style={{ padding: "16px 20px" }}>
+                  <ErrorCard type="network" compact />
+                </div>
+              ) : (!highlights?.naik?.length && !highlights?.turun?.length) ? (
+                <div style={{ padding: "16px 20px" }}>
+                  <ErrorCard type="highlights" />
                 </div>
               ) : (
                 <div style={{ padding: 16, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
@@ -403,9 +440,7 @@ export default function TrenHarga() {
               )}
             </div>
           ) : loading ? (
-            <div style={{ ...card, padding: "60px 20px", textAlign: "center", color: "var(--text-muted)" }}>
-              Memuat data tren...
-            </div>
+            <ChartSkeleton komoditasNama={selectedKomoditas?.nama} />
           ) : trenData ? (
             <div style={card}>
               <div style={{
@@ -481,9 +516,10 @@ export default function TrenHarga() {
               </div>
             </div>
           ) : (
-            <div style={{ ...card, padding: "40px 20px", textAlign: "center", color: "var(--text-muted)" }}>
-              Gagal memuat data. Pastikan API berjalan.
-            </div>
+            <ErrorCard
+              type={trenError || "generic"}
+              onRetry={() => pilihKomoditas(selectedKomoditas, selectedHari)}
+            />
           )}
         </div>
       </div>
