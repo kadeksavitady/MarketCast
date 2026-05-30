@@ -21,6 +21,12 @@ function getSaranKurangi(hasilPredict, budget) {
 }
 
 function SubItem({ sub }) {
+  const refItem = keranjang.find(k =>
+    k.nama?.toLowerCase() === sub.current_nama?.toLowerCase()
+  );
+  const currentHarga = refItem?.harga_ref || sub.current_harga;
+  const currentSatuan = refItem?.satuan || "kg";
+
   return (
     <div style={{
       border: "1px solid var(--border)",
@@ -34,7 +40,7 @@ function SubItem({ sub }) {
           <span style={{ fontSize: 13, fontWeight: 600 }}>{sub.current_nama}</span>
         </div>
         <div style={{ fontSize: 12, fontFamily: "DM Mono,monospace", color: "var(--accent)", fontWeight: 600, marginBottom: 8 }}>
-          {formatRp(sub.current_harga)}/kg
+          {formatRp(currentHarga)}/{currentSatuan}
         </div>
         <div style={{ textAlign: "center", color: "var(--primary)", fontSize: 18, lineHeight: 1, marginBottom: 8 }}>↓</div>
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
@@ -42,7 +48,7 @@ function SubItem({ sub }) {
           <span style={{ fontSize: 13, fontWeight: 600 }}>{sub.substitute_nama}</span>
         </div>
         <div style={{ fontSize: 12, fontFamily: "DM Mono,monospace", color: "var(--primary-dark)", fontWeight: 600 }}>
-          {formatRp(sub.substitute_harga)}/kg
+          {formatRp(sub.substitute_harga)}/{currentSatuan}
         </div>
       </div>
       <div style={{
@@ -119,7 +125,7 @@ export default function SmartSubstitution({
           </div>
         </div>
         <div style={{ padding: "12px 14px" }}>
-          {substitutions.map((sub, i) => <SubItem key={i} sub={sub} />)}
+          {substitutions.map((sub, i) => <SubItem key={i} sub={sub} keranjang={keranjang} />)}
         </div>
         <div style={{
           margin: "0 14px 14px",
@@ -182,7 +188,7 @@ export default function SmartSubstitution({
           </div>
         </div>
         <div style={{ padding: "12px 14px" }}>
-          {substitutions.map((sub, i) => <SubItem key={i} sub={sub} />)}
+          {substitutions.map((sub, i) => <SubItem key={i} sub={sub} keranjang={keranjang} />)}
         </div>
         {masihOver && saran && (
           <div style={{
