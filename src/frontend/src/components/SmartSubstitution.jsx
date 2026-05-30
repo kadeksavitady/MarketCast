@@ -20,7 +20,7 @@ function getSaranKurangi(hasilPredict, budget) {
   return { item: termahal, qtyKurang, qtyBaru, hemat };
 }
 
-function SubItem({ sub }) {
+function SubItem({ sub, keranjang = [] }) {
   const refItem = keranjang.find(k =>
     k.nama?.toLowerCase() === sub.current_nama?.toLowerCase()
   );
