@@ -19,12 +19,38 @@ def get_tren(komoditas_id: str, hari: int = 90):
     if not info: raise HTTPException(404, detail="Komoditas tidak ditemukan")
     if not engine: raise HTTPException(503, detail="Database tidak terhubung")
 
-    df = pd.read_sql(
-        text("SELECT tanggal_data, harga_per_kg FROM harga_historis WHERE komoditas = :nama ORDER BY tanggal_data DESC LIMIT :hari"),
-        engine, params={"nama": info["nama"], "hari": hari}
-    ).sort_values("tanggal_data")
-    
-    historis = [TitikData(tanggal=row["tanggal_data"].strftime("%Y-%m-%d"), harga=round(float(row["harga_per_kg"]), 2)) for _, row in df.iterrows()]
+    # Step 1: Ambil data periode sekarang (termasuk yang 0)
+    df = pd.read_sql(text("""
+        SELECT tanggal_data, harga_per_kg 
+        FROM harga_historis 
+        WHERE komoditas = :nama 
+        AND tanggal_data >= CURRENT_DATE - INTERVAL '1 day' * :hari
+        ORDER BY tanggal_data ASC
+    """), engine, params={"nama": info["nama"], "hari": hari})
+
+    # Step 2: Cari harga terakhir yang valid (bisa dari kapan saja)
+    last_valid = pd.read_sql(text("""
+        SELECT harga_per_kg FROM harga_historis
+        WHERE komoditas = :nama AND harga_per_kg > 0
+        ORDER BY tanggal_data DESC LIMIT 1
+    """), engine, params={"nama": info["nama"]})
+
+    # Step 3: Ganti 0 dengan NaN, isi dari harga terakhir valid
+    if not df.empty:
+        df["tanggal_data"] = pd.to_datetime(df["tanggal_data"])
+        df.loc[df["harga_per_kg"] == 0, "harga_per_kg"] = None
+        if not last_valid.empty:
+            fill_price = float(last_valid["harga_per_kg"].iloc[0]) if not last_valid.empty else float(info["harga_ref"])
+            df["harga_per_kg"] = df["harga_per_kg"].fillna(fill_price).ffill()
+
+    historis = [
+        TitikData(
+            tanggal=row["tanggal_data"].strftime("%Y-%m-%d"),
+            harga=round(float(row["harga_per_kg"]), 2)
+        )
+        for _, row in df.iterrows()
+    ] if not df.empty else []
+
     last_harga = float(df["harga_per_kg"].iloc[-1]) if not df.empty else float(info["harga_ref"])
     
     # 🚨 PERBAIKAN 1: Tangkap error dari MLflow

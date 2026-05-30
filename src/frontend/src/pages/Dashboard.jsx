@@ -6,6 +6,7 @@ import {
   Leaf, Fish, Wheat, Cookie, FlameKindling
 } from "lucide-react";
 import SmartSubstitution from "../components/SmartSubstitution";
+import { ICON_CATALOG } from "../assets/iconCatalog";
 
 // Icon mapping per kategori
 const KATEGORI_ICON = {
@@ -108,22 +109,25 @@ export default function Dashboard() {
 
   // Kalkulasi lokal kalau belum ada hasil predict
   const totalPrediksi = useMemo(() => {
-    if (hasilPredict && keranjang.length > 0) return hasilPredict.total_prediksi;
-    return keranjang.reduce((s, i) => s + i.harga_ref * i.qty, 0);
+    const fromPredict = hasilPredict?.total_prediksi;
+    if (fromPredict != null && !isNaN(fromPredict) && keranjang.length > 0) {
+      return fromPredict;
+    }
+    return keranjang.reduce((s, i) => s + (i.harga_ref || 0) * i.qty, 0);
   }, [keranjang, hasilPredict]);
 
   useEffect(() => {
-    if (keranjang.length === 0) setHasilPredict(null);
+    setHasilPredict(null);
   }, [keranjang]);
 
   const sisaBudget = budget - totalPrediksi;
   const persen = budget > 0 ? Math.min(100, (totalPrediksi / budget) * 100) : 0;
-  const status = persen < 80 ? "safe" : persen < 100 ? "warning" : "danger";
+  const status = persen < 80 ? "aman" : persen < 100 ? "perhatian" : "over_budget";
 
   const statusInfo = {
-    safe:    { icon: "✅", title: "Status: Budget Aman", desc: "Belanja Anda masih dalam budget" },
-    warning: { icon: "⚠️", title: "Status: Hampir Habis", desc: "Budget Anda hampir terpakai semua" },
-    danger:  { icon: "❌", title: "Status: Melebihi Budget", desc: "Total belanja melebihi budget" },
+    aman:    { icon: "✅", title: "Status: Budget Aman", desc: "Belanja Anda masih dalam budget" },
+    perhatian: { icon: "⚠️", title: "Status: Hampir Habis", desc: "Budget Anda hampir terpakai semua" },
+    over_budget:  { icon: "❌", title: "Status: Melebihi Budget", desc: "Total belanja melebihi budget" },
   }[status];
 
   const substitutions = hasilPredict?.smart_substitution || [];
@@ -189,9 +193,16 @@ export default function Dashboard() {
                     <div key={k.kategori} onClick={() => openKategori(k)}
                       style={{ ...kategoriCard, border: selectedKat?.kategori === k.kategori ? "1.5px solid var(--primary)" : "1.5px solid var(--border)" }}>
                       <div style={{ ...kategoriIconWrap, background: meta.bg }}>
-                        <Icon size={26} color={meta.color} />
+                        {ICON_CATALOG[k.kategori]
+                          ? <img
+                              src={ICON_CATALOG[k.kategori]}
+                              style={{ width: 28, height: 28, objectFit: "contain" }}
+                              alt={k.kategori}
+                            />
+                          : <Icon size={26} color={meta.color} />
+                        }
                       </div>
-                      <span style={{ fontSize: 13, fontWeight: 600 }}>{k.kategori}</span>
+                      <span style={{ fontSize: 13, fontWeight: 600, textAlign: "center" }}>{k.kategori}</span>
                       <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
                         {k.jumlah_komoditas} item
                       </span>
@@ -262,7 +273,8 @@ export default function Dashboard() {
                 <div style={{
                   height: "100%", borderRadius: 20,
                   width: `${persen}%`,
-                  background: status === "safe" ? "var(--primary)" : status === "warning" ? "var(--yellow)" : "var(--red)",
+                  // FIX: pakai string status yang baru
+                  background: status === "aman" ? "var(--primary)" : status === "perhatian" ? "var(--yellow)" : "var(--red)",
                   transition: "width 0.4s ease"
                 }} />
               </div>
@@ -295,8 +307,9 @@ export default function Dashboard() {
             padding: "12px 14px",
             borderRadius: "var(--radius-sm)",
             display: "flex", alignItems: "flex-start", gap: 10,
-            background: status === "safe" ? "#e6faf5" : status === "warning" ? "#fff7ed" : "#fef2f2",
-            border: `1px solid ${status === "safe" ? "#a7f3d0" : status === "warning" ? "#fed7aa" : "#fecaca"}`,
+            // FIX: pakai string status yang baru
+            background: status === "aman" ? "#e6faf5" : status === "perhatian" ? "#fff7ed" : "#fef2f2",
+            border: `1px solid ${status === "aman" ? "#a7f3d0" : status === "perhatian" ? "#fed7aa" : "#fecaca"}`,
           }}>
             <span style={{ fontSize: 18 }}>{statusInfo.icon}</span>
             <div>
@@ -326,7 +339,7 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* SMART SUBSTITUTION — semua skenario */}
+        {/* SMART SUBSTITUTION */}
         {hasilPredict && keranjang.length > 0 && (
           <SmartSubstitution
             status={hasilPredict?.status || status}
@@ -418,7 +431,6 @@ const qtyBtn = { width: 24, height: 24, borderRadius: 6, border: "1px solid var(
 const delBtn = { background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", padding: 4, display: "flex", alignItems: "center" };
 const badge = { background: "var(--primary)", color: "white", fontSize: 11, fontWeight: 700, padding: "2px 9px", borderRadius: 20 };
 const emptyCart = { textAlign: "center", padding: "32px 20px", color: "var(--text-muted)", fontSize: 14, display: "flex", flexDirection: "column", alignItems: "center" };
-const subBadge = { fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", padding: "2px 7px", borderRadius: 20, color: "white" };
 const modalOverlay = { position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(4px)" };
 const modalBox = { background: "white", borderRadius: "var(--radius)", boxShadow: "var(--shadow-lg)", width: 420, maxHeight: "80vh", display: "flex", flexDirection: "column", overflow: "hidden" };
 const modalHeader = { padding: "18px 20px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between" };

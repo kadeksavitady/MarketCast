@@ -39,15 +39,15 @@ const CustomTooltip = ({ active, payload, label }) => {
   );
 };
 
-// Ambil highlight dari data historis: top naik & top turun
+// FIX: tambah satuan ke data highlights agar future-proof saat backend tambah field satuan
 function getHighlights(allData) {
   const changes = [];
-  allData.forEach(({ nama, historis }) => {
+  allData.forEach(({ nama, historis, satuan }) => {
     if (historis.length < 2) return;
     const last  = historis[historis.length - 1].harga;
     const prev  = historis[historis.length - 2].harga;
     const delta = ((last - prev) / prev) * 100;
-    changes.push({ nama, last, delta });
+    changes.push({ nama, last, delta, satuan });
   });
   changes.sort((a, b) => b.delta - a.delta);
   return {
@@ -68,31 +68,35 @@ export default function TrenHarga() {
   const [highlights,        setHighlights]        = useState(null);
   const [loadingHL,         setLoadingHL]         = useState(true);
 
-  // Load kategori
   useEffect(() => {
     getKategori().then(setKategoriList);
   }, []);
 
-  // Load highlight saat pertama kali — ambil data 3 komoditas perwakilan
   useEffect(() => {
     const proxyKomoditas = [
       "beras_premium", "cabe_merah_keriting", "daging_ayam_ras",
       "bawang_merah", "minyak_goreng_curah", "telur_ayam_ras",
     ];
-    Promise.all(
-      proxyKomoditas.map(async (id) => {
+    
+    const loadSequential = async () => {
+      const results = [];
+      for (const id of proxyKomoditas) {
         try {
           const data = await getTren(id, 7);
-          return { nama: data.nama_komoditas, historis: data.data_historis };
+          results.push({ 
+            nama: data.nama_komoditas, 
+            historis: data.data_historis,
+            satuan: data.satuan || null 
+          });
         } catch {
-          return null;
+          // skip kalau gagal
         }
-      })
-    ).then((results) => {
-      const valid = results.filter(Boolean);
-      setHighlights(getHighlights(valid));
+      }
+      setHighlights(getHighlights(results));
       setLoadingHL(false);
-    });
+    };
+    
+    loadSequential();
   }, []);
 
   const pilihKategori = async (kat) => {
@@ -102,7 +106,6 @@ export default function TrenHarga() {
     setTrenData(null);
     const data = await getKomoditas(kat.kategori);
     setKomoditasList(data);
-    // Auto-select komoditas pertama
     if (data.length > 0) {
       pilihKomoditas(data[0], selectedHari);
     }
@@ -148,6 +151,10 @@ export default function TrenHarga() {
   const trend     = getTrendInfo();
   const lastHarga = trenData?.data_historis?.slice(-1)[0]?.harga;
   const nextHarga = trenData?.forecast_30_hari?.[29]?.harga;
+
+  // FIX: gunakan satuan dari selectedKomoditas (sudah ada di data komoditas)
+  // Fallback ke trenData.satuan jika backend sudah menambahkan field tersebut
+  const satuanLabel = selectedKomoditas?.satuan || trenData?.satuan || "kg";
 
   return (
     <div>
@@ -261,18 +268,20 @@ export default function TrenHarga() {
         {/* ── PANEL KANAN ── */}
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
 
-          {/* Stat cards — selalu tampil kalau ada data */}
+          {/* Stat cards */}
           {trenData && (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12 }}>
               <div style={{ ...card, padding: 16 }}>
                 <div style={{ fontSize: 11, color: "var(--text-sub)", marginBottom: 4 }}>Harga Terakhir</div>
                 <div style={{ fontSize: 20, fontWeight: 800 }}>{formatRp(lastHarga)}</div>
-                <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>per kg</div>
+                {/* FIX: gunakan satuanLabel, bukan hardcoded "per kg" */}
+                <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>per {satuanLabel}</div>
               </div>
               <div style={{ ...card, padding: 16 }}>
                 <div style={{ fontSize: 11, color: "var(--text-sub)", marginBottom: 4 }}>Prediksi 30 Hari</div>
                 <div style={{ fontSize: 20, fontWeight: 800, color: "var(--primary-dark)" }}>{formatRp(nextHarga)}</div>
-                <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>per kg</div>
+                {/* FIX: gunakan satuanLabel, bukan hardcoded "per kg" */}
+                <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>per {satuanLabel}</div>
               </div>
               <div style={{ ...card, padding: 16 }}>
                 <div style={{ fontSize: 11, color: "var(--text-sub)", marginBottom: 4 }}>Tren Historis</div>
@@ -294,9 +303,8 @@ export default function TrenHarga() {
             </div>
           )}
 
-          {/* Chart */}
+          {/* Chart area */}
           {!selectedKomoditas ? (
-            // Panel kosong — isi dengan highlight harga
             <div style={card}>
               <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--border)" }}>
                 <div style={{ fontSize: 15, fontWeight: 700 }}>Sorotan Harga Hari Ini</div>
@@ -333,8 +341,9 @@ export default function TrenHarga() {
                           <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--text-main)" }}>
                             {item.nama}
                           </div>
+                          {/* FIX: gunakan item.satuan jika tersedia, fallback tanpa satuan */}
                           <div style={{ fontSize: 11, color: "var(--text-muted)", fontFamily: "DM Mono,monospace" }}>
-                            {formatRp(item.last)}/kg
+                            {formatRp(item.last)}{item.satuan ? `/${item.satuan}` : ""}
                           </div>
                         </div>
                         <span style={{
@@ -372,8 +381,9 @@ export default function TrenHarga() {
                           <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--text-main)" }}>
                             {item.nama}
                           </div>
+                          {/* FIX: gunakan item.satuan jika tersedia */}
                           <div style={{ fontSize: 11, color: "var(--text-muted)", fontFamily: "DM Mono,monospace" }}>
-                            {formatRp(item.last)}/kg
+                            {formatRp(item.last)}{item.satuan ? `/${item.satuan}` : ""}
                           </div>
                         </div>
                         <span style={{
