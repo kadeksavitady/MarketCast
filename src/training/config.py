@@ -199,12 +199,61 @@ CLUSTER_FULL_TO_SHORT = {v: k for k, v in CLUSTER_SHORT_TO_FULL.items()}
 # ─────────────────────────────────────────────────────────────
 # DYNAMIC CLUSTER LOADER
 # ─────────────────────────────────────────────────────────────
-def load_cluster_map(csv_path: Path = CSV_CLUSTER_ASSIGN) -> dict:
-    if not csv_path.exists():
-        logging.getLogger("config").warning(
-            f"{csv_path} tidak ditemukan — pakai CLUSTER_MAP_FALLBACK"
+def _download_clustering_artifacts() -> bool:
+    """
+    Download clustering artifacts dari MLflow DagHub ke outputs/clustering/.
+    Dipanggil otomatis kalau CSV tidak ada di disk lokal.
+    Return True kalau berhasil, False kalau gagal.
+    """
+    _log = logging.getLogger("config")
+    try:
+        import mlflow, dagshub
+        dagshub.init(repo_name=DAGSHUB_REPO, repo_owner=DAGSHUB_USER, mlflow=True)
+        client = mlflow.tracking.MlflowClient()
+
+        # Cari run KMeans-Final terbaru di experiment siskaperbapo-clustering
+        exp = client.get_experiment_by_name("siskaperbapo-clustering")
+        if exp is None:
+            _log.warning("Experiment siskaperbapo-clustering tidak ditemukan di MLflow")
+            return False
+
+        runs = client.search_runs(
+            exp.experiment_id,
+            filter_string="tags.mlflow.runName = \'KMeans-Final\'",
+            order_by=["attributes.start_time DESC"],
+            max_results=1,
         )
-        return CLUSTER_MAP_FALLBACK
+        if not runs:
+            _log.warning("Tidak ada run KMeans-Final di MLflow")
+            return False
+
+        run_id = runs[0].info.run_id
+        _log.info(f"Download clustering artifacts dari run {run_id[:8]}...")
+
+        DIR_CLUSTERING.mkdir(parents=True, exist_ok=True)
+        mlflow.artifacts.download_artifacts(
+            run_id=run_id,
+            artifact_path="clustering_results",
+            dst_path=str(DIR_CLUSTERING.parent.parent),
+        )
+        _log.info(f"✅ Clustering artifacts berhasil di-download ke {DIR_CLUSTERING}")
+        return True
+
+    except Exception as e:
+        _log.warning(f"Gagal download clustering artifacts: {e}")
+        return False
+
+
+def load_cluster_map(csv_path: Path = CSV_CLUSTER_ASSIGN) -> dict:
+    _log = logging.getLogger("config")
+
+    # Kalau CSV tidak ada, coba download dari MLflow dulu
+    if not csv_path.exists():
+        _log.info(f"{csv_path} tidak ada — mencoba download dari MLflow...")
+        success = _download_clustering_artifacts()
+        if not success or not csv_path.exists():
+            _log.warning("Download gagal — pakai CLUSTER_MAP_FALLBACK")
+            return CLUSTER_MAP_FALLBACK
 
     df            = pd.read_csv(csv_path)
     col_komoditas = next((c for c in df.columns if "komoditas" in c.lower()),
@@ -219,6 +268,9 @@ def load_cluster_map(csv_path: Path = CSV_CLUSTER_ASSIGN) -> dict:
         cluster   = str(row[col_cluster]).strip()
         komoditas = str(row[col_komoditas]).strip()
         result.setdefault(cluster, []).append(komoditas)
+
+    _log.info(f"Cluster map loaded: {len(result)} cluster, "
+              f"{sum(len(v) for v in result.values())} komoditas")
     return result
 
 
@@ -253,9 +305,33 @@ def get_cluster_short(komoditas: str, cluster_map: dict = None) -> str:
     """
     Return label pendek cluster (C0_LabilDatar, dst).
     Dipakai sebagai tag di MLflow dan argumen --champion di CLI.
+
+    DYNAMIC LABEL SUPPORT:
+    Label cluster dari clustering.py bersifat dinamis — bisa berubah
+    sesuai karakteristik data terkini. Fungsi ini meng-handle dua format:
+        Format lama (hardcode): "Cluster 0: Labil & Murah (→Datar)"
+        Format baru (dinamis) : "Cluster 0: Labil & Mahal (→Datar)"
+    Keduanya akan di-map ke "C0_<label>" berdasarkan nomor cluster.
     """
     full = get_cluster(komoditas, cluster_map)
-    return CLUSTER_FULL_TO_SHORT.get(full, full)
+
+    # Coba mapping hardcode dulu (untuk backward compatibility)
+    if full in CLUSTER_FULL_TO_SHORT:
+        return CLUSTER_FULL_TO_SHORT[full]
+
+    # Dynamic mapping: ekstrak nomor cluster dari label string
+    # Format: "Cluster N: ..." → "CN_<slug>"
+    import re
+    match = re.match(r"Cluster\s+(\d+):\s*(.+)", full)
+    if match:
+        cid   = match.group(1)
+        desc  = match.group(2).strip()
+        # Buat slug dari deskripsi: "Labil & Mahal (→Datar)" → "LabilMahalDatar"
+        slug  = re.sub(r"[^a-zA-Z0-9]", "", desc.replace("→", "").replace("↑", "").replace("↓", ""))
+        return f"C{cid}_{slug}"
+
+    # Fallback: return full label kalau tidak bisa di-parse
+    return full
 
 
 # ─────────────────────────────────────────────────────────────
@@ -278,6 +354,7 @@ def get_logger(name: str) -> logging.Logger:
 # METRICS
 # ─────────────────────────────────────────────────────────────
 def compute_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict:
+    from sklearn.metrics import r2_score
     y_true = np.array(y_true, dtype=float)
     y_pred = np.array(y_pred, dtype=float)
 
@@ -293,9 +370,14 @@ def compute_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict:
         2 * np.abs(y_pred - y_true) / (np.abs(y_true) + np.abs(y_pred) + 1e-8)
     ) * 100
 
+    # R² — seberapa baik model menjelaskan variansi data
+    # R²=1 sempurna, R²=0 sama dengan prediksi rata-rata, R²<0 lebih buruk dari rata-rata
+    r2 = r2_score(y_true, y_pred) if len(y_true) > 1 else 0.0
+
     return {
         "mae"  : round(float(mae),   2),
         "rmse" : round(float(rmse),  2),
         "mape" : round(float(mape),  4),
         "smape": round(float(smape), 4),
+        "r2"   : round(float(r2),    4),
     }
