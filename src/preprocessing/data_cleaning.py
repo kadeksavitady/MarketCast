@@ -208,43 +208,49 @@ def robust_scale(df: pd.DataFrame) -> tuple:
     return df_scaled, scalers_dict
 
 # ─────────────────────────────────────────────────────────────
-# 7. EXPORT LANGSUNG KE MLFLOW (Cloud Hub)
+# 7. EXPORT: NEON DB (DATA) & MLFLOW (SCALER/METADATA)
 # ─────────────────────────────────────────────────────────────
-def export_and_log_to_mlflow(df: pd.DataFrame, scalers_dict: dict, uri: str) -> None:
+def export_results(df: pd.DataFrame, scalers_dict: dict, engine, uri: str) -> None:
+    # ── A. PUSH DATA KE NEON DB ──
     try:
-        import requests
-        requests.get(uri.rstrip("/") + "/api/2.0/mlflow/experiments/list", timeout=5)
-    except Exception:
-        log.warning(f"⚠️ MLflow tidak dapat dijangkau di {uri} — skip logging")
-        return
+        log.info("  Mengirim data bersih ke tabel 'harga_historis_clean' di Neon PostgreSQL...")
+        
+        # Rapikan nama kolom (tanggal_data -> tanggal) agar seragam untuk pipeline selanjutnya
+        df_export = df[['tanggal_data', 'komoditas', 'kategori', 'harga_per_kg', 'harga_scaled']].copy()
+        df_export.rename(columns={'tanggal_data': 'tanggal'}, inplace=True)
+        
+        # if_exists='replace' akan menimpa tabel lama jika ada. Sangat aman untuk pipeline batch!
+        df_export.to_sql('harga_historis_clean', engine, if_exists='replace', index=False)
+        log.info(f"✅ Data bersih ({len(df_export):,} baris) berhasil disimpan ke Database!")
+    except Exception as e:
+        log.error(f"❌ Gagal push ke Database: {e}")
+        return # Hentikan jika DB gagal, percuma lanjut ke MLflow
 
+    # ── B. PUSH SCALER & METADATA KE MLFLOW ──
     try:
-        # Inisialisasi koneksi ke DagsHub
+        import mlflow, dagshub
         dagshub.init('MarketCast', 'kadeksavitady', mlflow=True)
-        # Buat "ruangan" baru di MLflow khusus untuk hasil cleaning data
+        mlflow.set_tracking_uri(uri)
         mlflow.set_experiment("MarketCast-Preprocessing")
 
         with mlflow.start_run(run_name="Data-Cleaning-Final"):
-            
-            # Bikin kardus hantu (temporary folder)
+            # Metadata metrik (Bagus buat dipantau di dashboard DagsHub)
+            mlflow.log_metric("total_komoditas_valid", df_export['komoditas'].nunique())
+            mlflow.log_metric("total_baris_bersih", len(df_export))
+
+            # Tempfile: Bikin, isi, upload, lalu musnahkan!
             with tempfile.TemporaryDirectory() as tmpdir:
                 tmp_path = Path(tmpdir)
+                joblib_path = tmp_path / "robust_scalers.joblib"
+                joblib.dump(scalers_dict, joblib_path)  # Bekukan 43 otak scaler ke dalam file .joblib
+                # Upload ke MLflow DagsHub
+                mlflow.log_artifact(local_path=str(joblib_path), artifact_path="preprocessing_results")
                 
-                # 1. Simpan Scaler (Untuk FastAPI)
-                joblib.dump(scalers_dict, tmp_path / "robust_scalers.joblib")
-                
-                # 2. Simpan CSV yang sudah bersih (Untuk Clustering)
-                df_export = (df[['tanggal_data', 'komoditas', 'kategori', 'harga_per_kg', 'harga_scaled']]
-                             .rename(columns={'tanggal_data': 'tanggal'}))
-                df_export.to_sql('harga_historis_clean', engine, if_exists='replace', index=False)
-                
-                # 3. UPLOAD KE MLFLOW
-                mlflow.log_artifacts(tmp_path.as_posix(), artifact_path="preprocessing_results")
-                
-                log.info(f"✅ Data bersih & 43 Scaler BERHASIL DI-UPLOAD ke MLflow DagsHub!")
-
+        log.info("✅ File robust_scalers.joblib berhasil di-upload ke DagsHub MLflow!")
+        
     except Exception as e:
-        log.error(f"❌ MLflow Error: {e}")
+        log.error(f"❌ Gagal upload ke MLflow: {e}")
+
 # ─────────────────────────────────────────────────────────────
 # MAIN
 # ─────────────────────────────────────────────────────────────
