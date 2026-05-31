@@ -258,7 +258,7 @@ def iqr_clip(df: pd.DataFrame) -> pd.DataFrame:
 # ─────────────────────────────────────────────────────────────
 # 6. EXPORT: NEON DB (DATA) & MLFLOW (SCALER/METADATA)
 # ─────────────────────────────────────────────────────────────
-def export_results(df: pd.DataFrame, scalers_dict: dict, engine) -> None:
+def export_results(df: pd.DataFrame, engine) -> None:
     # ── PUSH DATA KE NEON DB ──
     try:
         log.info("  Mengirim data bersih ke tabel 'harga_historis_clean' di Neon PostgreSQL...")
