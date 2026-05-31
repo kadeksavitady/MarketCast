@@ -349,7 +349,7 @@ def train_sarima(
  
     series_full  = data["series_full"]
     dates_full   = data["dates_full"]
-    cluster      = get_cluster_short(komoditas)
+    cluster      = data.get("cluster") or get_cluster_short(komoditas)
  
     log.info(f"\n{'='*60}")
     log.info(f"[{MODEL_NAME}] {komoditas} | cluster={cluster} | mode={mode}")
@@ -443,12 +443,14 @@ def train_sarima(
                     f"split_{i}_rmse" : result["rmse"],
                     f"split_{i}_mape" : result["mape"],
                     f"split_{i}_smape": result["smape"],
+                    f"split_{i}_r2"   : result.get("r2", 0.0),
                 })
  
                 log.info(
                     f"  MAE={result['mae']:>10,.0f} | "
                     f"MAPE={result['mape']:>6.2f}% | "
                     f"SMAPE={result['smape']:>6.2f}%"
+                    f"R²={result.get('r2', 0):>6.4f}"
                 )
  
                 split_results.append({
@@ -482,23 +484,29 @@ def train_sarima(
             w * r["rmse"]
             for w, r in zip(split_weights, split_results)
         )
+        wr2 = sum(
+            w * r.get("r2", 0.0)
+            for w, r in zip(split_weights, split_results)
+        )
  
         agg_metrics = {
             "wmape" : round(wmape,  4),
             "wsmape": round(wsmape, 4),
             "wmae"  : round(wmae,   2),
             "wrmse" : round(wrmse,  2),
+            "wr2"   : round(wr2,    4),
             # Alias untuk kompatibilitas dengan train_all.py leaderboard
             "mape"  : round(wmape,  4),
             "smape" : round(wsmape, 4),
             "mae"   : round(wmae,   2),
             "rmse"  : round(wrmse,  2),
+            "r2"    : round(wr2,    4),
         }
         mlflow.log_metrics(agg_metrics)
  
         log.info(f"\n  ── Agregat Weighted ──")
         log.info(f"  WMAPE={wmape:.2f}% | WSMAPE={wsmape:.2f}% | "
-                 f"WMAE={wmae:,.0f} | WRMSE={wrmse:,.0f}")
+                 f"WMAE={wmae:,.0f} | WRMSE={wrmse:,.0f} | WR²={wr2:.4f}")
  
         # ── Refit model final di full series ──────────────────────────────────
         # Pakai order dari split terakhir (paling representatif data terkini)
