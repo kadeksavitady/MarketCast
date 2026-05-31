@@ -59,6 +59,13 @@ EXCLUDE_KOMODITAS = set()  # tambah di sini kalau ada yang perlu di-skip
 # ─────────────────────────────────────────────────────────────
 # 1. LOAD DATA
 # ─────────────────────────────────────────────────────────────
+def get_db_engine():
+    load_dotenv()
+    db_url = os.getenv("DATABASE_URL")
+    if not db_url:
+        raise EnvironmentError("DATABASE_URL tidak ditemukan di .env")
+    return create_engine(db_url)
+
 def load_from_neon() -> pd.DataFrame:
     load_dotenv()
     db_url = os.getenv("DATABASE_URL")
@@ -260,13 +267,15 @@ def main():
     log.info("=" * 60)
 
     mlflow_uri = "https://dagshub.com/kadeksavitady/MarketCast.mlflow"
+    engine = get_db_engine()
 
     # Pipeline
     df = load_from_neon()
     df = filter_invalid(df)
     df = zero_to_nan(df)
-
+    
     nan_before = df['harga_per_kg'].isna().sum()
+
     log.info(f"\n── Fill Missing Values ({nan_before} NaN total) ──")
     df = fill_missing(df)
 
@@ -280,12 +289,14 @@ def main():
     log.info("\n── Robust Scaling ──")
     df, scalers_dict = robust_scale(df)
 
-    log.info("\n── Export to MLflow ──")
-    export_and_log_to_mlflow(df, scalers_dict, mlflow_uri)
+    log.info("\n── Exporting (Database & MLflow) ──")
+    export_results(df, scalers_dict, engine, mlflow_uri)
+
+    engine.dispose() # Putuskan koneksi DB dengan aman
     
     log.info("=" * 60)
     log.info("  Selesai. Jalankan clustering.py dengan:")
-    log.info(f"  --csv-path {output_path} --source csv")
+    log.info("  Data ada di Neon DB. Scaler ada di MLflow.")
     log.info("=" * 60)
 
 if __name__ == "__main__":
