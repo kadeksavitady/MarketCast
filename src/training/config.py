@@ -149,54 +149,6 @@ FORECAST_DAYS  = 30     # hari ke depan yang diprediksi (semua model)
 MIN_TRAIN_ROWS = 180    # minimum data train = 6 bulan (guard data terlalu pendek)
 
 # ─────────────────────────────────────────────────────────────
-# CLUSTER MAP — fallback hardcode
-# ─────────────────────────────────────────────────────────────
-# Dipakai HANYA jika cluster_assignments.csv belum ada
-# (misalnya: pertama kali setup, atau saat testing tanpa run preprocessing).
-# Sumber aktual: load_cluster_map() baca dari CSV hasil pipeline.
-#
-# Hasil clustering K-Means K=3 dari preprocessing_clustering.py:
-#   Cluster 0: CV tinggi (avg 0.358), tren datar  → komoditas volatile
-#   Cluster 1: CV menengah (avg 0.095), tren naik → komoditas inflasi
-#   Cluster 2: CV rendah (avg 0.030), harga mahal → komoditas stabil
-CLUSTER_MAP_FALLBACK = {
-    "Cluster 0: Labil & Murah (\u2192Datar)": [
-        "Cabe Merah Besar", "Cabe Merah Keriting",
-        "Cabe Rawit Merah", "Tomat Merah",
-    ],
-    "Cluster 1: Labil & Murah (\u2191Inflasi)": [
-        "Bawang Merah", "Bawang Putih Sinco/Honan",
-        "Beras Medium", "Beras Premium",
-        "Daging Ayam Ras", "Gula Kristal Putih",
-        "Ikan Bandeng", "Ikan Cakalang", "Ikan Kembung",
-        "Ikan Tongkol", "Ikan Tuna",
-        "Indomie Rasa Kari Ayam", "Jagung Pipilan Kering",
-        "Kedelai Impor", "Kedelai Lokal",
-        "Minyak Goreng Curah", "Minyak Goreng Kemasan Premium",
-        "Minyak Goreng Kemasan Sederhana", "Minyak Goreng MINYAKITA",
-        "Susu Kental Manis Merk Bendera", "Susu Kental Manis Merk Indomilk",
-        "Telur Ayam Kampung", "Telur Ayam Ras",
-        "Terigu Protein Sedang (Kemasan)",
-    ],
-    "Cluster 2: Stabil & Mahal (\u2192Datar)": [
-        "Daging Ayam Kampung", "Daging Sapi Paha Belakang",
-        "Ikan Asin Teri",
-        "Susu Bubuk Merk Bendera (Instant)",
-        "Susu Bubuk Merk Indomilk (Instant)",
-    ],
-}
-
-# Lookup dua arah: label pendek ↔ nama cluster penuh
-# Label pendek dipakai di MLflow tags dan CLI --champion
-CLUSTER_SHORT_TO_FULL = {
-    "C0_LabilDatar"  : "Cluster 0: Labil & Murah (\u2192Datar)",
-    "C1_LabilInflasi": "Cluster 1: Labil & Murah (\u2191Inflasi)",
-    "C2_StabilMahal" : "Cluster 2: Stabil & Mahal (\u2192Datar)",
-}
-CLUSTER_FULL_TO_SHORT = {v: k for k, v in CLUSTER_SHORT_TO_FULL.items()}
-
-
-# ─────────────────────────────────────────────────────────────
 # DYNAMIC CLUSTER LOADER
 # ─────────────────────────────────────────────────────────────
 def _download_clustering_artifacts() -> bool:
@@ -315,10 +267,6 @@ def get_cluster_short(komoditas: str, cluster_map: dict = None) -> str:
     """
     full = get_cluster(komoditas, cluster_map)
 
-    # Coba mapping hardcode dulu (untuk backward compatibility)
-    if full in CLUSTER_FULL_TO_SHORT:
-        return CLUSTER_FULL_TO_SHORT[full]
-
     # Dynamic mapping: ekstrak nomor cluster dari label string
     # Format: "Cluster N: ..." → "CN_<slug>"
     import re
@@ -332,7 +280,6 @@ def get_cluster_short(komoditas: str, cluster_map: dict = None) -> str:
 
     # Fallback: return full label kalau tidak bisa di-parse
     return full
-
 
 # ─────────────────────────────────────────────────────────────
 # LOGGING
