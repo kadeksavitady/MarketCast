@@ -270,7 +270,7 @@ def main():
     engine = get_db_engine()
 
     # Pipeline
-    df = load_from_neon()
+    df = load_from_neon(engine)
     df = filter_invalid(df)
     df = zero_to_nan(df)
     
