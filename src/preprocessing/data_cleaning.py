@@ -6,15 +6,12 @@ src/preprocessing/data_cleaning.py
 import os
 import logging
 import warnings
-import joblib
-import tempfile
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
-from sklearn.preprocessing import RobustScaler
 
 warnings.filterwarnings("ignore")
 logging.basicConfig(
@@ -259,35 +256,10 @@ def iqr_clip(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 # ─────────────────────────────────────────────────────────────
-# 6. SCALING 
-# ─────────────────────────────────────────────────────────────
-def robust_scale(df: pd.DataFrame) -> tuple:
-    """
-    Mengembalikan dataframe yang sudah di-scale DAN dictionary scalernya.
-    Tidak ada lagi simpan ke lokal di sini!
-    """
-    df = df.copy()
-    scaled_list = []
-    scalers_dict = {}
-    
-    for komoditas, group in df.groupby("komoditas"):
-        group   = group.copy()
-        scaler  = RobustScaler()
-        values  = group["harga_per_kg"].values.reshape(-1, 1)
-        
-        group["harga_scaled"] = scaler.fit_transform(values).flatten()
-        scalers_dict[komoditas] = scaler
-        scaled_list.append(group)
-        
-    df_scaled = pd.concat(scaled_list, ignore_index=True)
-    log.info(f"  RobustScaler: Selesai untuk {df_scaled['komoditas'].nunique()} komoditas")
-    return df_scaled, scalers_dict
-
-# ─────────────────────────────────────────────────────────────
-# 7. EXPORT: NEON DB (DATA) & MLFLOW (SCALER/METADATA)
+# 6. EXPORT: NEON DB (DATA) & MLFLOW (SCALER/METADATA)
 # ─────────────────────────────────────────────────────────────
 def export_results(df: pd.DataFrame, scalers_dict: dict, engine, uri: str) -> None:
-    # ── A. PUSH DATA KE NEON DB ──
+    # ── PUSH DATA KE NEON DB ──
     try:
         log.info("  Mengirim data bersih ke tabel 'harga_historis_clean' di Neon PostgreSQL...")
         
@@ -302,31 +274,6 @@ def export_results(df: pd.DataFrame, scalers_dict: dict, engine, uri: str) -> No
         log.error(f"❌ Gagal push ke Database: {e}")
         return # Hentikan jika DB gagal, percuma lanjut ke MLflow
 
-    # ── B. PUSH SCALER & METADATA KE MLFLOW ──
-    try:
-        import mlflow, dagshub
-        dagshub.init('MarketCast', 'kadeksavitady', mlflow=True)
-        mlflow.set_tracking_uri(uri)
-        mlflow.set_experiment("MarketCast-Preprocessing")
-
-        with mlflow.start_run(run_name="Data-Cleaning-Final"):
-            # Metadata metrik (Bagus buat dipantau di dashboard DagsHub)
-            mlflow.log_metric("total_komoditas_valid", df_export['komoditas'].nunique())
-            mlflow.log_metric("total_baris_bersih", len(df_export))
-
-            # Tempfile: Bikin, isi, upload, lalu musnahkan!
-            with tempfile.TemporaryDirectory() as tmpdir:
-                tmp_path = Path(tmpdir)
-                joblib_path = tmp_path / "robust_scalers.joblib"
-                joblib.dump(scalers_dict, joblib_path)  # Bekukan 43 otak scaler ke dalam file .joblib
-                # Upload ke MLflow DagsHub
-                mlflow.log_artifact(local_path=str(joblib_path), artifact_path="preprocessing_results")
-                
-        log.info("✅ File robust_scalers.joblib berhasil di-upload ke DagsHub MLflow!")
-        
-    except Exception as e:
-        log.error(f"❌ Gagal upload ke MLflow: {e}")
-
 # ─────────────────────────────────────────────────────────────
 # MAIN
 # ─────────────────────────────────────────────────────────────
@@ -335,7 +282,6 @@ def main():
     log.info("  DATA CLEANING PIPELINE — MarketCast")
     log.info("=" * 60)
 
-    mlflow_uri = "https://dagshub.com/kadeksavitady/MarketCast.mlflow"
     engine = get_db_engine()
 
     # Pipeline
@@ -356,17 +302,14 @@ def main():
     log.info("\n── IQR Clipping ──")
     df = iqr_clip(df)
 
-    log.info("\n── Robust Scaling ──")
-    df, scalers_dict = robust_scale(df)
-
-    log.info("\n── Exporting (Database & MLflow) ──")
-    export_results(df, scalers_dict, engine, mlflow_uri)
+    log.info("\n── Exporting (Database) ──")
+    export_results(df, engine)
 
     engine.dispose() # Putuskan koneksi DB dengan aman
     
     log.info("=" * 60)
     log.info("  Selesai. Jalankan clustering.py dengan:")
-    log.info("  Data ada di Neon DB. Scaler ada di MLflow.")
+    log.info("  Data ada di Neon DB.")
     log.info("=" * 60)
 
 if __name__ == "__main__":
