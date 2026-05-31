@@ -66,13 +66,7 @@ def get_db_engine():
         raise EnvironmentError("DATABASE_URL tidak ditemukan di .env")
     return create_engine(db_url)
 
-def load_from_neon() -> pd.DataFrame:
-    load_dotenv()
-    db_url = os.getenv("DATABASE_URL")
-    if not db_url:
-        raise EnvironmentError("DATABASE_URL tidak ditemukan di .env")
-
-    engine = create_engine(db_url)
+def load_from_neon(engine) -> pd.DataFrame:
     query = """
         SELECT tanggal_data, komoditas, kategori, harga_per_kg
         FROM harga_historis
