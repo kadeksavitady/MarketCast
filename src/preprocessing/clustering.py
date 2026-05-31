@@ -29,23 +29,11 @@ def get_db_engine():
         raise EnvironmentError("DATABASE_URL tidak ditemukan di .env")
     return create_engine(db_url)
 
-def load_data(args):
-    """Load data dari CSV hasil cleaning hulu atau PostgreSQL."""
-    if args.source == "csv":
-        path = Path(args.csv_path)
-        if not path.exists():
-            log.error(f"File hasil cleaning tidak ditemukan di {path}")
-            sys.exit(1)
-        df = pd.read_csv(path)
-    else:
-        from sqlalchemy import create_engine
-        engine = create_engine(
-            f"postgresql://{args.pg_user}:{args.pg_password}"
-            f"@{args.pg_host}:{args.pg_port}/{args.pg_db}"
-        )
-        df = pd.read_sql("SELECT * FROM harga_historis", engine)
-
-    log.info(f"Loaded {len(df):,} rows. Siap untuk clustering.")
+def load_data(engine) -> pd.DataFrame:
+    query = "SELECT * FROM harga_historis_clean"
+    df = pd.read_sql(query, engine)
+    df["tanggal"] = pd.to_datetime(df["tanggal"])
+    log.info(f"Loaded {len(df):,} rows dari Neon DB. Siap untuk clustering.")
     return df
 
 # ─────────────────────────────────────────────────────────────────────────────
