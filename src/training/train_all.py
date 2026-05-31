@@ -84,7 +84,6 @@ MODEL_REGISTRY = {
 # ══════════════════════════════════════════════════════════════
 # HELPER: pemanggilan model dengan training_mode
 # ══════════════════════════════════════════════════════════════
- 
 def _call_model(model_name: str, komoditas: str, data: dict,
                 mlflow_experiment: str, training_mode: str) -> dict:
     """
@@ -126,7 +125,6 @@ def _call_model(model_name: str, komoditas: str, data: dict,
 # ══════════════════════════════════════════════════════════════
 # TAHAP 2 — TURNAMEN BASELINE
 # ══════════════════════════════════════════════════════════════
- 
 def run_tournament(models: list, komoditas_list: list,
                    all_data: dict, cluster_map: dict) -> list:
     """
@@ -188,7 +186,6 @@ def run_tournament(models: list, komoditas_list: list,
     log.info(f"  → Pilih juara per cluster, lalu jalankan --mode specialize")
     return results
  
- 
 def _print_tournament_leaderboard(results: list):
     if not results:
         return
@@ -208,7 +205,6 @@ def _print_tournament_leaderboard(results: list):
 # ══════════════════════════════════════════════════════════════
 # TAHAP 3a — SPESIALISASI
 # ══════════════════════════════════════════════════════════════
- 
 def run_specialize(champion_map: dict, all_data: dict,
                    cluster_map: dict) -> dict:
     """
@@ -342,7 +338,6 @@ def run_specialize(champion_map: dict, all_data: dict,
     log.info(f"{'='*65}")
     return registry
  
- 
 def _save_registry(registry: dict):
     import mlflow, tempfile, os
     DIR_REGISTRY.mkdir(parents=True, exist_ok=True)
@@ -380,7 +375,6 @@ def _save_registry(registry: dict):
 # ══════════════════════════════════════════════════════════════
 # MAIN
 # ══════════════════════════════════════════════════════════════
- 
 def load_champion_from_registry() -> dict:
     """Baca alias @champion dari MLflow Model Registry."""
     import mlflow
@@ -404,7 +398,6 @@ def load_champion_from_registry() -> dict:
         log.warning(f"Gagal baca Registry: {e}")
     return champion_map
  
- 
 def parse_champion(champion_args: list) -> dict:
     if not champion_args:
         return {}
@@ -423,7 +416,6 @@ def parse_champion(champion_args: list) -> dict:
         result[cluster] = model
     return result
  
- 
 def main():
     parser = argparse.ArgumentParser(description="MarketCast Training Pipeline")
     parser.add_argument("--mode",
@@ -439,7 +431,6 @@ def main():
     parser.add_argument("--csv", default=None)
     args = parser.parse_args()
  
-    csv_path      = CSV_PREPROCESSED
     cluster_map   = load_cluster_map()
     centroid_list = load_centroid_list()
  
@@ -486,7 +477,6 @@ def main():
         if not registry:
             log.error("Registry kosong — tidak ada model berhasil ditraining.")
             sys.exit(1)
- 
  
 if __name__ == "__main__":
     main()

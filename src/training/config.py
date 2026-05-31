@@ -205,7 +205,6 @@ def load_cluster_map(csv_path: Path = CSV_CLUSTER_ASSIGN) -> dict:
         success = _download_clustering_artifacts()
         if not success or not csv_path.exists():
             _log.warning("Download gagal — pakai CLUSTER_MAP_FALLBACK")
-            return CLUSTER_MAP_FALLBACK
 
     df            = pd.read_csv(csv_path)
     col_komoditas = next((c for c in df.columns if "komoditas" in c.lower()),
