@@ -166,7 +166,6 @@ def fill_missing(df: pd.DataFrame) -> pd.DataFrame:
 # ─────────────────────────────────────────────────────────────
 # 5. IQR CLIPPING (outlier)
 # ─────────────────────────────────────────────────────────────
-
 def iqr_clip(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     n_clipped = 0
