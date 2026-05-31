@@ -37,24 +37,28 @@ def load_data(engine) -> pd.DataFrame:
     return df
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 2. PREPROCESSING
+# 2. FEATURE ENGINEERING
 # ─────────────────────────────────────────────────────────────────────────────
-
-def preprocess_for_clustering(df: pd.DataFrame) -> pd.DataFrame:
-    """Hanya menangani outlier karena satuan sudah kg dari hulu."""
-    log.info("─── PREPROCESSING CLUSTERING ───")
-    df = df.copy()
-    df["tanggal"] = pd.to_datetime(df["tanggal"])
-
+def build_features(df: pd.DataFrame) -> pd.DataFrame:
+    features = []
     for komoditas, group in df.groupby("komoditas"):
-        q1, q3 = group["harga_per_kg"].quantile([0.25, 0.75])
-        iqr = q3 - q1
-        lower, upper = q1 - 1.5 * iqr, q3 + 1.5 * iqr
-        mask = df["komoditas"] == komoditas
-        df.loc[mask & (df["harga_per_kg"] < lower), "harga_per_kg"] = lower
-        df.loc[mask & (df["harga_per_kg"] > upper), "harga_per_kg"] = upper
+        prices = group.sort_values("tanggal")["harga_per_kg"].values
+        days   = (group["tanggal"] - group["tanggal"].min()).dt.days.values
 
-    return df
+        mean_p = np.mean(prices)
+        cv     = np.std(prices) / mean_p if mean_p > 0 else 0
+        
+        # Trend slope dikali 365 / mean_p = persentase inflasi tahunan!
+        slope  = (stats.linregress(days, prices).slope * 365 / mean_p
+                  if len(days) > 1 else 0)
+
+        features.append({
+            "komoditas"  : komoditas,
+            "mean_harga" : mean_p,
+            "cv"         : cv,
+            "trend_slope": slope,
+        })
+    return pd.DataFrame(features).set_index("komoditas")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 3. FEATURE ENGINEERING & CLUSTERING
