@@ -207,36 +207,27 @@ def main():
     parser = argparse.ArgumentParser(
         description="Clustering pipeline PBL-MarketCast"
     )
-    parser.add_argument("--source", choices=["csv", "postgres"], default="csv")
-    parser.add_argument("--csv-path", default="data/processed/harga_historis_clean.csv")
-    parser.add_argument("--output-dir", default="outputs/clustering")
     parser.add_argument("--k", type=int, default=3)
     parser.add_argument("--mlflow-uri", default="https://dagshub.com/kadeksavitady/MarketCast.mlflow")
     args = parser.parse_args()
 
-    out_dir = Path(args.output_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
-
     # ── Pipeline ──────────────────────────────────────────────────────────────
-    df_raw   = load_data(args)
-    df_clean = preprocess_for_clustering(df_raw)
+    log.info("=" * 60)
+    log.info("  CLUSTERING PIPELINE — MarketCast")
+    log.info("=" * 60)
+
+    engine = get_db_engine()
+    df_clean = load_data(engine)
     feat_df  = build_features(df_clean)
+    feat_final, X_scaled, scaler = run_clustering_pipeline(feat_df, args.k)
 
-    feat_final, X_scaled, scaler_path = run_clustering_pipeline(
-        feat_df, args.k, out_dir
-    )
-
-    # ── Export ────────────────────────────────────────────────────────────────
-    export_pipeline_inputs(df_clean, feat_final, out_dir)
-    export_centroid_timeseries(df_clean, feat_final, out_dir)
-
-    # ── MLflow ────────────────────────────────────────────────────────────────
-    log_to_mlflow(feat_final, out_dir, scaler_path, args.mlflow_uri)
+    # ── Export & MLflow ────────────────────────────────────────────────────────────────
+    export_and_log_to_mlflow(df_clean, feat_final, scaler, args.mlflow_uri, args.k)
+    engine.dispose()
 
     log.info("=" * 60)
-    log.info("Clustering selesai. outputs/clustering/ siap untuk train_all.py")
+    log.info("Clustering selesai. Data hasil Clustering aman di MLflow DagsHub dan siap untuk train_all.py")
     log.info("=" * 60)
-
 
 if __name__ == "__main__":
     main()
