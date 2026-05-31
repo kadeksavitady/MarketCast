@@ -83,7 +83,7 @@ def run_clustering_pipeline(feat_df: pd.DataFrame, k: int):
     for cid in range(k):
         nearest = feat_df[feat_df["cluster"] == cid]["dist"].idxmin()
         feat_df.loc[nearest, "is_centroid"] = True
-        
+
     # DYNAMIC LABELING (Berdasarkan kondisi nyata data di memori)
     feat_df["cluster_label"] = ""
     overall_harga = feat_df["mean_harga"].median()
@@ -114,79 +114,17 @@ def run_clustering_pipeline(feat_df: pd.DataFrame, k: int):
     return feat_df, X_scaled, scaler
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 4. EXPORT
+# 4. EXPORT EXPORT & MLFLOW LOGGING (TEMPFILE)
 # ─────────────────────────────────────────────────────────────────────────────
-
-def export_pipeline_inputs(df_clean: pd.DataFrame, feat_final: pd.DataFrame,
-                            scaler, uri: str) -> None:
+def export_and_log_to_mlflow(df_clean: pd.DataFrame, feat_final: pd.DataFrame,
+                             scaler, uri: str, k: int) -> None:
     """
     Export semua file yang dibutuhkan pipeline selanjutnya:
-        2. cluster_assignments.csv     → outputs/clustering/
-        3. centroid_representatives.csv→ outputs/clustering/
+        2. cluster_assignments.csv     → artifacts mlflow
+        3. centroid_representatives.csv→ artifacts mlflow
            (CV, mean_harga, trend_slope, cluster per komoditas)
            ↑ dipakai substitution engine untuk cari komoditas serupa
     """
-
-    # ── 1. data_preprocessed.csv ─────────────────────────────────────────────
-    df_export = (df_clean
-                 .rename(columns={"tanggal": "tanggal"})
-                 [["tanggal", "komoditas", "harga_per_kg"]])
-    df_export.to_csv(output_dir / "data_preprocessed.csv", index=False)
-    log.info(f"✅ data_preprocessed.csv  — {len(df_export):,} baris, "
-             f"{df_export['komoditas'].nunique()} komoditas")
-
-    # ── 2. cluster_assignments.csv ───────────────────────────────────────────
-    assignments = feat_final[["cluster"]].copy()
-    assignments["cluster_label"] = assignments["cluster"].map(CLUSTER_LABEL_MAP)
-    assignments.index.name = "komoditas"
-    assignments[["cluster_label"]].to_csv(output_dir / "cluster_assignments.csv")
-    log.info(f"✅ cluster_assignments.csv — {len(assignments)} komoditas")
-    for cid, label in CLUSTER_LABEL_MAP.items():
-        n = (assignments["cluster_label"] == label).sum()
-        log.info(f"   Cluster {cid}: {n} komoditas — {label}")
-
-    # ── 3. centroid_representatives.csv ─────────────────────────────────────
-    centroids = feat_final[feat_final["is_centroid"]].index.tolist()
-    pd.DataFrame({"komoditas": centroids}).to_csv(
-        output_dir / "centroid_representatives.csv", index=False
-    )
-    log.info(f"✅ centroid_representatives.csv — {centroids}")
-
-    # ── 4. cluster_features.csv ──────────────────────────────────────────────
-    feat_export = feat_final[["cv", "mean_harga", "trend_slope",
-                               "cluster", "dist", "is_centroid"]].copy()
-    feat_export["cluster_label"] = feat_export["cluster"].map(CLUSTER_LABEL_MAP)
-    feat_export.index.name = "komoditas"
-    feat_export.to_csv(output_dir / "cluster_features.csv")
-    log.info(f"✅ cluster_features.csv — CV, mean_harga, trend_slope per komoditas")
-
-
-def export_centroid_timeseries(df_clean: pd.DataFrame, feat_final: pd.DataFrame,
-                                output_dir: Path) -> None:
-    for komo in feat_final[feat_final["is_centroid"]].index:
-        slug   = komo.lower().replace(" ", "_")
-        sub_df = (df_clean[df_clean["komoditas"] == komo]
-                  [["tanggal", "harga_per_kg"]]
-                  .copy())
-        sub_df.columns = ["ds", "y"]
-        sub_df.to_csv(output_dir / f"ts_centroid_{slug}.csv", index=False)
-    log.info("✅ ts_centroid_*.csv disimpan untuk semua centroid")
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 5. MLflow LOGGING
-# ─────────────────────────────────────────────────────────────────────────────
-
-def log_to_mlflow(feat_df: pd.DataFrame, output_dir: Path,
-                  scaler_path: Path, uri: str) -> None:
-    """
-    Log ke MLflow:
-        Params    : k
-        Metrics   : ukuran tiap cluster
-        Metrics   : CV, mean_harga, trend_slope, cluster, is_centroid
-                    per komoditas → dipakai substitution engine
-        Artifacts : semua file di output_dir (CSV + scaler)
-    """
-    # Cek koneksi dulu — hindari retry 4 menit kalau MLflow mati
     try:
         import requests
         requests.get(uri.rstrip("/") + "/api/2.0/mlflow/experiments/list", timeout=5)
@@ -197,22 +135,17 @@ def log_to_mlflow(feat_df: pd.DataFrame, output_dir: Path,
     try:
         import mlflow, dagshub
         dagshub.init('MarketCast', 'kadeksavitady', mlflow=True)
+        mlflow.set_tracking_uri(uri)
         mlflow.set_experiment("siskaperbapo-clustering")
 
         with mlflow.start_run(run_name="KMeans-Final"):
+            mlflow.log_param("k", k)
 
-            # ── Params ───────────────────────────────────────────────────────
-            mlflow.log_param("k", feat_df["cluster"].nunique())
-
-            # ── Metrics: ukuran cluster ───────────────────────────────────────
-            for cid in sorted(feat_df["cluster"].unique()):
-                n = (feat_df["cluster"] == cid).sum()
+            for cid in sorted(feat_final["cluster"].unique()):
+                n = (feat_final["cluster"] == cid).sum()
                 mlflow.log_metric(f"cluster_{cid}_size", int(n))
 
-            # ── Metrics: fitur per komoditas ──────────────────────────────────
-            # Format key: {nama_komoditas}__{fitur}
-            # Substitution engine bisa query: "cari CV mirip cabai merah besar"
-            for komoditas, row in feat_df.iterrows():
+            for komoditas, row in feat_final.iterrows():
                 prefix = (komoditas.lower()
                                    .replace(" ", "_")
                                    .replace("/", "_")
@@ -225,17 +158,47 @@ def log_to_mlflow(feat_df: pd.DataFrame, output_dir: Path,
                     f"{prefix}__cluster"    : int(row["cluster"]),
                     f"{prefix}__is_centroid": int(row["is_centroid"]),
                 })
+            
+            with tempfile.TemporaryDirectory() as tmpdir:
+                tmp_path = Path(tmpdir)
+                
+                joblib.dump(scaler, tmp_path / "minmax_scaler.joblib")
+                
+                # ── 1. data_preprocessed.csv ─────────────────────────────────────────────
+                df_export = df_clean[["tanggal", "komoditas", "harga_per_kg"]].copy()
+                df_export.to_csv(tmp_path / "data_preprocessed.csv", index=False)
+                
+                # ── 2. cluster_assignments.csv ───────────────────────────────────────────
+                # Export Label sekarang langsung tarik dari kolom data yang udah dinamis!
+                assignments = feat_final[["cluster", "cluster_label"]].copy()
+                assignments.index.name = "komoditas"
+                assignments.to_csv(tmp_path / "cluster_assignments.csv")
+                
+                # ── 3. centroid_representatives.csv ─────────────────────────────────────
+                centroids = feat_final[feat_final["is_centroid"]].index.tolist()
+                pd.DataFrame({"komoditas": centroids}).to_csv(
+                    tmp_path / "centroid_representatives.csv", index=False
+                )
+                
+                # ── 4. cluster_features.csv ──────────────────────────────────────────────
+                feat_export = feat_final[["cv", "mean_harga", "trend_slope",
+                                           "cluster", "cluster_label", "dist", "is_centroid"]].copy()
+                feat_export.index.name = "komoditas"
+                feat_export.to_csv(tmp_path / "cluster_features.csv")
+                
+                # export centroid timeseries
+                for komo in centroids:
+                    slug   = komo.lower().replace(" ", "_")
+                    sub_df = (df_clean[df_clean["komoditas"] == komo]
+                              [["tanggal", "harga_per_kg"]].copy())
+                    sub_df.columns = ["ds", "y"]
+                    sub_df.to_csv(tmp_path / f"ts_centroid_{slug}.csv", index=False)
 
-            log.info("✅ MLflow params & metrics ter-log")
-
-            # ── Artifacts: semua file output ──────────────────────────────────
-            mlflow.log_artifacts(output_dir.as_posix(),
-                                 artifact_path="clustering_results")
-            log.info(f"✅ Artifacts di-upload: {output_dir.as_posix()}")
+                mlflow.log_artifacts(tmp_path.as_posix(), artifact_path="clustering_results")
+                log.info("✅ Semua file CSV & Scaler berhasil di-upload ke MLflow, laptop tetap bersih!")
 
     except Exception as e:
         log.error(f"❌ MLflow Error: {e}")
-
 # ─────────────────────────────────────────────────────────────────────────────
 # MAIN
 # ─────────────────────────────────────────────────────────────────────────────
