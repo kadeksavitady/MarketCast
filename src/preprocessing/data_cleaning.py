@@ -11,6 +11,9 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import joblib
+import tempfile
+import mlflow
+import dagshub
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sklearn.preprocessing import RobustScaler
@@ -187,24 +190,53 @@ def iqr_clip(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 # ─────────────────────────────────────────────────────────────
+# 6. SCALING 
+# ─────────────────────────────────────────────────────────────
+def robust_scale(df: pd.DataFrame) -> tuple:
+    """
+    Mengembalikan dataframe yang sudah di-scale DAN dictionary scalernya.
+    Tidak ada lagi simpan ke lokal di sini!
+    """
+    df = df.copy()
+    scaled_list = []
+    scalers_dict = {}
+    
+    for komoditas, group in df.groupby("komoditas"):
+        group   = group.copy()
+        scaler  = RobustScaler()
+        values  = group["harga_per_kg"].values.reshape(-1, 1)
+        
+        group["harga_scaled"] = scaler.fit_transform(values).flatten()
+        scalers_dict[komoditas] = scaler
+        scaled_list.append(group)
+        
+    df_scaled = pd.concat(scaled_list, ignore_index=True)
+    log.info(f"  RobustScaler: Selesai untuk {df_scaled['komoditas'].nunique()} komoditas")
+    
+    return df_scaled, scalers_dict
+
+# ─────────────────────────────────────────────────────────────
 # 6. EXPORT
 # ─────────────────────────────────────────────────────────────
 
 def robust_scale(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Scale harga_per_kg per komoditas dengan RobustScaler.
-    RobustScaler pakai median dan IQR — robust terhadap outlier
-    yang lolos dari clipping (lebih cocok dari MinMaxScaler untuk data harga).
+    Scale harga_per_kg per komoditas dengan RobustScaler. RobustScaler 
+    pakai median dan IQR — robust terhadap outlier yang lolos dari clipping.
     Hasil disimpan di kolom baru 'harga_scaled', kolom asli tetap ada.
     """
     df = df.copy()
     scaled_list = []
+    scalers_dict = {}
+
     for komoditas, group in df.groupby("komoditas"):
         group   = group.copy()
         scaler  = RobustScaler()
         values  = group["harga_per_kg"].values.reshape(-1, 1)
         group["harga_scaled"] = scaler.fit_transform(values).flatten()
+        scalers_dict[komoditas] = scaler
         scaled_list.append(group)
+
     df_scaled = pd.concat(scaled_list, ignore_index=True)
     log.info(f"  RobustScaler: harga_scaled ditambahkan untuk {df_scaled['komoditas'].nunique()} komoditas")
     return df_scaled
