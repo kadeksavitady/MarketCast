@@ -61,29 +61,8 @@ def build_features(df: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(features).set_index("komoditas")
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 3. FEATURE ENGINEERING & CLUSTERING
+# 3. CLUSTERING
 # ─────────────────────────────────────────────────────────────────────────────
-
-def build_features(df: pd.DataFrame) -> pd.DataFrame:
-    features = []
-    for komoditas, group in df.groupby("komoditas"):
-        prices = group.sort_values("tanggal")["harga_per_kg"].values
-        days   = (group["tanggal"] - group["tanggal"].min()).dt.days.values
-
-        mean_p = np.mean(prices)
-        cv     = np.std(prices) / mean_p if mean_p > 0 else 0
-        slope  = (stats.linregress(days, prices).slope * 365 / mean_p
-                  if len(days) > 1 else 0)
-
-        features.append({
-            "komoditas"  : komoditas,
-            "mean_harga" : mean_p,
-            "cv"         : cv,
-            "trend_slope": slope,
-        })
-    return pd.DataFrame(features).set_index("komoditas")
-
-
 def run_clustering_pipeline(feat_df: pd.DataFrame, k: int):
     cols     = ["cv", "mean_harga", "trend_slope"]
     scaler   = MinMaxScaler()
