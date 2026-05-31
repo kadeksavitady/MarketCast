@@ -72,6 +72,7 @@ def run_clustering_pipeline(feat_df: pd.DataFrame, k: int):
     feat_df = feat_df.copy()
     feat_df["cluster"] = km.labels_
 
+    # Cari Centroid
     feat_df["dist"] = 0.0
     for cid in range(k):
         mask  = feat_df["cluster"] == cid
@@ -82,6 +83,33 @@ def run_clustering_pipeline(feat_df: pd.DataFrame, k: int):
     for cid in range(k):
         nearest = feat_df[feat_df["cluster"] == cid]["dist"].idxmin()
         feat_df.loc[nearest, "is_centroid"] = True
+    # DYNAMIC LABELING (Berdasarkan kondisi nyata data di memori)
+    feat_df["cluster_label"] = ""
+    overall_harga = feat_df["mean_harga"].median()
+    overall_cv    = feat_df["cv"].median()
+    
+    for cid in range(k):
+        mask = feat_df["cluster"] == cid
+        med_harga = feat_df.loc[mask, "mean_harga"].median()
+        med_cv    = feat_df.loc[mask, "cv"].median()
+        med_slope = feat_df.loc[mask, "trend_slope"].median()
+        
+        # Logika Bisnis: Bandingkan median cluster dengan median total 43 komoditas
+        harga_lbl = "Mahal" if med_harga > overall_harga else "Murah"
+        cv_lbl    = "Labil" if med_cv > overall_cv else "Stabil"
+        
+        # Logika Tren: Jika tren di atas 5% pertahun (0.05) -> Inflasi
+        if med_slope > 0.05:
+            tren_lbl = "↑Inflasi"
+        elif med_slope < -0.05:
+            tren_lbl = "↓Deflasi"
+        else:
+            tren_lbl = "→Datar"
+            
+        label = f"Cluster {cid}: {cv_lbl} & {harga_lbl} ({tren_lbl})"
+        feat_df.loc[mask, "cluster_label"] = label
+        log.info(f"  [Auto-Label] {label} (Median Harga: Rp{med_harga:,.0f})")
+        
     return feat_df, X_scaled, scaler
 
 # ─────────────────────────────────────────────────────────────────────────────
