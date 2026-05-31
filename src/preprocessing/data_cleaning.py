@@ -76,6 +76,81 @@ def load_from_neon(engine) -> pd.DataFrame:
     log.info(f"Load dari Neon: {len(df):,} baris | {df['komoditas'].nunique()} komoditas")
     return df
 
+def patch_kategori(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Menambal kategori yang kosong berdasarkan nama komoditas 
+    hasil adaptasi dari query UPDATE SQL (menggunakan LOWER).
+    """
+    df = df.copy()
+    
+    # Mapping eksak 43 komoditas menggunakan huruf kecil semua (standar LOWER)
+    kategori_map = {
+        'beras premium': 'BERAS',
+        'beras medium': 'BERAS',
+        'gula kristal putih': 'GULA',
+        'minyak goreng curah': 'MINYAK GORENG',
+        'minyak goreng kemasan premium': 'MINYAK GORENG',
+        'minyak goreng kemasan sederhana': 'MINYAK GORENG',
+        'minyak goreng minyakita': 'MINYAK GORENG',
+        'daging sapi paha belakang': 'DAGING',
+        'daging ayam ras': 'DAGING',
+        'daging ayam kampung': 'DAGING',
+        'telur ayam ras': 'TELUR',
+        'telur ayam kampung': 'TELUR',
+        'susu kental manis merk bendera': 'SUSU',
+        'susu kental manis merk indomilk': 'SUSU',
+        'susu bubuk merk bendera (instant)': 'SUSU',
+        'susu bubuk merk indomilk (instant)': 'SUSU',
+        'jagung pipilan kering': 'PALAWIJA',
+        'kedelai impor': 'PALAWIJA',
+        'kedelai lokal': 'PALAWIJA',
+        'kacang hijau': 'PALAWIJA',
+        'kacang tanah': 'PALAWIJA',
+        'ketela pohon': 'PALAWIJA',
+        'bata': 'GARAM',
+        'halus': 'GARAM',
+        'terigu protein sedang (kemasan)': 'TEPUNG TERIGU',
+        'indomie rasa kari ayam': 'MIE INSTAN',
+        'cabe merah keriting': 'CABE',
+        'cabe merah besar': 'CABE',
+        'cabe rawit merah': 'CABE',
+        'bawang merah': 'BAWANG',
+        'bawang putih sinco/honan': 'BAWANG',
+        'ikan asin teri': 'IKAN ASIN',
+        'kol/kubis': 'SAYUR MAYUR',
+        'kentang': 'SAYUR MAYUR',
+        'tomat merah': 'SAYUR MAYUR',
+        'wortel': 'SAYUR MAYUR',
+        'buncis': 'SAYUR MAYUR',
+        'ikan bandeng': 'IKAN SEGAR',
+        'ikan kembung': 'IKAN SEGAR',
+        'ikan tuna': 'IKAN SEGAR',
+        'ikan tongkol': 'IKAN SEGAR',
+        'ikan cakalang': 'IKAN SEGAR',
+        'gas elpigi 3 kg': 'BARANG PENTING LAINNYA'
+    }
+
+    # Cari baris yang kategorinya kosong/null
+    mask_kosong = df['kategori'].isna() | (df['kategori'].str.strip() == '')
+    
+    if mask_kosong.any():
+        n_kosong = mask_kosong.sum()
+        log.info(f"  [HOTFIX] Menambal {n_kosong:,} baris yang kategorinya kosong...")
+        
+        # Eksekusi mirip SQL: Ubah nama komoditas ke huruf kecil dulu (LOWER), baru dicocokkan (map)
+        kategori_baru = df.loc[mask_kosong, 'komoditas'].str.lower().map(kategori_map)
+        
+        # Timpa ke dataframe utama (yang tidak match akan pakai nilai aslinya/NaN)
+        df.loc[mask_kosong, 'kategori'] = kategori_baru.fillna(df.loc[mask_kosong, 'kategori'])
+        
+        # Cek apakah masih ada data bocor/gagal ter-map
+        sisa_kosong = df['kategori'].isna() | (df['kategori'].str.strip() == '')
+        if sisa_kosong.any():
+            komo_gagal = df[sisa_kosong]['komoditas'].unique()
+            log.warning(f"  ⚠️ Peringatan: Masih ada komoditas gagal ditambal kategorinya: {komo_gagal}")
+
+    return df
+
 # ─────────────────────────────────────────────────────────────
 # 2. VALIDASI & FILTER
 # ─────────────────────────────────────────────────────────────
@@ -265,6 +340,7 @@ def main():
 
     # Pipeline
     df = load_from_neon(engine)
+    df = patch_kategori(df)
     df = filter_invalid(df)
     df = zero_to_nan(df)
     
