@@ -205,7 +205,6 @@ def robust_scale(df: pd.DataFrame) -> tuple:
         
     df_scaled = pd.concat(scaled_list, ignore_index=True)
     log.info(f"  RobustScaler: Selesai untuk {df_scaled['komoditas'].nunique()} komoditas")
-    
     return df_scaled, scalers_dict
 
 # ─────────────────────────────────────────────────────────────
