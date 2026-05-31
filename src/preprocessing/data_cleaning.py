@@ -6,14 +6,12 @@ src/preprocessing/data_cleaning.py
 import os
 import logging
 import warnings
+import joblib
+import tempfile
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
-import joblib
-import tempfile
-import mlflow
-import dagshub
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sklearn.preprocessing import RobustScaler
@@ -61,7 +59,6 @@ EXCLUDE_KOMODITAS = set()  # tambah di sini kalau ada yang perlu di-skip
 # ─────────────────────────────────────────────────────────────
 # 1. LOAD DATA
 # ─────────────────────────────────────────────────────────────
-
 def load_from_neon() -> pd.DataFrame:
     load_dotenv()
     db_url = os.getenv("DATABASE_URL")
@@ -81,7 +78,6 @@ def load_from_neon() -> pd.DataFrame:
 # ─────────────────────────────────────────────────────────────
 # 2. VALIDASI & FILTER
 # ─────────────────────────────────────────────────────────────
-
 def filter_invalid(df: pd.DataFrame) -> pd.DataFrame:
     before = df['komoditas'].nunique()
 
@@ -103,7 +99,6 @@ def filter_invalid(df: pd.DataFrame) -> pd.DataFrame:
 # ─────────────────────────────────────────────────────────────
 # 3. KONVERSI HARGA 0 → NaN
 # ─────────────────────────────────────────────────────────────
-
 def zero_to_nan(df: pd.DataFrame) -> pd.DataFrame:
     mask = df['harga_per_kg'] <= 0
     n_zero = mask.sum()
@@ -111,7 +106,7 @@ def zero_to_nan(df: pd.DataFrame) -> pd.DataFrame:
         df = df.copy()
         df.loc[mask, 'harga_per_kg'] = np.nan
         log.info(f"  Konversi harga ≤0 → NaN: {n_zero} baris")
-        # Log per komoditas
+        # Log pelacakan granular per komoditas
         per_komo = df[mask].groupby('komoditas').size()
         for k, n in per_komo.items():
             log.info(f"    {k}: {n} baris")
@@ -122,7 +117,6 @@ def zero_to_nan(df: pd.DataFrame) -> pd.DataFrame:
 # ─────────────────────────────────────────────────────────────
 # 4. FILL NaN BERDASARKAN KATEGORI
 # ─────────────────────────────────────────────────────────────
-
 def fill_missing(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     df['tanggal_data'] = pd.to_datetime(df['tanggal_data'])
@@ -216,49 +210,52 @@ def robust_scale(df: pd.DataFrame) -> tuple:
     return df_scaled, scalers_dict
 
 # ─────────────────────────────────────────────────────────────
-# 6. EXPORT
+# 7. EXPORT LANGSUNG KE MLFLOW (Cloud Hub)
 # ─────────────────────────────────────────────────────────────
+def export_and_log_to_mlflow(df: pd.DataFrame, scalers_dict: dict, uri: str) -> None:
+    try:
+        import requests
+        requests.get(uri.rstrip("/") + "/api/2.0/mlflow/experiments/list", timeout=5)
+    except Exception:
+        log.warning(f"⚠️ MLflow tidak dapat dijangkau di {uri} — skip logging")
+        return
 
-def robust_scale(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Scale harga_per_kg per komoditas dengan RobustScaler. RobustScaler 
-    pakai median dan IQR — robust terhadap outlier yang lolos dari clipping.
-    Hasil disimpan di kolom baru 'harga_scaled', kolom asli tetap ada.
-    """
-    df = df.copy()
-    scaled_list = []
-    scalers_dict = {}
+    try:
+        # Inisialisasi koneksi ke DagsHub
+        dagshub.init('MarketCast', 'kadeksavitady', mlflow=True)
+        # Buat "ruangan" baru di MLflow khusus untuk hasil cleaning data
+        mlflow.set_experiment("MarketCast-Preprocessing")
 
-    for komoditas, group in df.groupby("komoditas"):
-        group   = group.copy()
-        scaler  = RobustScaler()
-        values  = group["harga_per_kg"].values.reshape(-1, 1)
-        group["harga_scaled"] = scaler.fit_transform(values).flatten()
-        scalers_dict[komoditas] = scaler
-        scaled_list.append(group)
+        with mlflow.start_run(run_name="Data-Cleaning-Final"):
+            
+            # Bikin kardus hantu (temporary folder)
+            with tempfile.TemporaryDirectory() as tmpdir:
+                tmp_path = Path(tmpdir)
+                
+                # 1. Simpan Scaler (Untuk FastAPI)
+                joblib.dump(scalers_dict, tmp_path / "robust_scalers.joblib")
+                
+                # 2. Simpan CSV yang sudah bersih (Untuk Clustering)
+                df_export = (df[['tanggal_data', 'komoditas', 'kategori', 'harga_per_kg', 'harga_scaled']]
+                             .rename(columns={'tanggal_data': 'tanggal'}))
+                df_export.to_sql('harga_historis_clean', engine, if_exists='replace', index=False)
+                
+                # 3. UPLOAD KE MLFLOW
+                mlflow.log_artifacts(tmp_path.as_posix(), artifact_path="preprocessing_results")
+                
+                log.info(f"✅ Data bersih & 43 Scaler BERHASIL DI-UPLOAD ke MLflow DagsHub!")
 
-    df_scaled = pd.concat(scaled_list, ignore_index=True)
-    log.info(f"  RobustScaler: harga_scaled ditambahkan untuk {df_scaled['komoditas'].nunique()} komoditas")
-    return df_scaled
-
-
-def export(df: pd.DataFrame, output_path: Path) -> None:
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    df_export = (df[['tanggal_data', 'komoditas', 'kategori', 'harga_per_kg']]
-                 .rename(columns={'tanggal_data': 'tanggal'}))
-    df_export.to_csv(output_path, index=False)
-    log.info(f"✅ Export: {output_path} — {len(df_export):,} baris | {df_export['komoditas'].nunique()} komoditas")
-
+    except Exception as e:
+        log.error(f"❌ MLflow Error: {e}")
 # ─────────────────────────────────────────────────────────────
 # MAIN
 # ─────────────────────────────────────────────────────────────
-
 def main():
     log.info("=" * 60)
     log.info("  DATA CLEANING PIPELINE — MarketCast")
     log.info("=" * 60)
 
-    output_path = Path("data/processed/harga_historis_clean.csv")
+    mlflow_uri = "https://dagshub.com/kadeksavitady/MarketCast.mlflow"
 
     # Pipeline
     df = load_from_neon()
@@ -276,9 +273,12 @@ def main():
     log.info("\n── IQR Clipping ──")
     df = iqr_clip(df)
 
-    log.info("\n── Export ──")
-    export(df, output_path)
+    log.info("\n── Robust Scaling ──")
+    df, scalers_dict = robust_scale(df)
 
+    log.info("\n── Export to MLflow ──")
+    export_and_log_to_mlflow(df, scalers_dict, mlflow_uri)
+    
     log.info("=" * 60)
     log.info("  Selesai. Jalankan clustering.py dengan:")
     log.info(f"  --csv-path {output_path} --source csv")
