@@ -65,15 +65,13 @@ from config import (
     init_mlflow,
     YAML_MODEL_REGISTRY, DIR_REGISTRY, CSV_PREPROCESSED,
     load_cluster_map, load_centroid_list,
-    CLUSTER_SHORT_TO_FULL, get_logger,
+    get_logger,
 )
 from data_loader import load_preprocessed, load_all_series
 from model_sarima  import train_sarima
 from model_prophet import train_prophet
 from model_xgboost import train_xgboost
 import dagshub
- 
-dagshub.init(repo_owner='kadeksavitady', repo_name='MarketCast', mlflow=True)
  
 log = get_logger("train_all")
  
@@ -176,7 +174,8 @@ def run_tournament(models: list, komoditas_list: list,
                 log.info(
                     f"  ✓ MAE={m['mae']:>10,.0f}  "
                     f"MAPE={m['mape']:>6.2f}%  "
-                    f"SMAPE={m['smape']:>6.2f}%"
+                    f"SMAPE={m['smape']:>6.2f}%  "
+                    f"R²={m.get('r2', 0):>6.4f}"
                 )
             except Exception as e:
                 n_failed += 1
@@ -202,7 +201,8 @@ def _print_tournament_leaderboard(results: list):
     log.info(f"\n{lb.to_string(index=False)}")
     log.info("\n── Best model per cluster ────────────────────────────────")
     best = lb.loc[lb.groupby("cluster")["mape"].idxmin()]
-    log.info(f"\n{best[['cluster','model','mape','smape']].to_string(index=False)}")
+    cols = [c for c in ['cluster','model','mape','smape','r2'] if c in best.columns]
+    log.info(f"\n{best[cols].to_string(index=False)}")
  
  
 # ══════════════════════════════════════════════════════════════
@@ -344,6 +344,7 @@ def run_specialize(champion_map: dict, all_data: dict,
  
  
 def _save_registry(registry: dict):
+    import mlflow, tempfile, os
     DIR_REGISTRY.mkdir(parents=True, exist_ok=True)
     output = {
         "_meta": {
@@ -357,9 +358,22 @@ def _save_registry(registry: dict):
         },
         "models": registry,
     }
+    # Simpan ke disk lokal
     with open(YAML_MODEL_REGISTRY, "w", encoding="utf-8") as f:
         yaml.dump(output, f, allow_unicode=True, sort_keys=False, indent=2)
     log.info(f"Registry disimpan: {YAML_MODEL_REGISTRY}")
+
+    # Upload ke MLflow sebagai artifact — agar semua anggota tim bisa akses
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_yaml = os.path.join(tmpdir, "model_registry_map.yaml")
+            with open(tmp_yaml, "w", encoding="utf-8") as f:
+                yaml.dump(output, f, allow_unicode=True, sort_keys=False, indent=2)
+            mlflow.log_artifact(tmp_yaml, artifact_path="registry")
+        log.info("✅ Registry di-upload ke MLflow artifacts")
+    except Exception as e:
+        log.warning(f"Upload registry ke MLflow gagal (tidak kritis): {e}")
+
     log.info(f"Total komoditas terdaftar: {len(registry)}")
  
  
@@ -370,8 +384,7 @@ def _save_registry(registry: dict):
 def load_champion_from_registry() -> dict:
     """Baca alias @champion dari MLflow Model Registry."""
     import mlflow
-    from config import DAGSHUB_USER, DAGSHUB_REPO
-    dagshub.init(DAGSHUB_REPO, DAGSHUB_USER, mlflow=True)
+    init_mlflow()   # idempoten — aman dipanggil ulang
     client = mlflow.tracking.MlflowClient()
  
     champion_map = {}
@@ -441,7 +454,7 @@ def main():
                           if args.model == "all" else [args.model])
         komoditas_list = ([args.komoditas] if args.komoditas else centroid_list)
  
-        df       = load_preprocessed(csv_path)
+        df       = load_preprocessed()   # baca dari Neon DB via config DATABASE_URL
         all_data = load_all_series(df, komoditas_list, cluster_map)
  
         results = run_tournament(models, komoditas_list, all_data, cluster_map)
@@ -465,7 +478,7 @@ def main():
  
         log.info(f"Champion map: {champion_map}")
  
-        df            = load_preprocessed(csv_path)
+        df            = load_preprocessed()   # baca dari Neon DB
         all_komoditas = df["komoditas"].unique().tolist()
         all_data      = load_all_series(df, all_komoditas, cluster_map)
  

@@ -235,7 +235,10 @@ def load_centroid_list(csv_path: Path = CSV_CENTROID) -> list:
     jika CSV belum ada.
     """
     if not csv_path.exists():
-        return [members[0] for members in CLUSTER_MAP_FALLBACK.values()]
+        raise RuntimeError(
+            "centroid_representatives.csv tidak tersedia di disk maupun MLflow. "
+            "Jalankan src/preprocessing/clustering.py terlebih dahulu."
+        )
     df  = pd.read_csv(csv_path)
     col = next((c for c in df.columns if "komoditas" in c.lower()), df.columns[0])
     return df[col].str.strip().tolist()
