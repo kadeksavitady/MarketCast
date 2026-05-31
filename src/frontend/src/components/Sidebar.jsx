@@ -6,9 +6,9 @@ import {
 } from "lucide-react";
 
 const navItems = [
-  { id: "/",      icon: LayoutDashboard, label: "Dashboard" },
+  { id: "/app",   icon: LayoutDashboard, label: "Dashboard" },
   { id: "/tren",  icon: TrendingUp,      label: "Market Trends" },
-  { id: "/faq",   icon: HelpCircle,      label: "FAQ & Tentang" },
+  { id: "/",      icon: HelpCircle,      label: "FAQ & Tentang" },
 ];
 
 export default function Sidebar() {
