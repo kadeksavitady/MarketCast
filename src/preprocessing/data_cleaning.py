@@ -258,13 +258,13 @@ def iqr_clip(df: pd.DataFrame) -> pd.DataFrame:
 # ─────────────────────────────────────────────────────────────
 # 6. EXPORT: NEON DB (DATA) & MLFLOW (SCALER/METADATA)
 # ─────────────────────────────────────────────────────────────
-def export_results(df: pd.DataFrame, scalers_dict: dict, engine, uri: str) -> None:
+def export_results(df: pd.DataFrame, scalers_dict: dict, engine) -> None:
     # ── PUSH DATA KE NEON DB ──
     try:
         log.info("  Mengirim data bersih ke tabel 'harga_historis_clean' di Neon PostgreSQL...")
         
         # Rapikan nama kolom (tanggal_data -> tanggal) agar seragam untuk pipeline selanjutnya
-        df_export = df[['tanggal_data', 'komoditas', 'kategori', 'harga_per_kg', 'harga_scaled']].copy()
+        df_export = df[['tanggal_data', 'komoditas', 'kategori', 'harga_per_kg']].copy()
         df_export.rename(columns={'tanggal_data': 'tanggal'}, inplace=True)
         
         # if_exists='replace' akan menimpa tabel lama jika ada. Sangat aman untuk pipeline batch!
