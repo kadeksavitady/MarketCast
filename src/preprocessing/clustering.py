@@ -83,6 +83,7 @@ def run_clustering_pipeline(feat_df: pd.DataFrame, k: int):
     for cid in range(k):
         nearest = feat_df[feat_df["cluster"] == cid]["dist"].idxmin()
         feat_df.loc[nearest, "is_centroid"] = True
+        
     # DYNAMIC LABELING (Berdasarkan kondisi nyata data di memori)
     feat_df["cluster_label"] = ""
     overall_harga = feat_df["mean_harga"].median()
