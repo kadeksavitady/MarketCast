@@ -10,6 +10,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import joblib
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sklearn.preprocessing import RobustScaler

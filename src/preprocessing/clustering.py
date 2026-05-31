@@ -2,6 +2,7 @@ import argparse
 import logging
 import sys
 import warnings
+import tempfile
 from pathlib import Path
 
 import numpy as np
