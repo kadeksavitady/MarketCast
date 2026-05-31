@@ -1,6 +1,6 @@
+import os
 import argparse
 import logging
-import sys
 import warnings
 import tempfile
 from pathlib import Path
@@ -12,22 +12,22 @@ from sklearn.cluster import KMeans
 from sklearn.preprocessing import MinMaxScaler
 import joblib
 
+from dotenv import load_dotenv
+from sqlalchemy import create_engine
+
 warnings.filterwarnings("ignore")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 log = logging.getLogger(__name__)
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Label cluster — satu tempat, dipakai export & MLflow
+# 1. DATA LOADING (NEON DB)
 # ─────────────────────────────────────────────────────────────────────────────
-CLUSTER_LABEL_MAP = {
-    0: "Cluster 0: Labil & Murah (\u2192Datar)",
-    1: "Cluster 1: Labil & Murah (\u2191Inflasi)",
-    2: "Cluster 2: Stabil & Mahal (\u2192Datar)",
-}
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 1. DATA LOADING
-# ─────────────────────────────────────────────────────────────────────────────
+def get_db_engine():
+    load_dotenv()
+    db_url = os.getenv("DATABASE_URL")
+    if not db_url:
+        raise EnvironmentError("DATABASE_URL tidak ditemukan di .env")
+    return create_engine(db_url)
 
 def load_data(args):
     """Load data dari CSV hasil cleaning hulu atau PostgreSQL."""
@@ -92,7 +92,7 @@ def build_features(df: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(features).set_index("komoditas")
 
 
-def run_clustering_pipeline(feat_df: pd.DataFrame, k: int, output_dir: Path):
+def run_clustering_pipeline(feat_df: pd.DataFrame, k: int):
     cols     = ["cv", "mean_harga", "trend_slope"]
     scaler   = MinMaxScaler()
     X_scaled = scaler.fit_transform(feat_df[cols])
@@ -111,18 +111,14 @@ def run_clustering_pipeline(feat_df: pd.DataFrame, k: int, output_dir: Path):
     for cid in range(k):
         nearest = feat_df[feat_df["cluster"] == cid]["dist"].idxmin()
         feat_df.loc[nearest, "is_centroid"] = True
-
-    scaler_path = output_dir / "minmax_scaler.joblib"
-    joblib.dump(scaler, scaler_path)
-
-    return feat_df, X_scaled, scaler_path
+    return feat_df, X_scaled, scaler
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 4. EXPORT
 # ─────────────────────────────────────────────────────────────────────────────
 
 def export_pipeline_inputs(df_clean: pd.DataFrame, feat_final: pd.DataFrame,
-                            output_dir: Path) -> None:
+                            scaler, uri: str) -> None:
     """
     Export semua file yang dibutuhkan pipeline selanjutnya:
         2. cluster_assignments.csv     → outputs/clustering/
