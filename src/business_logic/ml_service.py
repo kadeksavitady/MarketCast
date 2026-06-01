@@ -17,39 +17,81 @@ mlflow.set_tracking_uri("https://dagshub.com/kadeksavitady/MarketCast.mlflow")
 
 active_models = {}
 
-# 1. Tempat menyimpan model dan namanya secara otomatis (Cache)
+# ==========================================
+# VARIABEL CACHE (PENYIMPANAN SEMENTARA)
+# ==========================================
 active_models = {}
 active_model_names = {}
+clustering_data_cache = {}
 
-# 2. Tiga awalan nama model
+# Awalan nama model
 KANDIDAT_MODEL = ["XGBoost__", "SARIMA__", "Prophet__"]
 
+# ==========================================
+# FUNGSI PENYEDOT CSV CLUSTERING (FUN FACT)
+# ==========================================
+
+def get_clustering_data():
+    """Menyedot CSV hasil clustering dari MLflow dan mengubahnya jadi Dictionary"""
+    global clustering_data_cache
+    
+    # Kalau sudah pernah disedot, pakai yang ada di memori saja
+    if clustering_data_cache:
+        return clustering_data_cache
+
+    try:
+        client = MlflowClient()
+        # 1. Cari model dengan nama 'Metadata__Clustering' yang berstatus production
+        model_version = client.get_model_version_by_alias(name="Metadata__Clustering", alias="production")
+        run_id = model_version.run_id
+        
+        # 2. Download file CSV-nya
+        lokasi_file = client.download_artifacts(run_id, "hasil_clustering.csv")
+        
+        # 3. Baca pakai Pandas
+        df_cluster = pd.read_csv(lokasi_file)
+        
+        # 4. Ubah jadi Dictionary
+        # (Asumsi nama kolom di CSV: 'komoditas', 'cluster', 'cv', 'trend_slope', 'mean')
+        for _, row in df_cluster.iterrows():
+            nama_komoditas = row['komoditas']
+            clustering_data_cache[nama_komoditas] = {
+                "cluster": row['cluster'],
+                "cv": row['cv'],
+                "trend_slope": row['trend_slope'],
+                "mean": row['mean']
+            }
+            
+        logger.info("✅ File CSV Clustering berhasil diunduh dan disimpan di memori!")
+        return clustering_data_cache
+        
+    except Exception as e:
+        logger.error(f"❌ Gagal menyedot CSV dari MLflow: {e}")
+        return {}
+
+# ==========================================
+# FUNGSI RESEPSIONIS MODEL OTOMATIS
+# ==========================================
 def dapatkan_nama_model_otomatis(komoditas_id: str) -> str:
     """Fungsi Resepsionis: Mencari tahu apa model terbaik saat ini di DagsHub"""
     
-    # Kalau namanya sudah pernah dicari, langsung ambil dari cache
     if komoditas_id in active_model_names:
         return active_model_names[komoditas_id]
         
     client = MlflowClient()
     
-    # Cek satu-satu (XGBoost, SARIMA, Prophet)
     for tipe in KANDIDAT_MODEL:
         nama_coba_coba = f"{tipe}{komoditas_id}"
         try:
-            # Cari model yang statusnya production
             client.get_model_version_by_alias(name=nama_coba_coba, alias="production")
-            
-            active_model_names[komoditas_id] = nama_coba_coba # Simpan nama model yang ditemukan ke cache
+            active_model_names[komoditas_id] = nama_coba_coba 
             logger.info(f"Menemukan model production: {nama_coba_coba}")
             return nama_coba_coba
             
         except Exception:
-            # Kalau Resepsionis bilang "Nggak ada!", lanjut coba pintu berikutnya
             continue
             
-    # Kalau ketiga tipe sudah dicoba dan tidak ada satupun yang 'production'
-    raise ValueError(f"Waduh, Laila belum nge-set model production untuk {komoditas_id} di MLflow!")
+    raise ValueError(f"model production untuk {komoditas_id} di MLflow belum di-set!")
 
 def get_model_on_demand(komoditas_id: str):
     if komoditas_id not in active_models:
@@ -69,7 +111,6 @@ def get_model_on_demand(komoditas_id: str):
 # ==========================================
 # FEATURE ENGINEERING DATA HISTORIS (XGBOOST)
 # ==========================================
-
 def get_recent_history(komoditas_id: str, days: int = 50) -> pd.DataFrame:
     if not engine: 
         raise RuntimeError("Koneksi database (Engine) tidak aktif.")
@@ -140,7 +181,6 @@ def _recursive_forecast_xgb(model, history_prices, history_dates, n_steps=30) ->
 # ==========================================
 # INTERFASE UTAMA ROUTER API
 # ==========================================
-
 def predict_harga_satuan(komoditas_id: str) -> float:
     """Dipanggil oleh routes/belanja.py"""
     exact_model_name = dapatkan_nama_model_otomatis(komoditas_id)
