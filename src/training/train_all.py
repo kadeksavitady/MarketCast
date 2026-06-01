@@ -231,13 +231,14 @@ def run_tournament(models: list, komoditas_list: list,
             reg_name = f"{cluster_name}"
             
             log.info(f" Juara {cluster_name} adalah {winner_model.upper()} ({TARGET_METRIC}={metric_val:.4f})")
-            _register_to_mlflow_registry(
-                komoditas=cluster_name,  # fungsi _register_to_mlflow_registry mu butuh param 'komoditas' untuk log
-                model_uri=model_uri,
-                reg_name=reg_name,
-                alias_name="champion",
-                client=client
-            )
+            reg_name, version = _register_to_mlflow_registry(
+                                    komoditas=cluster_name,  # fungsi _register_to_mlflow_registry mu butuh param 'komoditas' untuk log
+                                    model_uri=model_uri,
+                                    reg_name=reg_name,
+                                    alias_name="champion",
+                                    client=client
+                                )           
+            log.info(f"  ✓ Registry: {reg_name} v{version} @champion")
 
     log.info(f"\n✓ Tournament: {len(results)}/{n_total} runs | {n_failed} gagal")
     log.info(f"  → Juara berhasil diregister dengan alias @champion")
