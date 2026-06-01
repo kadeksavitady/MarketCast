@@ -104,22 +104,12 @@ def _call_model(model_name: str, komoditas: str, data: dict,
         (diabaikan oleh Prophet dan XGBoost)
     """
     fn = MODEL_REGISTRY[model_name]
- 
-    if model_name == "sarima":
-        # SARIMA menerima mode= secara eksplisit
-        return fn(
-            komoditas,
-            data,
-            mlflow_experiment=mlflow_experiment,
-            mode=training_mode,           # ← ini yang sebelumnya tidak pernah di-pass
-        )
-    else:
-        # Prophet dan XGBoost: interface tidak berubah
-        return fn(
-            komoditas,
-            data,
-            mlflow_experiment=mlflow_experiment,
-        )
+    return fn(
+        komoditas,
+        data,
+        mlflow_experiment=mlflow_experiment,
+        mode=training_mode,
+    )
  
  
 # ══════════════════════════════════════════════════════════════
@@ -218,7 +208,7 @@ def run_tournament(models: list, komoditas_list: list,
             # Format reg_name sesuai gambar: Murni nama clusternya saja (tanpa Champion_)
             reg_name = f"{cluster_name}"
             
-            log.info(f"  👑 Juara {cluster_name} adalah {winner_model.upper()} ({TARGET_METRIC}={metric_val:.4f})")
+            log.info(f" Juara {cluster_name} adalah {winner_model.upper()} ({TARGET_METRIC}={metric_val:.4f})")
             _register_to_mlflow_registry(
                 komoditas=cluster_name,  # fungsi _register_to_mlflow_registry mu butuh param 'komoditas' untuk log
                 model_uri=model_uri,
