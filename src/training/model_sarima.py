@@ -449,7 +449,7 @@ def train_sarima(
                 log.info(
                     f"  MAE={result['mae']:>10,.0f} | "
                     f"MAPE={result['mape']:>6.2f}% | "
-                    f"SMAPE={result['smape']:>6.2f}%"
+                    f"SMAPE={result['smape']:>6.2f}% |" 
                     f"R²={result.get('r2', 0):>6.4f}"
                 )
  
