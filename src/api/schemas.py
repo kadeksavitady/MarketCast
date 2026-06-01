@@ -56,3 +56,4 @@ class TrenResponse(BaseModel):
     nama_komoditas: str
     data_historis: List[TitikData]
     forecast_30_hari: List[TitikData]
+    forecast_trend_percentage: float
