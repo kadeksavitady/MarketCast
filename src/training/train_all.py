@@ -80,9 +80,33 @@ MODEL_REGISTRY = {
     "prophet" : train_prophet,
     "xgboost" : train_xgboost,
 }
- 
+
 # ══════════════════════════════════════════════════════════════
-# HELPER: pemanggilan model dengan training_mode
+# HELPER: Pendaftaran Model ke MLflow Registry
+# ══════════════════════════════════════════════════════════════
+def _register_to_mlflow_registry(model_uri: str, reg_name: str, alias_name: str, client) -> tuple:
+    """
+    Mendaftarkan model ke MLflow Model Registry dengan nama dan alias dinamis.
+    - Specialize -> alias: 'production'
+    - Tournament -> alias: 'champion'
+    """
+    import mlflow
+    
+    log.info(f"  Mendaftarkan ke DagsHub Registry sebagai '{reg_name}@{alias_name}'...")
+    
+    # 1. Register Model
+    mv = mlflow.register_model(model_uri=model_uri, name=reg_name)
+
+    # 2. Set Alias
+    client.set_registered_model_alias(
+        name=reg_name,
+        alias=alias_name,
+        version=mv.version
+    )
+    return reg_name, mv.version
+
+# ══════════════════════════════════════════════════════════════
+# HELPER: Pemanggilan Model dengan Arsitektur Unified Interface
 # ══════════════════════════════════════════════════════════════
 def _call_model(model_name: str, komoditas: str, data: dict,
                 mlflow_experiment: str, training_mode: str) -> dict:
@@ -111,7 +135,6 @@ def _call_model(model_name: str, komoditas: str, data: dict,
         mode=training_mode,
     )
  
- 
 # ══════════════════════════════════════════════════════════════
 # TAHAP 2 — TURNAMEN BASELINE
 # ══════════════════════════════════════════════════════════════
@@ -134,7 +157,6 @@ def run_tournament(models: list, komoditas_list: list,
     log.info("=" * 65)
     log.info("  TAHAP 2 — TURNAMEN BASELINE MODEL")
     log.info(f"  {len(models)} model × {len(komoditas_list)} centroid = {n_total} runs")
-    log.info(f"  SARIMA mode : auto_arima (AIC stepwise)")
     log.info(f"  Experiment  : {MLFLOW_EXP_TOURNAMENT}")
     log.info(f"  MLflow      : {MLFLOW_TRACKING_URI}")
     log.info("=" * 65)
@@ -269,7 +291,6 @@ def run_specialize(champion_map: dict, all_data: dict,
     log.info("=" * 65)
     log.info("  TAHAP 3a — SPESIALISASI")
     log.info(f"  {len(full_train_list)} komoditas total (centroid + non-centroid)")
-    log.info(f"  SARIMA mode : GridSearch 36 kombinasi + prior knowledge cluster")
     log.info(f"  Champion map: {champion_map}")
     log.info(f"  Experiment  : {MLFLOW_EXP_SPECIALIZE}")
     log.info("=" * 65)
@@ -366,7 +387,7 @@ def run_specialize(champion_map: dict, all_data: dict,
     _save_registry(registry)
  
     log.info(f"\n{'='*65}")
-    log.info(f"  SPESIALISASI SELESAI")
+    log.info(f"  SPESIALISASI SELESAI ")
     log.info(f"  Berhasil : {len(registry)}/{n_total}")
     log.info(f"  Gagal    : {n_failed}")
     log.info(f"  Coverage : {len([k for k, v in registry.items() if v.get('model_uri')])} "
@@ -375,30 +396,7 @@ def run_specialize(champion_map: dict, all_data: dict,
     log.info(f"{'='*65}")
     return registry
 
-def _register_to_mlflow_registry(model_uri: str, reg_name: str, alias_name: str, client) -> tuple:
-    """
-    Mendaftarkan model ke MLflow Model Registry dengan nama dan alias dinamis.
-    - Specialize -> alias: 'production'
-    - Tournament -> alias: 'champion'
-    """
-    import mlflow
-    
-    log.info(f"  Mendaftarkan ke DagsHub Registry sebagai '{reg_name}@{alias_name}'...")
-    
-    # 1. Register Model
-    mv = mlflow.register_model(model_uri=model_uri, name=reg_name)
-
-    # 2. Set Alias
-    client.set_registered_model_alias(
-        name=reg_name,
-        alias=alias_name,
-        version=mv.version
-    )
-    return reg_name, mv.version
-
 def _save_registry(registry: dict):
-    import mlflow, tempfile, os
-
     DIR_REGISTRY.mkdir(parents=True, exist_ok=True)
     output = {
         "_meta": {
@@ -419,6 +417,7 @@ def _save_registry(registry: dict):
 
     # Upload ke MLflow sebagai artifact — agar semua anggota tim bisa akses
     try:
+        import mlflow, tempfile, os
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_yaml = os.path.join(tmpdir, "model_registry_map.yaml")
             with open(tmp_yaml, "w", encoding="utf-8") as f:
@@ -465,14 +464,7 @@ def parse_champion(champion_args: list) -> dict:
         if "=" not in item:
             raise ValueError(f"Format salah: '{item}'. Harus: C0_LabilDatar=xgboost")
         cluster, model = item.split("=", 1)
-        cluster = cluster.strip()
-        model   = model.strip()
-        if model not in MODEL_REGISTRY:
-            raise ValueError(
-                f"Model '{model}' tidak dikenal. "
-                f"Pilihan: {list(MODEL_REGISTRY.keys())}"
-            )
-        result[cluster] = model
+        result[cluster.strip()] = model.strip()
     return result
  
 def main():
@@ -519,13 +511,10 @@ def main():
             champion_map = load_champion_from_registry()
         if not champion_map:
             log.error(
-                "Mode specialize butuh --champion. Contoh:\n"
-                "  --champion C0_LabilDatar=sarima "
-                "--champion C1_LabilInflasi=prophet "
-                "--champion C2_StabilMahal=xgboost"
+                "Mode specialize butuh mapping champion dari tournament!"
             )
             sys.exit(1)
- 
+
         log.info(f"Champion map: {champion_map}")
  
         df            = load_preprocessed()   # baca dari Neon DB
