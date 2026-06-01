@@ -284,20 +284,20 @@ def run_specialize(champion_map: dict, all_data: dict,
                 )
                 n_failed += 1
                 continue
- 
-            # Buat nama standar yang aman untuk URL
-            safe_name = komoditas.replace(" ", "_").replace("/", "_")
-            reg_name  = f"MarketCast_{safe_name}"
 
-            # Daftarkan model ke tab "Models" di DagsHub UI
-            log.info(f"  Mendaftarkan ke DagsHub Registry sebagai '{reg_name}'...")
-            mv = mlflow.register_model(model_uri=model_uri, name=reg_name)
+            # Map nama model agar kapitalisasinya sesuai dengan gambar (SARIMA, XGBoost, Prophet)
+            model_map = {"sarima": "SARIMA", "xgboost": "XGBoost", "prophet": "Prophet"}
+            proper_model_name = model_map.get(model_name.lower(), model_name.upper())
+            
+            # Format reg_name sesuai gambar: ModelName_Nama Komoditas Asli (spasi tetap dipertahankan)
+            reg_name = f"{proper_model_name}_{komoditas}"
 
-            # Beri alias 'production' ke versi model yang baru saja masuk
-            client.set_registered_model_alias(
-                name=reg_name,
-                alias="production",
-                version=mv.version
+            # ── Panggil Fungsi Helper Registry ──
+            _, mv_version = _register_to_mlflow_registry(
+                model_uri=model_uri, 
+                reg_name=reg_name, 
+                alias_name="production", 
+                client=client
             )
 
             registry[komoditas] = {
@@ -309,7 +309,7 @@ def run_specialize(champion_map: dict, all_data: dict,
                 "mae"          : result["metrics"]["mae"],
                 "is_centroid"  : is_centroid,
                 "registry_name" : reg_name,    # ── Menyimpan nama registry untuk backup
-                "version"       : mv.version, # ── Menyimpan versi model
+                "version"       : mv_version, # ── Menyimpan versi model
             }
             log.info(f"  ✓ MAPE={result['metrics']['mape']:.2f}%  uri={model_uri} | Registry: {reg_name}@production (v{mv.version})")
  
@@ -361,6 +361,7 @@ def _register_to_mlflow_registry(model_uri: str, reg_name: str, alias_name: str,
 
 def _save_registry(registry: dict):
     import mlflow, tempfile, os
+
     DIR_REGISTRY.mkdir(parents=True, exist_ok=True)
     output = {
         "_meta": {
