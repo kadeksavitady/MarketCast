@@ -357,7 +357,6 @@ def _register_to_mlflow_registry(model_uri: str, reg_name: str, alias_name: str,
         alias=alias_name,
         version=mv.version
     )
-    
     return reg_name, mv.version
 
 def _save_registry(registry: dict):
