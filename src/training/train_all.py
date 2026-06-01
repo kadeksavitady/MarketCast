@@ -215,6 +215,9 @@ def run_tournament(models: list, komoditas_list: list,
         } for r in results
     ])
     
+    df_res = df_res[df_res["model_uri"].str.len() > 0]
+    if df_res.empty:
+        log.error("Semua model_uri kosong — tidak ada yang bisa diregister.")
     if not df_res.empty:
         # Cari index dengan nilai metrik TERKECIL untuk masing-masing cluster
         best_idx = df_res.groupby("cluster")["metric_val"].idxmin()
