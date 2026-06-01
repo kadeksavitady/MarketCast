@@ -4,7 +4,7 @@ import pandas as pd
 from sqlalchemy import text
 from src.core.config import engine
 from src.business_logic.katalog import COMMODITY_CATALOG
-from src.business_logic.ml_service import generate_forecast
+from src.business_logic.ml_service import generate_forecast, hitung_tren_forecast
 from src.api.schemas import TrenResponse, CommodityInfo, TitikData
 
 router = APIRouter()
@@ -53,13 +53,13 @@ def get_tren(komoditas_id: str, hari: int = 90):
 
     last_harga = float(df["harga_per_kg"].iloc[-1]) if not df.empty else float(info["harga_ref"])
     
-    # 🚨 PERBAIKAN 1: Tangkap error dari MLflow
+    # Tangkap error dari MLflow
     try:
         forecast_prices = generate_forecast(info["nama"], last_harga)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Gagal menyusun ramalan: {str(e)}")
     
-    # 🚨 PERBAIKAN 2: Rakit tanggal kalender untuk angka ramalan
+    # Rakit tanggal kalender untuk angka ramalan
     forecast_models = []
     if historis:
         last_date_obj = pd.to_datetime(historis[-1].tanggal)
@@ -70,8 +70,13 @@ def get_tren(komoditas_id: str, hari: int = 90):
         # Tambahkan hari (1 sampai 30) dari tanggal terakhir
         next_date = (last_date_obj + pd.Timedelta(days=i+1)).strftime("%Y-%m-%d")
         forecast_models.append(TitikData(tanggal=next_date, harga=round(price, 2)))
+
+    persentase_ramalan = hitung_tren_forecast(forecast_prices)
     
     return TrenResponse(
-        komoditas_id=komoditas_id, nama_komoditas=info["nama"], 
-        data_historis=historis, forecast_30_hari=forecast_models
+        komoditas_id=komoditas_id,
+        nama_komoditas=info["nama"], 
+        data_historis=historis, 
+        forecast_30_hari=forecast_models,
+        forecast_trend_percentage=persentase_ramalan
     )
