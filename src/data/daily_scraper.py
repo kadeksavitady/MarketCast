@@ -3,7 +3,7 @@ import re, logging, os, sys
 from datetime import date, timedelta
 from sqlalchemy import create_engine, text
 from dotenv import load_dotenv
-import cloudscraper
+import requests
 
 load_dotenv()
 
@@ -13,6 +13,8 @@ if sys.platform == "win32":
 
 POSTGRE_URL = os.getenv("DATABASE_URL")
 TABEL_URL   = "https://siskaperbapo.jatimprov.go.id/harga/tabel.nodesign/"
+SCRAPER_API_KEY = os.getenv("SCRAPER_API_KEY")
+
 
 if not POSTGRE_URL:
     print("❌ ERROR: DATABASE_URL tidak ditemukan!")
@@ -62,17 +64,24 @@ def parse_harga(teks):
 def fetch_dari_siskaperbapo(tgl_str):
     """Ambil data dari Siskaperbapo untuk tanggal tertentu."""
     try:
-        scraper = cloudscraper.create_scraper(
-            browser={"browser": "chrome", "platform": "windows", "mobile": False}
-        )
-        resp = scraper.post(
+        if SCRAPER_API_KEY:
+            proxy = f"http://scraperapi:{SCRAPER_API_KEY}@proxy-server.scraperapi.com:8001"
+            proxies = {"http": proxy, "https": proxy}
+        else:
+            proxies = None
+
+        resp = requests.post(
             TABEL_URL,
             data={"tanggal": tgl_str, "kabkota": "surabayakota", "pasar": ""},
             headers={
+                "Content-Type": "application/x-www-form-urlencoded",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
                 "Origin":  "https://siskaperbapo.jatimprov.go.id",
                 "Referer": "https://siskaperbapo.jatimprov.go.id/harga/tabel",
             },
-            timeout=30
+            proxies=proxies,
+            verify=False,  # ScraperAPI pakai SSL intercept
+            timeout=60
         )
         resp.raise_for_status()
 
