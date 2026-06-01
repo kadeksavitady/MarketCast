@@ -369,7 +369,7 @@ def run_specialize(champion_map: dict, all_data: dict,
                 "registry_name" : reg_name,    # ── Menyimpan nama registry untuk backup
                 "version"       : mv_version, # ── Menyimpan versi model
             }
-            log.info(f"  ✓ MAPE={result['metrics']['mape']:.2f}%  uri={model_uri} | Registry: {reg_name}@production (v{mv.version})")
+            log.info(f"  ✓ MAPE={result['metrics']['mape']:.2f}%  uri={model_uri} | Registry: {reg_name}@production (v{mv_version})")
  
         except Exception as e:
             n_failed += 1
