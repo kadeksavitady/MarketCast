@@ -483,7 +483,6 @@ def main():
     parser.add_argument("--champion",
                         action="append",
                         metavar="CLUSTER=MODEL")
-    parser.add_argument("--csv", default=None)
     args = parser.parse_args()
  
     cluster_map   = load_cluster_map()
