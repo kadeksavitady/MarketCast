@@ -1,9 +1,9 @@
-import requests
 from bs4 import BeautifulSoup
 import re, logging, os, sys
 from datetime import date, timedelta
 from sqlalchemy import create_engine, text
 from dotenv import load_dotenv
+import cloudscraper
 
 load_dotenv()
 
@@ -62,33 +62,16 @@ def parse_harga(teks):
 def fetch_dari_siskaperbapo(tgl_str):
     """Ambil data dari Siskaperbapo untuk tanggal tertentu."""
     try:
-        session = requests.Session()
-    
-        # Step 1: GET main page dulu → dapat session cookie
-        session.get(
-            "https://siskaperbapo.jatimprov.go.id/harga/tabel",
-            headers={
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                "Accept-Language": "id-ID,id;q=0.9,en-US;q=0.8",
-                "Accept-Encoding": "gzip, deflate, br",
-            },
-            timeout=30
+        scraper = cloudscraper.create_scraper(
+            browser={"browser": "chrome", "platform": "windows", "mobile": False}
         )
-        
-        # Step 2: POST dengan session yang sudah punya cookie
-        resp = requests.post(
+        resp = scraper.post(
             TABEL_URL,
-            headers={
-                "Content-Type": "application/x-www-form-urlencoded",
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-                "Accept": "*/*",
-                "Accept-Language": "id-ID,id;q=0.9",
-                "Origin": "https://siskaperbapo.jatimprov.go.id",
-                "Referer": "https://siskaperbapo.jatimprov.go.id/harga/tabel",
-                "X-Requested-With": "XMLHttpRequest",
-            },
             data={"tanggal": tgl_str, "kabkota": "surabayakota", "pasar": ""},
+            headers={
+                "Origin":  "https://siskaperbapo.jatimprov.go.id",
+                "Referer": "https://siskaperbapo.jatimprov.go.id/harga/tabel",
+            },
             timeout=30
         )
         resp.raise_for_status()
