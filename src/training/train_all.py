@@ -233,7 +233,6 @@ def run_tournament(models: list, komoditas_list: list,
             # Format reg_name sesuai gambar: Murni nama clusternya saja (tanpa Champion_)
             reg_name = f"{cluster_name}"
             
-            log.info(f" Juara {cluster_name} adalah {winner_model.upper()} ({TARGET_METRIC}={metric_val:.4f})")
             reg_name, version = _register_to_mlflow_registry(
                                     komoditas=cluster_name,  # fungsi _register_to_mlflow_registry mu butuh param 'komoditas' untuk log
                                     model_uri=model_uri,
@@ -242,7 +241,8 @@ def run_tournament(models: list, komoditas_list: list,
                                     client=client
                                 )           
             log.info(f"  ✓ Registry: {reg_name} v{version} @champion")
-    
+            log.info(f" Juara {cluster_name} adalah {winner_model.upper()} ({TARGET_METRIC}={metric_val:.4f})")
+
     log.info(f"\n✓ Tournament: {len(results)}/{n_total} runs | {n_failed} gagal")
     log.info(f"  → Juara berhasil diregister dengan alias @champion")
     log.info(f"  → Buka MLflow UI: {MLFLOW_TRACKING_URI}")
