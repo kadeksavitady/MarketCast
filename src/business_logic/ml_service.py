@@ -46,7 +46,7 @@ def get_clustering_data():
         run_id = model_version.run_id
         
         # 2. Download file CSV-nya
-        lokasi_file = client.download_artifacts(run_id, "hasil_clustering.csv")
+        lokasi_file = client.download_artifacts(run_id, "clustering_results/cluster_features.csv")
         
         # 3. Baca pakai Pandas
         df_cluster = pd.read_csv(lokasi_file)
@@ -56,10 +56,10 @@ def get_clustering_data():
         for _, row in df_cluster.iterrows():
             nama_komoditas = row['komoditas']
             clustering_data_cache[nama_komoditas] = {
-                "cluster": row['cluster'],
+                "cluster": row['cluster', 'Tidak Diketahui'],
                 "cv": row['cv'],
                 "trend_slope": row['trend_slope'],
-                "mean": row['mean']
+                "mean": row['mean_harga']
             }
             
         logger.info("✅ File CSV Clustering berhasil diunduh dan disimpan di memori!")
