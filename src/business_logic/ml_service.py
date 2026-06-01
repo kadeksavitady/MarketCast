@@ -200,3 +200,17 @@ def generate_forecast(komoditas_id: str, last_harga: float) -> list:
         
     else:
         raise ValueError(f"Tipe model untuk '{exact_model_name}' tidak dikenal.")
+
+def hitung_tren_forecast(list_harga_prediksi: list) -> float:
+    """Menghitung persentase kenaikan/penurunan harga dari hari 1 ke hari 30"""
+    if not list_harga_prediksi or len(list_harga_prediksi) < 2:
+        return 0.0
+    
+    harga_awal = float(list_harga_prediksi[0])
+    harga_akhir = float(list_harga_prediksi[-1])
+    
+    if harga_awal == 0:
+        return 0.0
+        
+    persentase = ((harga_akhir - harga_awal) / harga_awal) * 100
+    return round(persentase, 2)
