@@ -240,7 +240,6 @@ def run_tournament(models: list, komoditas_list: list,
                                 )           
             log.info(f"  ✓ Registry: {reg_name} v{version} @champion")
     
-    log.info(f"  Training mode: {TRAINING_MODE}")
     log.info(f"\n✓ Tournament: {len(results)}/{n_total} runs | {n_failed} gagal")
     log.info(f"  → Juara berhasil diregister dengan alias @champion")
     log.info(f"  → Buka MLflow UI: {MLFLOW_TRACKING_URI}")
