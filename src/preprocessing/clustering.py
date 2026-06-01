@@ -99,7 +99,7 @@ def run_clustering_pipeline(feat_df: pd.DataFrame, k: int):
         harga_lbl = "Mahal" if med_harga > overall_harga else "Murah"
         cv_lbl    = "Labil" if med_cv > overall_cv else "Stabil"
         
-        # Logika Tren: Jika tren di atas 51 pertahun (0.05) -> Inflasi
+        # Logika Tren: Jika tren di atas 1% pertahun (0.01) -> Inflasi
         if med_slope > 0.01:
             tren_lbl = "↑Inflasi"
         elif med_slope < -0.01:
