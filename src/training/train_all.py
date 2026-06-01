@@ -337,7 +337,29 @@ def run_specialize(champion_map: dict, all_data: dict,
     log.info(f"  Registry : {YAML_MODEL_REGISTRY}")
     log.info(f"{'='*65}")
     return registry
- 
+
+def _register_to_mlflow_registry(model_uri: str, reg_name: str, alias_name: str, client) -> tuple:
+    """
+    Mendaftarkan model ke MLflow Model Registry dengan nama dan alias dinamis.
+    - Specialize -> alias: 'production'
+    - Tournament -> alias: 'champion'
+    """
+    import mlflow
+    
+    log.info(f"  Mendaftarkan ke DagsHub Registry sebagai '{reg_name}@{alias_name}'...")
+    
+    # 1. Register Model
+    mv = mlflow.register_model(model_uri=model_uri, name=reg_name)
+
+    # 2. Set Alias
+    client.set_registered_model_alias(
+        name=reg_name,
+        alias=alias_name,
+        version=mv.version
+    )
+    
+    return reg_name, mv.version
+
 def _save_registry(registry: dict):
     import mlflow, tempfile, os
     DIR_REGISTRY.mkdir(parents=True, exist_ok=True)
