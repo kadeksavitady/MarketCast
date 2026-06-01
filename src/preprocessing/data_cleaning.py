@@ -65,7 +65,7 @@ def get_db_engine():
 
 def load_from_neon(engine) -> pd.DataFrame:
     query = """
-        SELECT tanggal_data, komoditas, kategori, harga_per_kg
+        SELECT tanggal_data, komoditas, kategori, satuan_original, faktor_konversi, harga_per_kg
         FROM harga_historis
         ORDER BY komoditas, tanggal_data
     """
@@ -189,7 +189,7 @@ def export_results(df: pd.DataFrame, engine) -> None:
         log.info("  Mengirim data bersih ke tabel 'harga_historis_clean' di Neon PostgreSQL...")
         
         # Rapikan nama kolom (tanggal_data -> tanggal) agar seragam untuk pipeline selanjutnya
-        df_export = df[['tanggal_data', 'komoditas', 'kategori', 'harga_per_kg']].copy()
+        df_export = df[['tanggal_data', 'komoditas', 'kategori', 'harga_per_kg', 'satuan_original', 'faktor_konversi']].copy()
         df_export.rename(columns={'tanggal_data': 'tanggal'}, inplace=True)
         
         # if_exists='replace' akan menimpa tabel lama jika ada. Sangat aman untuk pipeline batch!
