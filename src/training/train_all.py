@@ -423,7 +423,7 @@ def _save_registry(registry: dict):
             tmp_yaml = os.path.join(tmpdir, "model_registry_map.yaml")
             with open(tmp_yaml, "w", encoding="utf-8") as f:
                 yaml.dump(output, f, allow_unicode=True, sort_keys=False, indent=2)
-            mlflow.log_artifact(tmp_yaml, artifact_path="registry")
+                mlflow.log_artifact(tmp_yaml, artifact_path="registry")
         log.info("✅ Registry di-upload ke MLflow artifacts")
     except Exception as e:
         log.warning(f"Upload registry ke MLflow gagal (tidak kritis): {e}")
