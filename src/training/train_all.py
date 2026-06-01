@@ -181,9 +181,56 @@ def run_tournament(models: list, komoditas_list: list,
                 log.debug(traceback.format_exc())
  
     _print_tournament_leaderboard(results)
+    
+    # ══════════════════════════════════════════════════════════════
+    # LOGIKA AUTO-REGISTRY @CHAMPION (THE FINAL JUDGE)
+    # ══════════════════════════════════════════════════════════════
+    from mlflow.tracking import MlflowClient
+    client = MlflowClient()
+    
+    # TODO: Metrik bisa diubah sesuai hasil riset jurnalmu nanti (misal "rmse")
+    TARGET_METRIC = "mape" 
+    
+    log.info(f"\n  ── AUTO-REGISTER CHAMPION (Berdasarkan {TARGET_METRIC.upper()}) ──")
+    
+    # Ekstrak hasil ke DataFrame untuk mempermudah pencarian juara
+    df_res = pd.DataFrame([
+        {
+            "cluster": r["data"]["cluster"],
+            "model_name": r["model_name"],
+            "model_uri": r["model_uri"],
+            "metric_val": r["metrics"][TARGET_METRIC]
+        } for r in results
+    ])
+    
+    if not df_res.empty:
+        # Cari index dengan nilai metrik TERKECIL untuk masing-masing cluster
+        best_idx = df_res.groupby("cluster")["metric_val"].idxmin()
+        best_models = df_res.loc[best_idx]
+        
+        # Daftarkan masing-masing juara ke Registry
+        for _, row in best_models.iterrows():
+            cluster_name = row['cluster']
+            winner_model = row['model_name']
+            model_uri = row['model_uri']
+            metric_val = row['metric_val']
+            
+            # Format reg_name sesuai gambar: Murni nama clusternya saja (tanpa Champion_)
+            reg_name = f"{cluster_name}"
+            
+            log.info(f"  👑 Juara {cluster_name} adalah {winner_model.upper()} ({TARGET_METRIC}={metric_val:.4f})")
+            _register_to_mlflow_registry(
+                komoditas=cluster_name,  # fungsi _register_to_mlflow_registry mu butuh param 'komoditas' untuk log
+                model_uri=model_uri,
+                reg_name=reg_name,
+                alias_name="champion",
+                client=client
+            )
+
     log.info(f"\n✓ Tournament: {len(results)}/{n_total} runs | {n_failed} gagal")
+    log.info(f"  → Juara berhasil diregister dengan alias @champion")
     log.info(f"  → Buka MLflow UI: {MLFLOW_TRACKING_URI}")
-    log.info(f"  → Pilih juara per cluster, lalu jalankan --mode specialize")
+    log.info(f"  → Lanjut jalankan: python src/training/train_all.py --mode specialize")
     return results
  
 def _print_tournament_leaderboard(results: list):
