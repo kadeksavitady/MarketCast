@@ -82,8 +82,19 @@ def dapatkan_nama_model_otomatis(komoditas_id: str) -> str:
         
     client = MlflowClient()
     
+    # Konversi nama komoditas menjadi tanpa slash
+    sanitized_id = komoditas_id
+    mapping_kondisional = {
+        "Bawang Putih Sinco/Honan": "Bawang Putih SincoHonan", # atau "bawang_putih_sincohonan"
+        "KOL/KUBIS": "KOLKUBIS"                                # atau "kolkubis"
+    }
+    
+    if komoditas_id in mapping_kondisional:
+        sanitized_id = mapping_kondisional[komoditas_id]
+        logger.info(f"🔄 Kondisional Aktif: Mengubah pencarian model {komoditas_id} -> {sanitized_id}")
+    
     for tipe in KANDIDAT_MODEL:
-        nama_coba_coba = f"{tipe}{komoditas_id}"
+        nama_coba_coba = f"{tipe}{sanitized_id}"
         try:
             client.get_model_version_by_alias(name=nama_coba_coba, alias="production")
             active_model_names[komoditas_id] = nama_coba_coba 
