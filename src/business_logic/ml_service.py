@@ -56,7 +56,9 @@ def get_clustering_data():
         for _, row in df_cluster.iterrows():
             nama_komoditas = row['komoditas']
             clustering_data_cache[nama_komoditas] = {
-                "cluster": row['cluster', 'Tidak Diketahui'],
+                "cluster": row.get('cluster', 'Tidak Diketahui'),
+                "cluster_label": row.get('cluster_label', ''),
+                "is_centroid": row.get('is_centroid', False),
                 "cv": row['cv'],
                 "trend_slope": row['trend_slope'],
                 "mean": row['mean_harga']
