@@ -234,7 +234,6 @@ def run_tournament(models: list, komoditas_list: list,
             reg_name = f"{cluster_name}"
             
             reg_name, version = _register_to_mlflow_registry(
-                                    komoditas=cluster_name,  # fungsi _register_to_mlflow_registry mu butuh param 'komoditas' untuk log
                                     model_uri=model_uri,
                                     reg_name=reg_name,
                                     alias_name="champion",
