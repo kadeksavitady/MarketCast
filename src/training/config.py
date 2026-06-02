@@ -279,7 +279,6 @@ def compute_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict:
 
     mae   = mean_absolute_error(y_true, y_pred)
     rmse  = np.sqrt(mean_squared_error(y_true, y_pred))
-
     nonzero = y_true != 0
     mape    = (np.mean(np.abs(
                    (y_true[nonzero] - y_pred[nonzero]) / y_true[nonzero]
