@@ -111,14 +111,19 @@ def register_clustering_metadata_to_mlflow(feat_df: pd.DataFrame, X_scaled, scal
         mlflow.log_artifact(csv_path, artifact_path="clustering_outputs")
         log.info(f"  ✅ CSV berhasil di-log sebagai artifact di MLflow.")
 
+        import time
         # ── TAHAP 2: REGISTER SEBAGAI MODEL IMAJINER ──
         # Karena MLflow Registry mewajibkan adanya objek 'Model', kita daftarkan 
         # objek 'scaler' (MinMaxScaler) sebagai perwakilan model imajiner kita.
         # Ini trik standar MLOps jika ingin meregistrasi metadata murni.
         log.info(f"  Mendaftarkan ke Model Registry dengan nama '{REGISTRY_NAME}'...")
-        
         # Log model scaler-nya terlebih dahulu
         mlflow.sklearn.log_model(scaler, artifact_path="scaler_model")
+
+        log.info(f"  ⏳ Menunggu 10 detik untuk proses sinkronisasi Eventual Consistency S3 DagsHub...")
+        time.sleep(10)
+
+        log.info(f"  Mendaftarkan ke Model Registry dengan nama '{REGISTRY_NAME}'...")
         model_uri = f"runs:/{run.info.run_id}/scaler_model"
         # Daftarkan ke Model Registry
         mv = mlflow.register_model(model_uri=model_uri, name=REGISTRY_NAME)
@@ -135,8 +140,6 @@ def register_clustering_metadata_to_mlflow(feat_df: pd.DataFrame, X_scaled, scal
         )
         
         log.info(f"✅ {REGISTRY_NAME} v{mv.version} sukses berstatus PRODUCTION dengan artifact CSV!")
-        log.info(f"=======================================================\n")
-        
     return run.info.run_id
 
 # ─────────────────────────────────────────────────────────────────────────────
