@@ -1,8 +1,9 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from src.business_logic.katalog import COMMODITY_CATALOG
 from src.business_logic.ml_service import predict_harga_satuan
 from src.business_logic.substitusi import build_substitution_dynamic
 from src.api.schemas import PredictRequest, BudgetResponse, ItemResult
+from src.core.config import logger
 
 router = APIRouter()
 
@@ -11,9 +12,19 @@ def predict_budget(payload: PredictRequest):
     detail = []
     total = 0.0
     for item in payload.keranjang:
-        if item.komoditas_id not in COMMODITY_CATALOG: continue
+        if item.komoditas_id not in COMMODITY_CATALOG: 
+            continue
+            
         info = COMMODITY_CATALOG[item.komoditas_id]
-        harga_satuan = predict_harga_satuan(item.komoditas_id)
+        
+        # 🚨 PERBAIKAN: Gunakan info["nama"], tangkap error dengan tegas
+        try:
+            harga_satuan = predict_harga_satuan(info["nama"])
+        except Exception as e:
+            # Logger kita taruh tepat di sini sebelum HTTPException dilempar
+            logger.error(f"🚨 TRACEBACK ERROR PREDIKSI: {str(e)}") 
+            raise HTTPException(status_code=400, detail=f"Gagal memprediksi harga {info['nama']}: {str(e)}")
+            
         subtotal = harga_satuan * item.jumlah
         total += subtotal
         detail.append(ItemResult(

@@ -40,7 +40,7 @@ BASE_URL   = "https://siskaperbapo.jatimprov.go.id/harga/tabel"
 TIMEOUT_MS = 60_000
 
 TANGGAL_AWAL  = date(2021, 5, 7)
-TANGGAL_AKHIR = date(2026, 5, 19)
+TANGGAL_AKHIR = date(2026, 5, 24)
 
 # Whitelist 43 Komoditas
 WHITELIST = {

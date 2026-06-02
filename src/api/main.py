@@ -1,12 +1,10 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-import mlflow
 
 # Import dari core & business logic
-from src.core.config import MODEL_REGISTRY, logger
+from src.core.config import logger
 from src.business_logic.katalog import load_harga_terkini
-from src.business_logic.ml_service import set_model
 
 # Import loket rute
 from src.api.routes import katalog, belanja, tren
@@ -14,21 +12,15 @@ from src.api.routes import katalog, belanja, tren
 # Proses saat server baru menyala (Startup)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # 1. Tetap muat harga terkini ke memori katalog
     load_harga_terkini()
     
-    for cluster_key, model_name in MODEL_REGISTRY.items():
-        try:
-            model_uri = f"models:/{model_name}@champion"
-            logger.info(f"Mengunduh model {model_name} (Champion) untuk {cluster_key}...")
-            
-            loaded_model = mlflow.pyfunc.load_model(model_uri)
-            set_model(cluster_key, loaded_model)
-            
-            logger.info(f"✅ Model {cluster_key} berhasil diaktifkan!")
-        except Exception as e:
-            logger.error(f"❌ Gagal memuat model {cluster_key}: {e}")
+    # 2. Server langsung menyala tanpa mendownload 43 model di awal
+    logger.info("🚀 Server MarketCast API siap. Model MLflow dimuat secara dinamis (Lazy Loading).")
 
     yield
+    
+    # 3. Pembersihan memori (cache model) saat server dimatikan
     import src.business_logic.ml_service as ml
     ml.active_models.clear()
 
