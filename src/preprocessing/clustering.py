@@ -1,4 +1,5 @@
 import os
+import sys  
 import argparse
 import logging
 import warnings
@@ -11,6 +12,10 @@ from scipy import stats
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import MinMaxScaler
 import joblib
+
+root_path = str(Path(__file__).resolve().parents[2])
+if root_path not in sys.path:
+    sys.path.append(root_path)
 
 import mlflow
 from src.training.config import init_mlflow
