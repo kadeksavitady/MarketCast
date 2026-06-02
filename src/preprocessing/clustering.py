@@ -13,6 +13,7 @@ from sklearn.preprocessing import MinMaxScaler
 import joblib
 
 import mlflow
+from training.config import init_mlflow
 import mlflow.sklearn
 from mlflow.tracking import MlflowClient
 
@@ -72,6 +73,8 @@ def register_clustering_metadata_to_mlflow(feat_df: pd.DataFrame, X_scaled, scal
     Menyimpan hasil clustering ke CSV, melakukan logging artifact,
     dan mendaftarkannya sebagai 'Model' resmi di MLflow Registry sesuai permintaan Backend.
     """
+    init_mlflow()
+
     # 1. Inisialisasi MLflow Client dan Experiment
     mlflow.set_experiment(mlflow_experiment)
     client = MlflowClient()
@@ -186,7 +189,7 @@ def run_clustering_pipeline(feat_df: pd.DataFrame, k: int):
         register_clustering_metadata_to_mlflow(feat_df, X_scaled, scaler)
     except Exception as e:
         log.error(f"⚠️ Gagal mengotomasi registry clustering: {e}")
-           
+
     return feat_df, X_scaled, scaler
 
 # ─────────────────────────────────────────────────────────────────────────────
