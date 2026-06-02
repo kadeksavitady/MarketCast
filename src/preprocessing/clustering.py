@@ -60,6 +60,76 @@ def build_features(df: pd.DataFrame) -> pd.DataFrame:
         })
     return pd.DataFrame(features).set_index("komoditas")
 
+import mlflow
+import mlflow.sklearn
+from mlflow.tracking import MlflowClient
+import os
+import pandas as pd
+
+def register_clustering_metadata_to_mlflow(feat_df: pd.DataFrame, X_scaled, scaler, mlflow_experiment: str = "MarketCast-Preprocessing"):
+    """
+    Menyimpan hasil clustering ke CSV, melakukan logging artifact,
+    dan mendaftarkannya sebagai 'Model' resmi di MLflow Registry sesuai permintaan Backend.
+    """
+    # 1. Inisialisasi MLflow Client dan Experiment
+    mlflow.set_experiment(mlflow_experiment)
+    client = MlflowClient()
+    
+    # Tentukan nama registrasi sesuai request Backend
+    REGISTRY_NAME = "Metadata__Clustering"
+    
+    log.info(f"\n=======================================================")
+    log.info(f"Mulai Proses Registrasi Metadata Clustering ke MLflow...")
+    log.info(f"=======================================================")
+
+    with mlflow.start_run(run_name="Clustering_Metadata_Export") as run:
+        # Atur Tags untuk mempermudah pencarian di UI
+        mlflow.set_tags({
+            "step": "preprocessing_clustering",
+            "project": "PBL-MarketCast",
+            "type": "metadata"
+        })
+
+        # ── TAHAP 1: SAVE & LOG ARTIFACT (CSV) ──
+        # Buat folder temporary jika belum ada
+        os.makedirs("/tmp/clustering", exist_ok=True)
+        csv_path = "/tmp/clustering/cluster_assignments.csv"
+        # Simpan hasil dataframe clustering ke CSV lokal sementara
+        feat_df.to_csv(csv_path, index=True)
+        log.info(f"  ✓ Berhasil menyimpan CSV sementara di: {csv_path}")
+        
+        # WAJIB: Log file CSV tersebut menggunakan mlflow.log_artifact sesuai request
+        mlflow.log_artifact(csv_path, artifact_path="clustering_outputs")
+        log.info(f"  ✅ CSV berhasil di-log sebagai artifact di MLflow.")
+
+        # ── TAHAP 2: REGISTER SEBAGAI MODEL IMAJINER ──
+        # Karena MLflow Registry mewajibkan adanya objek 'Model', kita daftarkan 
+        # objek 'scaler' (MinMaxScaler) sebagai perwakilan model imajiner kita.
+        # Ini trik standar MLOps jika ingin meregistrasi metadata murni.
+        log.info(f"  Mendaftarkan ke Model Registry dengan nama '{REGISTRY_NAME}'...")
+        
+        # Log model scaler-nya terlebih dahulu
+        mlflow.sklearn.log_model(scaler, artifact_path="scaler_model")
+        model_uri = f"runs:/{run.info.run_id}/scaler_model"
+        # Daftarkan ke Model Registry
+        mv = mlflow.register_model(model_uri=model_uri, name=REGISTRY_NAME)
+        log.info(f"  ✓ Model berhasil terdaftar sebagai Version {mv.version}")
+
+        # ── TAHAP 3: SET STATUS KE PRODUCTION ──
+        # Set versi terbaru ini langsung menggunakan alias atau stage 'Production'
+        log.info(f"  Mengeset versi {mv.version} ke label / alias 'production'...")
+        # Menggunakan set_registered_model_alias (Direkomendasikan untuk MLflow modern)
+        client.set_registered_model_alias(
+            name=REGISTRY_NAME,
+            alias="production",
+            version=mv.version
+        )
+        
+        log.info(f"✅ {REGISTRY_NAME} v{mv.version} sukses berstatus PRODUCTION dengan artifact CSV!")
+        log.info(f"=======================================================\n")
+        
+    return run.info.run_id
+
 # ─────────────────────────────────────────────────────────────────────────────
 # 3. CLUSTERING
 # ─────────────────────────────────────────────────────────────────────────────
