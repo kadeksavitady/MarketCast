@@ -60,6 +60,12 @@ WHITELIST_MAP = {
 
 WHITELIST_LOWER = {k.lower(): k for k in WHITELIST_MAP.keys()}
 
+# ── RENAME DISPLAY NAME ──
+RENAME_KOMODITAS = {
+    "Bata":  "Garam Bata",
+    "Halus": "Garam Halus",
+}
+
 SATUAN_KONVERSI = {
     "kg": 1.0, "1 liter": 0.92, "370 gr/kl": 0.370,
     "400 gr/dos": 0.400, "bungkus": 0.085, "ekor": 1.0
@@ -146,7 +152,7 @@ async def scrape_harian(page, tgl_str):
                     
                     rows_data.append({
                         'tanggal_data': tgl_str,
-                        'komoditas': nama_asli,
+                        'komoditas': RENAME_KOMODITAS.get(nama_asli, nama_asli),
                         'kategori': WHITELIST_MAP[nama_asli],
                         'harga_per_kg': harga_per_kg,
                         'satuan_original': satuan_raw,

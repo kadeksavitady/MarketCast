@@ -18,8 +18,17 @@ venv_py310/
 # Blokir cache Python
 __pycache__/
 *.py[cod]
+*$py.class
 
 # --- CREDENTIALS & LOGS ---
 .env
 *.log
 cek_sinkron.py
+node_modules/
+*.bak
+
+# Frontend
+src/frontend/.vite/
+
+# DVC Local Config
+.dvc/config.local
