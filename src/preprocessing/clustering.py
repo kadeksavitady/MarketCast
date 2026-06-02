@@ -12,6 +12,10 @@ from sklearn.cluster import KMeans
 from sklearn.preprocessing import MinMaxScaler
 import joblib
 
+import mlflow
+import mlflow.sklearn
+from mlflow.tracking import MlflowClient
+
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
 
@@ -60,12 +64,9 @@ def build_features(df: pd.DataFrame) -> pd.DataFrame:
         })
     return pd.DataFrame(features).set_index("komoditas")
 
-import mlflow
-import mlflow.sklearn
-from mlflow.tracking import MlflowClient
-import os
-import pandas as pd
-
+# ─────────────────────────────────────────────────────────────────────────────
+# 2.5 HELPER FUNCTION: REGISTRY METADATA (TARUH DI SINI)
+# ─────────────────────────────────────────────────────────────────────────────
 def register_clustering_metadata_to_mlflow(feat_df: pd.DataFrame, X_scaled, scaler, mlflow_experiment: str = "MarketCast-Preprocessing"):
     """
     Menyimpan hasil clustering ke CSV, melakukan logging artifact,
