@@ -113,9 +113,6 @@ def register_clustering_metadata_to_mlflow(feat_df: pd.DataFrame, X_scaled, scal
 
         import time
         # ── TAHAP 2: REGISTER SEBAGAI MODEL IMAJINER ──
-        # Karena MLflow Registry mewajibkan adanya objek 'Model', kita daftarkan 
-        # objek 'scaler' (MinMaxScaler) sebagai perwakilan model imajiner kita.
-        # Ini trik standar MLOps jika ingin meregistrasi metadata murni.
         log.info(f"  Mendaftarkan ke Model Registry dengan nama '{REGISTRY_NAME}'...")
         # Log model scaler-nya terlebih dahulu
         mlflow.sklearn.log_model(scaler, artifact_path="scaler_model")
@@ -130,7 +127,6 @@ def register_clustering_metadata_to_mlflow(feat_df: pd.DataFrame, X_scaled, scal
         log.info(f"  ✓ Model berhasil terdaftar sebagai Version {mv.version}")
 
         # ── TAHAP 3: SET STATUS KE PRODUCTION ──
-        # Set versi terbaru ini langsung menggunakan alias atau stage 'Production'
         log.info(f"  Mengeset versi {mv.version} ke label / alias 'production'...")
         # Menggunakan set_registered_model_alias (Direkomendasikan untuk MLflow modern)
         client.set_registered_model_alias(
@@ -248,7 +244,6 @@ def export_and_log_to_mlflow(df_clean: pd.DataFrame, feat_final: pd.DataFrame,
             
             with tempfile.TemporaryDirectory() as tmpdir:
                 tmp_path = Path(tmpdir)
-                
                 joblib.dump(scaler, tmp_path / "minmax_scaler.joblib")
                 
                 # ── 1. data_preprocessed.csv ─────────────────────────────────────────────
@@ -282,7 +277,7 @@ def export_and_log_to_mlflow(df_clean: pd.DataFrame, feat_final: pd.DataFrame,
                     sub_df.to_csv(tmp_path / f"ts_centroid_{slug}.csv", index=False)
 
                 mlflow.log_artifacts(tmp_path.as_posix(), artifact_path="clustering_results")
-                log.info("✅ Semua file CSV & Scaler berhasil di-upload ke MLflow, laptop tetap bersih!")
+                log.info("✅ Semua file CSV & Scaler berhasil di-upload ke MLflow")
 
     except Exception as e:
         log.error(f"❌ MLflow Error: {e}")

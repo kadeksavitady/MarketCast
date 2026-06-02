@@ -115,6 +115,8 @@ def init_mlflow() -> str:
 # PATH — semua relatif terhadap root repo
 # ─────────────────────────────────────────────────────────────
 DIR_OUTPUTS_BASE = Path("outputs")
+CSV_CLUSTER_ASSIGN = DIR_OUTPUTS_BASE / "clustering_results" / "cluster_assignments.csv"
+CSV_CENTROID       = DIR_OUTPUTS_BASE / "clustering_results" / "centroid_representatives.csv"
 YAML_MODEL_REGISTRY = DIR_OUTPUTS_BASE / "registry" / "model_registry_map.yaml"
 
 SATUAN_TO_KG = {
@@ -170,7 +172,7 @@ def _download_clustering_artifacts() -> bool:
             artifact_path="clustering_results",
             dst_path=str(DIR_OUTPUTS_BASE),
         )
-        _log.info(f"✅ Clustering artifacts berhasil di-download ke {DIR_CLUSTERING}")
+        _log.info(f"✅ Clustering artifacts berhasil di-download ke {DIR_OUTPUTS_BASE}")
         return True
 
     except Exception as e:
@@ -187,7 +189,8 @@ def load_cluster_map(csv_path: Path = CSV_CLUSTER_ASSIGN) -> dict:
         success = _download_clustering_artifacts()
         if not success or not csv_path.exists():
             _log.warning("Download gagal — pakai CLUSTER_MAP_FALLBACK")
-
+            raise FileNotFoundError(f"Berkas {csv_path.name} tidak berhasil disinkronkan dari MLflow.")
+        
     df            = pd.read_csv(csv_path)
     col_komoditas = next((c for c in df.columns if "komoditas" in c.lower()),
                          "komoditas")
@@ -206,24 +209,20 @@ def load_cluster_map(csv_path: Path = CSV_CLUSTER_ASSIGN) -> dict:
               f"{sum(len(v) for v in result.values())} komoditas")
     return result
 
-
 def load_centroid_list(csv_path: Path = CSV_CENTROID) -> list:
     """
-    Baca centroid_representatives.csv.
+    Baca centroid_representatives.csv langsung dari hasil unduhan terpusat MLflow.
     Return: list 3 nama komoditas yang menjadi wakil setiap cluster.
-
-    Fallback: ambil elemen pertama tiap cluster dari CLUSTER_MAP_FALLBACK
-    jika CSV belum ada.
     """
+    load_cluster_map()
     if not csv_path.exists():
         raise RuntimeError(
-            "centroid_representatives.csv tidak tersedia di disk maupun MLflow. "
-            "Jalankan src/preprocessing/clustering.py terlebih dahulu."
-        )
+                f"Berkas '{csv_path.name}' tidak tersedia di folder outputs/clustering_results/. "
+                "Jalankan src/preprocessing/clustering.py terlebih dahulu."
+            )
     df  = pd.read_csv(csv_path)
     col = next((c for c in df.columns if "komoditas" in c.lower()), df.columns[0])
     return df[col].str.strip().tolist()
-
 
 # ─────────────────────────────────────────────────────────────
 # CLUSTER LOOKUP UTILS
