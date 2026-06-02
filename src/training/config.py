@@ -143,14 +143,15 @@ def _download_clustering_artifacts() -> bool:
     """
     _log = logging.getLogger("config")
     try:
-        import mlflow, dagshub
-        dagshub.init(repo_name=DAGSHUB_REPO, repo_owner=DAGSHUB_USER, mlflow=True)
+        import mlflow
+        init_mlflow()
         client = mlflow.tracking.MlflowClient()
 
         # Cari run KMeans-Final terbaru di experiment siskaperbapo-clustering
-        exp = client.get_experiment_by_name("siskaperbapo-clustering")
+        target_exp = MLFLOW_EXP_CLUSTERING
+        exp = client.get_experiment_by_name(target_exp)
         if exp is None:
-            _log.warning("Experiment siskaperbapo-clustering tidak ditemukan di MLflow")
+            _log.warning(f"Experiment '{target_exp}' tidak ditemukan di MLflow")
             return False
 
         runs = client.search_runs(
