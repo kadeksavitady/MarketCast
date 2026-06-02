@@ -181,7 +181,12 @@ def run_clustering_pipeline(feat_df: pd.DataFrame, k: int):
         label = f"Cluster {cid}: {cv_lbl} & {harga_lbl} ({tren_lbl})"
         feat_df.loc[mask, "cluster_label"] = label
         log.info(f"  [Auto-Label] {label} (Median Harga: Rp{med_harga:,.0f})")
-        
+    # ── PEMANGGILAN OTOMASI REGISTRY (SISIPKAN DI SINI SEBELUM RETURN) ──
+    try:
+        register_clustering_metadata_to_mlflow(feat_df, X_scaled, scaler)
+    except Exception as e:
+        log.error(f"⚠️ Gagal mengotomasi registry clustering: {e}")
+           
     return feat_df, X_scaled, scaler
 
 # ─────────────────────────────────────────────────────────────────────────────
