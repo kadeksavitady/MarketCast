@@ -134,7 +134,7 @@ def run_and_log_clustering_pipeline(df_clean: pd.DataFrame, feat_df: pd.DataFram
 
     log.info(f"\n{"=" * 60}")
     log.info(f"Mulai Orkestrasi Satu Atap ke Experiment: {mlflow_experiment}")
-    log.info(f"{"=" * 60}\n")
+    log.info(f"{"=" * 60}")
 
     # Nama Run disesuaikan menjadi KMeans-Final-Orchestration agar terbaca config.py
     with mlflow.start_run(run_name="KMeans-Final-Orchestration") as run:
