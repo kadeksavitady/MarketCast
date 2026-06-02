@@ -46,7 +46,7 @@ def get_clustering_data():
         run_id = model_version.run_id
         
         # 2. Download file CSV-nya
-        lokasi_file = client.download_artifacts(run_id, "clustering_results/cluster_features.csv")
+        lokasi_file = client.download_artifacts(run_id, "clustering_results/model_artifacts/cluster_assignments.csv")
         
         # 3. Baca pakai Pandas
         df_cluster = pd.read_csv(lokasi_file)
