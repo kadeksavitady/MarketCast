@@ -83,24 +83,25 @@ def get_tren(komoditas_id: str, hari: int = 90):
 
 @router.get("/funfact/{komoditas_id}")
 def get_fun_fact(komoditas_id: str):
-    # Panggil data CSV yang sudah ada di memori
+    # BACA KATALOG DULU UNTUK MENGUBAH SLUG (beras-premium) MENJADI NAMA ASLI (Beras Premium)
+    info = COMMODITY_CATALOG.get(komoditas_id)
+    if not info:
+        return {"pesan": "Komoditas tidak ditemukan di katalog."}
+        
+    nama_asli = info["nama"]
+    satuan_barang = info.get("satuan", "satuan")
+    
+    # Panggil data CSV menggunakan NAMA ASLI
     data_cluster = get_clustering_data()
-    info_komoditas = data_cluster.get(komoditas_id)
+    info_komoditas = data_cluster.get(nama_asli)
     
     if not info_komoditas:
         return {"pesan": "Data informasi pasar belum tersedia untuk komoditas ini."}
-        
-    # Ambil Satuan dari Katalog Komoditas milikmu
-    # Jika kebetulan tidak ditemukan, standarnya akan diisi kata "satuan"
-    katalog_info = COMMODITY_CATALOG.get(komoditas_id, {})
-    satuan_barang = katalog_info.get("satuan", "satuan")
         
     # Ambil nilai spesifik untuk komoditas yang sedang dicari
     cv_value = float(info_komoditas['cv'])
     trend_slope = float(info_komoditas['trend_slope'])
     mean_harga = float(info_komoditas['mean'])
-    
-    # Terjemahan Bahasa Awam untuk CV dan Tren
     
     # A. Menerjemahkan Tingkat Fluktuasi (CV)
     if cv_value < 0.1:
@@ -119,12 +120,13 @@ def get_fun_fact(komoditas_id: str):
         arah_tren = "cenderung datar tanpa pergerakan yang berarti"
     
     kalimat_fun_fact = (
-        f"💡 Info Pasar: Saat ini, rata-rata harga wajar untuk {komoditas_id} berada di kisaran Rp{mean_harga:,.0f} per {satuan_barang}. "
+        f"💡 Info Pasar: Saat ini, rata-rata harga wajar untuk {nama_asli} berada di kisaran Rp{mean_harga:,.0f} per {satuan_barang}. "
         f"Berdasarkan catatan historis, harga komoditas ini {karakter_cv}. Untuk saat ini, pergerakannya di pasar {arah_tren}."
     )
     
     return {
-        "komoditas": komoditas_id,
+        "komoditas": nama_asli,
+        "label_cerdas_ml": info_komoditas.get("cluster_label", ""),
         "detail_cluster": info_komoditas,
         "teks_fun_fact": kalimat_fun_fact
     }
