@@ -325,6 +325,19 @@ return (
           font-family: inherit;
           transition: all .18s;
         }
+        .tr-stat-grid {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 14px;
+        }
+
+        @media (max-width: 860px) {
+          .tr-stat-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        @media (max-width: 560px) {
+          .tr-stat-grid { grid-template-columns: 1fr; }
+        }
         .tr-range-btn.active {
           background: #1B4332; color: white;
           border-color: #1B4332; font-weight: 700;
@@ -445,7 +458,7 @@ return (
             
             {/* 4 Elemen Stat Cards */}
             {trenData && (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14 }}>
+              <div className="tr-stat-grid">
                 {/* 1 — Harga Terakhir */}
                 <div className="tr-stat-card">
                   <div style={{ fontSize: 11, color: "#9ca3af", fontWeight: 600, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 10 }}>Harga Terakhir</div>
