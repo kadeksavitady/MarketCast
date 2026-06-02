@@ -181,7 +181,7 @@ def iqr_clip(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 # ─────────────────────────────────────────────────────────────
-# 6. EXPORT: NEON DB (DATA) & MLFLOW (SCALER/METADATA)
+# 6. EXPORT: NEON DB (DATA)
 # ─────────────────────────────────────────────────────────────
 def export_results(df: pd.DataFrame, engine) -> None:
     # ── PUSH DATA KE NEON DB ──
