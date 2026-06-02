@@ -160,15 +160,15 @@ def _download_clustering_artifacts() -> bool:
         if not runs:
             _log.warning("Tidak ada run KMeans-Final di MLflow")
             return False
-
         run_id = runs[0].info.run_id
         _log.info(f"Download clustering artifacts dari run {run_id[:8]}...")
 
-        DIR_CLUSTERING.mkdir(parents=True, exist_ok=True)
+        DIR_OUTPUTS_BASE.mkdir(parents=True, exist_ok=True)
+        # Unduh berkas langsung dari cloud ke folder kerja outputs
         mlflow.artifacts.download_artifacts(
             run_id=run_id,
             artifact_path="clustering_results",
-            dst_path=str(DIR_CLUSTERING.parent.parent),
+            dst_path=str(DIR_OUTPUTS_BASE),
         )
         _log.info(f"✅ Clustering artifacts berhasil di-download ke {DIR_CLUSTERING}")
         return True
