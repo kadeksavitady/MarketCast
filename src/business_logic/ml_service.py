@@ -5,6 +5,7 @@ import pandas as pd
 from sqlalchemy import text
 from dotenv import load_dotenv
 from src.core.config import logger, engine
+from mlflow.tracking import MlflowClient
 
 # 1. Pastikan variabel lingkungan dari .env terbaca
 load_dotenv()
@@ -16,59 +17,88 @@ mlflow.set_tracking_uri("https://dagshub.com/kadeksavitady/MarketCast.mlflow")
 
 active_models = {}
 
-# Peta 43 Komoditas ke Registry MLflow
-MODEL_REGISTRY_MAP = {
-    "Beras Premium": "XGBoost__Beras Premium",
-    "Beras Medium": "XGBoost__Beras Medium",
-    "Gula Kristal Putih": "XGBoost__Gula Kristal Putih",
-    "Minyak Goreng Curah": "XGBoost__Minyak Goreng Curah",
-    "Minyak Goreng Kemasan Premium": "XGBoost__Minyak Goreng Kemasan Premium",
-    "Minyak Goreng Kemasan Sederhana": "XGBoost__Minyak Goreng Kemasan Sederhana",
-    "Minyak Goreng MINYAKITA": "XGBoost__Minyak Goreng MINYAKITA",
-    "Daging Sapi Paha Belakang": "SARIMA__Daging Sapi Paha Belakang",
-    "Daging Ayam Ras": "XGBoost__Daging Ayam Ras",
-    "Daging Ayam Kampung": "SARIMA__Daging Ayam Kampung",
-    "Telur Ayam Ras": "XGBoost__Telur Ayam Ras",
-    "Telur Ayam Kampung": "XGBoost__Telur Ayam Kampung",
-    "Susu Kental Manis Merk Bendera": "XGBoost__Susu Kental Manis Merk Bendera",
-    "Susu Kental Manis Merk Indomilk": "XGBoost__Susu Kental Manis Merk Indomilk",
-    "Susu Bubuk Merk Bendera (Instant)": "SARIMA__Susu Bubuk Merk Bendera (Instant)",
-    "Susu Bubuk Merk Indomilk (Instant)": "SARIMA__Susu Bubuk Merk Indomilk (Instant)",
-    "Jagung Pipilan Kering": "XGBoost__Jagung Pipilan Kering",
-    "Kedelai Impor": "XGBoost__Kedelai Impor",
-    "Kedelai Lokal": "XGBoost__Kedelai Lokal",
-    "KACANG HIJAU": "XGBoost__KACANG HIJAU",
-    "KACANG TANAH": "XGBoost__KACANG TANAH",
-    "KETELA POHON": "XGBoost__KETELA POHON",
-    "Bata": "XGBoost__Bata",
-    "Halus": "XGBoost__Halus",
-    "Terigu Protein Sedang (Kemasan)": "XGBoost__Terigu Protein Sedang (Kemasan)",
-    "Indomie Rasa Kari Ayam": "XGBoost__Indomie Rasa Kari Ayam",
-    "Cabe Merah Keriting": "SARIMA__Cabe Merah Keriting",
-    "Cabe Merah Besar": "SARIMA__Cabe Merah Besar",
-    "Cabe Rawit Merah": "SARIMA__Cabe Rawit Merah",
-    "Bawang Merah": "XGBoost__Bawang Merah",
-    "Bawang Putih Sinco/Honan": "XGBoost__Bawang Putih SincoHonan",
-    "KOL/KUBIS": "XGBoost__KOLKUBIS",
-    "KENTANG": "XGBoost__KENTANG",
-    "Tomat Merah": "SARIMA__Tomat Merah",
-    "WORTEL": "XGBoost__WORTEL",
-    "BUNCIS": "XGBoost__BUNCIS",
-    "Ikan Asin Teri": "SARIMA__Ikan Asin Teri",
-    "Ikan Bandeng": "XGBoost__Ikan Bandeng",
-    "Ikan Kembung": "XGBoost__Ikan Kembung",
-    "Ikan Tuna": "XGBoost__Ikan Tuna",
-    "Ikan Tongkol": "XGBoost__Ikan Tongkol",
-    "Ikan Cakalang": "XGBoost__Ikan Cakalang",
-    "GAS ELPIGI 3 Kg": "XGBoost__GAS ELPIGI 3 Kg"
-}
+# ==========================================
+# VARIABEL CACHE (PENYIMPANAN SEMENTARA)
+# ==========================================
+active_models = {}
+active_model_names = {}
+clustering_data_cache = {}
+
+# Awalan nama model
+KANDIDAT_MODEL = ["XGBoost__", "SARIMA__", "Prophet__"]
+
+# ==========================================
+# FUNGSI PENYEDOT CSV CLUSTERING (FUN FACT)
+# ==========================================
+
+def get_clustering_data():
+    """Menyedot CSV hasil clustering dari MLflow dan mengubahnya jadi Dictionary"""
+    global clustering_data_cache
+    
+    # Kalau sudah pernah disedot, pakai yang ada di memori saja
+    if clustering_data_cache:
+        return clustering_data_cache
+
+    try:
+        client = MlflowClient()
+        # 1. Cari model dengan nama 'Metadata__Clustering' yang berstatus production
+        model_version = client.get_model_version_by_alias(name="Metadata__Clustering", alias="production")
+        run_id = model_version.run_id
+        
+        # 2. Download file CSV-nya
+        lokasi_file = client.download_artifacts(run_id, "clustering_results/cluster_features.csv")
+        
+        # 3. Baca pakai Pandas
+        df_cluster = pd.read_csv(lokasi_file)
+        
+        # 4. Ubah jadi Dictionary
+        # (Asumsi nama kolom di CSV: 'komoditas', 'cluster', 'cv', 'trend_slope', 'mean')
+        for _, row in df_cluster.iterrows():
+            nama_komoditas = row['komoditas']
+            clustering_data_cache[nama_komoditas] = {
+                "cluster": row.get('cluster', 'Tidak Diketahui'),
+                "cluster_label": row.get('cluster_label', ''),
+                "is_centroid": row.get('is_centroid', False),
+                "cv": row['cv'],
+                "trend_slope": row['trend_slope'],
+                "mean": row['mean_harga']
+            }
+            
+        logger.info("✅ File CSV Clustering berhasil diunduh dan disimpan di memori!")
+        return clustering_data_cache
+        
+    except Exception as e:
+        logger.error(f"❌ Gagal menyedot CSV dari MLflow: {e}")
+        return {}
+
+# ==========================================
+# FUNGSI RESEPSIONIS MODEL OTOMATIS
+# ==========================================
+def dapatkan_nama_model_otomatis(komoditas_id: str) -> str:
+    """Fungsi Resepsionis: Mencari tahu apa model terbaik saat ini di DagsHub"""
+    
+    if komoditas_id in active_model_names:
+        return active_model_names[komoditas_id]
+        
+    client = MlflowClient()
+    
+    for tipe in KANDIDAT_MODEL:
+        nama_coba_coba = f"{tipe}{komoditas_id}"
+        try:
+            client.get_model_version_by_alias(name=nama_coba_coba, alias="production")
+            active_model_names[komoditas_id] = nama_coba_coba 
+            logger.info(f"Menemukan model production: {nama_coba_coba}")
+            return nama_coba_coba
+            
+        except Exception:
+            continue
+            
+    raise ValueError(f"model production untuk {komoditas_id} di MLflow belum di-set!")
 
 def get_model_on_demand(komoditas_id: str):
     if komoditas_id not in active_models:
         try:
-            exact_model_name = MODEL_REGISTRY_MAP.get(komoditas_id)
-            if not exact_model_name:
-                raise ValueError(f"Komoditas '{komoditas_id}' tidak ditemukan di peta registrasi.")
+            exact_model_name = dapatkan_nama_model_otomatis(komoditas_id)
             
             model_uri = f"models:/{exact_model_name}@production"
             logger.info(f"⏳ Mengunduh model {exact_model_name} dari MLflow...")
@@ -83,7 +113,6 @@ def get_model_on_demand(komoditas_id: str):
 # ==========================================
 # FEATURE ENGINEERING DATA HISTORIS (XGBOOST)
 # ==========================================
-
 def get_recent_history(komoditas_id: str, days: int = 50) -> pd.DataFrame:
     if not engine: 
         raise RuntimeError("Koneksi database (Engine) tidak aktif.")
@@ -154,10 +183,9 @@ def _recursive_forecast_xgb(model, history_prices, history_dates, n_steps=30) ->
 # ==========================================
 # INTERFASE UTAMA ROUTER API
 # ==========================================
-
 def predict_harga_satuan(komoditas_id: str) -> float:
     """Dipanggil oleh routes/belanja.py"""
-    exact_model_name = MODEL_REGISTRY_MAP.get(komoditas_id, "")
+    exact_model_name = dapatkan_nama_model_otomatis(komoditas_id)
     model = get_model_on_demand(komoditas_id)
 
     if "XGBoost" in exact_model_name:
@@ -176,13 +204,24 @@ def predict_harga_satuan(komoditas_id: str) -> float:
     elif "SARIMA" in exact_model_name:
         prediksi = model._model_impl.predict(1)
         return float(prediksi[0])
+
+    elif "Prophet" in exact_model_name:
+        # Prophet butuh tanggal esok hari di dalam DataFrame bernama 'ds'
+        history_df = get_recent_history(komoditas_id, 1)
+        last_date = history_df.index[-1] if not history_df.empty else pd.Timestamp.today()
+        
+        future_df = pd.DataFrame({'ds': [last_date + pd.Timedelta(days=1)]})
+        prediksi = model.predict(future_df)
+        
+        # Prophet mengembalikan dataframe, hasil prediksi ada di kolom 'yhat'
+        return float(prediksi['yhat'].iloc[0])
         
     else:
         raise ValueError(f"Tipe model untuk '{exact_model_name}' tidak dikenal.")
 
 def generate_forecast(komoditas_id: str, last_harga: float) -> list:
     """Dipanggil oleh routes/tren.py"""
-    exact_model_name = MODEL_REGISTRY_MAP.get(komoditas_id, "")
+    exact_model_name = dapatkan_nama_model_otomatis(komoditas_id)
     model = get_model_on_demand(komoditas_id)
 
     if "XGBoost" in exact_model_name:
@@ -197,6 +236,19 @@ def generate_forecast(komoditas_id: str, last_harga: float) -> list:
     elif "SARIMA" in exact_model_name:
         ramalan = model._model_impl.predict(30)
         return [float(x) for x in ramalan]
+    
+    elif "Prophet" in exact_model_name:
+        # Prophet butuh rentang tanggal (30 hari ke depan) di kolom 'ds'
+        history_df = get_recent_history(komoditas_id, 1)
+        last_date = history_df.index[-1] if not history_df.empty else pd.Timestamp.today()
+        
+        future_dates = pd.date_range(start=last_date + pd.Timedelta(days=1), periods=30, freq="D")
+        future_df = pd.DataFrame({'ds': future_dates})
+        
+        prediksi = model.predict(future_df)
+        
+        # Ekstrak seluruh nilai dari kolom 'yhat' menjadi list
+        return [float(x) for x in prediksi['yhat']]
         
     else:
         raise ValueError(f"Tipe model untuk '{exact_model_name}' tidak dikenal.")

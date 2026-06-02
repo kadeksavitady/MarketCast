@@ -4,7 +4,7 @@ import pandas as pd
 from sqlalchemy import text
 from src.core.config import engine
 from src.business_logic.katalog import COMMODITY_CATALOG
-from src.business_logic.ml_service import generate_forecast, hitung_tren_forecast
+from src.business_logic.ml_service import generate_forecast, hitung_tren_forecast, get_clustering_data
 from src.api.schemas import TrenResponse, CommodityInfo, TitikData
 
 router = APIRouter()
@@ -80,3 +80,53 @@ def get_tren(komoditas_id: str, hari: int = 90):
         forecast_30_hari=forecast_models,
         forecast_trend_percentage=persentase_ramalan
     )
+
+@router.get("/funfact/{komoditas_id}")
+def get_fun_fact(komoditas_id: str):
+    # BACA KATALOG DULU UNTUK MENGUBAH SLUG (beras-premium) MENJADI NAMA ASLI (Beras Premium)
+    info = COMMODITY_CATALOG.get(komoditas_id)
+    if not info:
+        return {"pesan": "Komoditas tidak ditemukan di katalog."}
+        
+    nama_asli = info["nama"]
+    satuan_barang = info.get("satuan", "satuan")
+    
+    # Panggil data CSV menggunakan NAMA ASLI
+    data_cluster = get_clustering_data()
+    info_komoditas = data_cluster.get(nama_asli)
+    
+    if not info_komoditas:
+        return {"pesan": "Data informasi pasar belum tersedia untuk komoditas ini."}
+        
+    # Ambil nilai spesifik untuk komoditas yang sedang dicari
+    cv_value = float(info_komoditas['cv'])
+    trend_slope = float(info_komoditas['trend_slope'])
+    mean_harga = float(info_komoditas['mean'])
+    
+    # A. Menerjemahkan Tingkat Fluktuasi (CV)
+    if cv_value < 0.1:
+        karakter_cv = "sangat stabil dan jarang mengalami perubahan harga yang drastis"
+    elif cv_value <= 0.25:
+        karakter_cv = "cukup stabil, meskipun terkadang ada sedikit penyesuaian harga yang wajar"
+    else:
+        karakter_cv = "memiliki tingkat fluktuasi tinggi, di mana harga bisa naik atau turun dengan cepat"
+        
+    # B. Menerjemahkan Arah Tren (Trend Slope)
+    if trend_slope > 0.01:
+        arah_tren = "menunjukkan tren kenaikan secara perlahan"
+    elif trend_slope < -0.01:
+        arah_tren = "menunjukkan tren penurunan harga"
+    else:
+        arah_tren = "cenderung datar tanpa pergerakan yang berarti"
+    
+    kalimat_fun_fact = (
+        f"💡 Info Pasar: Saat ini, rata-rata harga wajar untuk {nama_asli} berada di kisaran Rp{mean_harga:,.0f} per {satuan_barang}. "
+        f"Berdasarkan catatan historis, harga komoditas ini {karakter_cv}. Untuk saat ini, pergerakannya di pasar {arah_tren}."
+    )
+    
+    return {
+        "komoditas": nama_asli,
+        "label_cerdas_ml": info_komoditas.get("cluster_label", ""),
+        "detail_cluster": info_komoditas,
+        "teks_fun_fact": kalimat_fun_fact
+    }
