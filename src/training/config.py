@@ -235,23 +235,14 @@ def get_cluster(komoditas: str, cluster_map: dict = None) -> str:
             return cluster
     return "unknown"
 
-
 def get_cluster_short(komoditas: str, cluster_map: dict = None) -> str:
     """
     Return label pendek cluster (C0_LabilDatar, dst).
     Dipakai sebagai tag di MLflow dan argumen --champion di CLI.
-
-    DYNAMIC LABEL SUPPORT:
-    Label cluster dari clustering.py bersifat dinamis — bisa berubah
-    sesuai karakteristik data terkini. Fungsi ini meng-handle dua format:
-        Format lama (hardcode): "Cluster 0: Labil & Murah (→Datar)"
-        Format baru (dinamis) : "Cluster 0: Labil & Mahal (→Datar)"
-    Keduanya akan di-map ke "C0_<label>" berdasarkan nomor cluster.
     """
     full = get_cluster(komoditas, cluster_map)
 
     # Dynamic mapping: ekstrak nomor cluster dari label string
-    # Format: "Cluster N: ..." → "CN_<slug>"
     import re
     match = re.match(r"Cluster\s+(\d+):\s*(.+)", full)
     if match:
@@ -260,7 +251,6 @@ def get_cluster_short(komoditas: str, cluster_map: dict = None) -> str:
         # Buat slug dari deskripsi: "Labil & Mahal (→Datar)" → "LabilMahalDatar"
         slug  = re.sub(r"[^a-zA-Z0-9]", "", desc.replace("→", "").replace("↑", "").replace("↓", ""))
         return f"C{cid}_{slug}"
-
     # Fallback: return full label kalau tidak bisa di-parse
     return full
 
@@ -279,7 +269,6 @@ def get_logger(name: str) -> logging.Logger:
     )
     return logging.getLogger(name)
 
-
 # ─────────────────────────────────────────────────────────────
 # METRICS
 # ─────────────────────────────────────────────────────────────
@@ -295,13 +284,10 @@ def compute_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict:
     mape    = (np.mean(np.abs(
                    (y_true[nonzero] - y_pred[nonzero]) / y_true[nonzero]
                )) * 100) if nonzero.any() else 0.0
-
     smape = np.mean(
         2 * np.abs(y_pred - y_true) / (np.abs(y_true) + np.abs(y_pred) + 1e-8)
     ) * 100
-
     # R² — seberapa baik model menjelaskan variansi data
-    # R²=1 sempurna, R²=0 sama dengan prediksi rata-rata, R²<0 lebih buruk dari rata-rata
     r2 = r2_score(y_true, y_pred) if len(y_true) > 1 else 0.0
 
     return {
