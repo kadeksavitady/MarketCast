@@ -274,21 +274,22 @@ def run_and_log_clustering_pipeline(df_clean: pd.DataFrame, feat_df: pd.DataFram
         # Ini taktik jitu memotong bug 'Unable to find a logged_model' akibat delay S3 DagsHub
         mlflow.sklearn.log_model(
             sk_model=scaler, 
-            artifact_path="scaler_model",
-            registered_model_name=REGISTRY_NAME
+            artifact_path="scaler_model"
         )
 
-        # Tarik info versi terbaru yang sukses diamankan server
-        versions = client.get_registered_model(REGISTRY_NAME).latest_versions
-        latest_version = versions[0].version if versions else "1"
+        log.info(f"   Mendaftarkan '{REGISTRY_NAME}' ke gerbang Model Registry...")
+        # 2. Daftarkan secara eksplisit menggunakan URI Run aktif
+        model_uri = f"runs:/{run.info.run_id}/scaler_model"
+        mv = mlflow.register_model(model_uri=model_uri, name=REGISTRY_NAME)
+        log.info(f"   ✓ Model sukses terdaftar sebagai Version {mv.version}")
 
         # Kunci versi terbaru tersebut ke status PRODUCTION untuk kebutuhan API
         client.set_registered_model_alias(
             name=REGISTRY_NAME,
             alias="production",
-            version=latest_version
+            version=mv.version
         )
-        log.info(f"🎉 SUKSES! {REGISTRY_NAME} v{latest_version} resmi mengudara dengan status @production!")
+        log.info(f"🎉 SUKSES! {REGISTRY_NAME} v{mv.version} resmi mengudara dengan status @production!")
         log.info(f"{"=" * 60}\n")
 # ─────────────────────────────────────────────────────────────────────────────
 # MAIN
