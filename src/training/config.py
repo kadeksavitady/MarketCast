@@ -20,13 +20,13 @@ INFRASTRUKTUR DOCKER (docker-compose.yml):
 import os
 import logging
 from dotenv import load_dotenv
-load_dotenv()
 import numpy as np
 import pandas as pd
 from pathlib import Path
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 
-# ─────────────────────────────────────────────────────────────
+load_dotenv()
+
 # KONEKSI DATABASE
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
@@ -50,6 +50,7 @@ _LOCAL_URI   = "http://localhost:5000"
 
 MLFLOW_TRACKING_URI   = os.getenv("MLFLOW_TRACKING_URI",
                                    _DAGSHUB_URI if DAGSHUB_TOKEN else _LOCAL_URI)
+MLFLOW_EXP_CLUSTERING = "MarketCast-Clustering"
 MLFLOW_EXP_TOURNAMENT = "MarketCast-Tournament"
 MLFLOW_EXP_SPECIALIZE = "MarketCast-Specialization"
 
@@ -58,24 +59,11 @@ MLFLOW_EXP_SPECIALIZE = "MarketCast-Specialization"
 _MLFLOW_INITIALIZED = False
 _ACTIVE_URI         = ""
 
-
 def init_mlflow() -> str:
     """
     Inisialisasi koneksi MLflow — idempoten, aman dipanggil berkali-kali.
-
-    KENAPA IDEMPOTEN PENTING:
-        train_all.py memanggil init_mlflow() di run_tournament/run_specialize.
-        Lalu tiap model (train_sarima, train_prophet, train_xgboost) juga
-        memanggil init_mlflow() di dalam fungsinya sendiri.
-        Tanpa flag, dagshub.init() terpanggil 10× per tournament run —
-        menyebabkan re-print "Initialized MLflow..." berulang dan
-        potensi reset credential di tengah jalan.
-
-        Dengan flag _MLFLOW_INITIALIZED: pemanggilan pertama melakukan setup,
-        pemanggilan berikutnya langsung return URI yang sudah aktif.
-
-    Returns:
-        str: URI aktif (DagsHub atau lokal)
+    Karena dengan flag _MLFLOW_INITIALIZED: pemanggilan pertama melakukan setup,
+    pemanggilan berikutnya langsung return URI yang sudah aktif (DagsHub atau lokal)
     """
     global _MLFLOW_INITIALIZED, _ACTIVE_URI
     import mlflow
@@ -98,11 +86,11 @@ def init_mlflow() -> str:
                 mlflow     = True,
             )
             _ACTIVE_URI = _DAGSHUB_URI
-            _log.info(f"MLflow → DagsHub: {_ACTIVE_URI}")
+            _log.info(f"MLflow → DagsHub Terinisialisasi: {_ACTIVE_URI}")
 
         except ImportError:
             _log.warning(
-                "dagshub tidak terinstall. pip install dagshub\n"
+                "dagshub tidak terinstall sehingga perlu pip install dagshub\n"
                 "Fallback ke MLflow lokal."
             )
             _ACTIVE_URI = _LOCAL_URI
@@ -126,14 +114,8 @@ def init_mlflow() -> str:
 # ─────────────────────────────────────────────────────────────
 # PATH — semua relatif terhadap root repo
 # ─────────────────────────────────────────────────────────────
-DIR_CLUSTERING = Path("outputs/clustering")   # output Tahap 0
-DIR_MODELS     = Path("outputs/models")       # model pkl lokal (opsional)
-DIR_REGISTRY   = Path("outputs/registry")     # model_registry_map.yaml
-
-CSV_PREPROCESSED   = DIR_CLUSTERING / "data_preprocessed.csv"
-CSV_CLUSTER_ASSIGN = DIR_CLUSTERING / "cluster_assignments.csv"
-CSV_CENTROID       = DIR_CLUSTERING / "centroid_representatives.csv"
-YAML_MODEL_REGISTRY = DIR_REGISTRY  / "model_registry_map.yaml"
+DIR_OUTPUTS_BASE = Path("outputs")
+YAML_MODEL_REGISTRY = DIR_OUTPUTS_BASE / "registry" / "model_registry_map.yaml"
 
 SATUAN_TO_KG = {
     "kg"        : 1.000,
