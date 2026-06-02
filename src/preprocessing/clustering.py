@@ -13,7 +13,7 @@ from sklearn.preprocessing import MinMaxScaler
 import joblib
 
 import mlflow
-from training.config import init_mlflow
+from src.training.config import init_mlflow
 import mlflow.sklearn
 from mlflow.tracking import MlflowClient
 
