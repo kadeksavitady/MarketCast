@@ -13,6 +13,7 @@ from sklearn.cluster import KMeans
 from sklearn.preprocessing import MinMaxScaler
 import joblib
 
+# Set path root proyek agar import internal tidak hancur
 root_path = str(Path(__file__).resolve().parents[2])
 if root_path not in sys.path:
     sys.path.append(root_path)
@@ -139,45 +140,49 @@ def register_clustering_metadata_to_mlflow(feat_df: pd.DataFrame, X_scaled, scal
     return run.info.run_id
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 3. CLUSTERING
+# 3. RUN PIPELINE OMNIBUS (KONSOLIDASI SINGLE RUN)
 # ─────────────────────────────────────────────────────────────────────────────
-def run_clustering_pipeline(feat_df: pd.DataFrame, k: int):
+def run_and_log_clustering_pipeline(df_clean: pd.DataFrame, feat_df: pd.DataFrame, k: int, mlflow_experiment: str = "MarketCast-Clustering"):
+    """
+    Menjalankan algoritma KMeans secara lokal, mengotomasi penamaan klaster secara dinamis,
+    lalu menyatukan semua pengiriman berkas artefak dan pendaftaran model registry 
+    ke dalam SATU sesi pelacakan tunggal yang aman.
+    """
+    # ── TAHAP 1: EKSEKUSI STATISTIKA KMEANS ──
     cols     = ["cv", "mean_harga", "trend_slope"]
     scaler   = MinMaxScaler()
     X_scaled = scaler.fit_transform(feat_df[cols])
 
     km = KMeans(n_clusters=k, random_state=42, n_init=20).fit(X_scaled)
-    feat_df = feat_df.copy()
-    feat_df["cluster"] = km.labels_
+    feat_final = feat_df.copy()
+    feat_final["cluster"] = km.labels_
 
-    # Cari Centroid
-    feat_df["dist"] = 0.0
+    # Menghitung Jarak Centroid
+    feat_final["dist"] = 0.0
     for cid in range(k):
-        mask  = feat_df["cluster"] == cid
+        mask  = feat_final["cluster"] == cid
         dists = np.linalg.norm(X_scaled[mask] - km.cluster_centers_[cid], axis=1)
-        feat_df.loc[mask, "dist"] = dists
+        feat_final.loc[mask, "dist"] = dists
 
-    feat_df["is_centroid"] = False
+    feat_final["is_centroid"] = False
     for cid in range(k):
-        nearest = feat_df[feat_df["cluster"] == cid]["dist"].idxmin()
-        feat_df.loc[nearest, "is_centroid"] = True
+        nearest = feat_final[feat_final["cluster"] == cid]["dist"].idxmin()
+        feat_final.loc[nearest, "is_centroid"] = True
 
-    # DYNAMIC LABELING (Berdasarkan kondisi nyata data di memori)
-    feat_df["cluster_label"] = ""
-    overall_harga = feat_df["mean_harga"].median()
-    overall_cv    = feat_df["cv"].median()
+    # Pelabelan Dinamis Klaster
+    feat_final["cluster_label"] = ""
+    overall_harga = feat_final["mean_harga"].median()
+    overall_cv    = feat_final["cv"].median()
     
     for cid in range(k):
-        mask = feat_df["cluster"] == cid
-        med_harga = feat_df.loc[mask, "mean_harga"].median()
-        med_cv    = feat_df.loc[mask, "cv"].median()
-        med_slope = feat_df.loc[mask, "trend_slope"].median()
+        mask = feat_final["cluster"] == cid
+        med_harga = feat_final.loc[mask, "mean_harga"].median()
+        med_cv    = feat_final.loc[mask, "cv"].median()
+        med_slope = feat_final.loc[mask, "trend_slope"].median()
         
-        # Logika Bisnis: Bandingkan median cluster dengan median total 43 komoditas
         harga_lbl = "Mahal" if med_harga > overall_harga else "Murah"
         cv_lbl    = "Labil" if med_cv > overall_cv else "Stabil"
         
-        # Logika Tren: Jika tren di atas 1% pertahun (0.01) -> Inflasi
         if med_slope > 0.01:
             tren_lbl = "↑Inflasi"
         elif med_slope < -0.01:
@@ -186,101 +191,105 @@ def run_clustering_pipeline(feat_df: pd.DataFrame, k: int):
             tren_lbl = "→Datar"
             
         label = f"Cluster {cid}: {cv_lbl} & {harga_lbl} ({tren_lbl})"
-        feat_df.loc[mask, "cluster_label"] = label
+        feat_final.loc[mask, "cluster_label"] = label
         log.info(f"  [Auto-Label] {label} (Median Harga: Rp{med_harga:,.0f})")
-    # ── PEMANGGILAN OTOMASI REGISTRY (SISIPKAN DI SINI SEBELUM RETURN) ──
-    try:
-        register_clustering_metadata_to_mlflow(feat_df, X_scaled, scaler)
-    except Exception as e:
-        log.error(f"⚠️ Gagal mengotomasi registry clustering: {e}")
 
-    return feat_df, X_scaled, scaler
+    # ── TAHAP 2: ORKESTRASI LOGGING MLFLOW (SATU PINTU) ──
+    init_mlflow()
+    mlflow.set_experiment(mlflow_experiment)
+    client = MlflowClient()
+    REGISTRY_NAME = "Metadata__Clustering"
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 4. EXPORT EXPORT & MLFLOW LOGGING (TEMPFILE)
-# ─────────────────────────────────────────────────────────────────────────────
-def export_and_log_to_mlflow(df_clean: pd.DataFrame, feat_final: pd.DataFrame,
-                             scaler, uri: str, k: int) -> None:
-    """
-    Export semua file yang dibutuhkan pipeline selanjutnya:
-        2. cluster_assignments.csv     → artifacts mlflow
-        3. centroid_representatives.csv→ artifacts mlflow
-           (CV, mean_harga, trend_slope, cluster per komoditas)
-           ↑ dipakai substitution engine untuk cari komoditas serupa
-    """
-    try:
-        import requests
-        requests.get(uri.rstrip("/") + "/api/2.0/mlflow/experiments/list", timeout=5)
-    except Exception:
-        log.warning(f"⚠️ MLflow tidak dapat dijangkau di {uri} — skip logging")
-        return
+    log.info(f"\n{"=" * 60}")
+    log.info(f"Mulai Orkestrasi Satu Atap ke Experiment: {mlflow_experiment}")
+    log.info(f"{"=" * 60}\n")
 
-    try:
-        import mlflow, dagshub
-        dagshub.init('MarketCast', 'kadeksavitady', mlflow=True)
-        mlflow.set_tracking_uri(uri)
-        mlflow.set_experiment("siskaperbapo-clustering")
+    # Nama Run disesuaikan menjadi KMeans-Final-Orchestration agar terbaca config.py
+    with mlflow.start_run(run_name="KMeans-Final-Orchestration") as run:
+        mlflow.log_param("k", k)
+        mlflow.set_tags({
+            "step": "preprocessing_clustering",
+            "project": "PBL-MarketCast",
+            "type": "production_registry"
+        })
 
-        with mlflow.start_run(run_name="KMeans-Final"):
-            mlflow.log_param("k", k)
+        # Log Ukuran Tiap Cluster
+        for cid in sorted(feat_final["cluster"].unique()):
+            n = (feat_final["cluster"] == cid).sum()
+            mlflow.log_metric(f"cluster_{cid}_size", int(n))
 
-            for cid in sorted(feat_final["cluster"].unique()):
-                n = (feat_final["cluster"] == cid).sum()
-                mlflow.log_metric(f"cluster_{cid}_size", int(n))
+        # Log Metrics Komoditas secara Batching (Optimasi performa pengiriman data)
+        metrics_batch = {}
+        for komoditas, row in feat_final.iterrows():
+            prefix = (komoditas.lower().replace(" ", "_").replace("/", "_").replace("(", "").replace(")", ""))[:30]
+            metrics_batch.update({
+                f"{prefix}__cv"         : round(float(row["cv"]), 6),
+                f"{prefix}__mean_harga" : round(float(row["mean_harga"]), 2),
+                f"{prefix}__trend_slope": round(float(row["trend_slope"]), 6),
+                f"{prefix}__cluster"    : int(row["cluster"]),
+                f"{prefix}__is_centroid": int(row["is_centroid"]),
+            })
+        mlflow.log_metrics(metrics_batch)
 
-            for komoditas, row in feat_final.iterrows():
-                prefix = (komoditas.lower()
-                                   .replace(" ", "_")
-                                   .replace("/", "_")
-                                   .replace("(", "")
-                                   .replace(")", ""))[:30]
-                mlflow.log_metrics({
-                    f"{prefix}__cv"         : round(float(row["cv"]), 6),
-                    f"{prefix}__mean_harga" : round(float(row["mean_harga"]), 2),
-                    f"{prefix}__trend_slope": round(float(row["trend_slope"]), 6),
-                    f"{prefix}__cluster"    : int(row["cluster"]),
-                    f"{prefix}__is_centroid": int(row["is_centroid"]),
-                })
+        # Pembuatan File & Upload Artifacts via Temporary Directory (EPHEMERAL CLEANUP)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
             
-            with tempfile.TemporaryDirectory() as tmpdir:
-                tmp_path = Path(tmpdir)
-                joblib.dump(scaler, tmp_path / "minmax_scaler.joblib")
-                
-                # ── 1. data_preprocessed.csv ─────────────────────────────────────────────
-                df_export = df_clean[["tanggal", "komoditas", "harga_per_kg"]].copy()
-                df_export.to_csv(tmp_path / "data_preprocessed.csv", index=False)
-                
-                # ── 2. cluster_assignments.csv ───────────────────────────────────────────
-                # Export Label sekarang langsung tarik dari kolom data yang udah dinamis!
-                assignments = feat_final[["cluster", "cluster_label"]].copy()
-                assignments.index.name = "komoditas"
-                assignments.to_csv(tmp_path / "cluster_assignments.csv")
-                
-                # ── 3. centroid_representatives.csv ─────────────────────────────────────
-                centroids = feat_final[feat_final["is_centroid"]].index.tolist()
-                pd.DataFrame({"komoditas": centroids}).to_csv(
-                    tmp_path / "centroid_representatives.csv", index=False
-                )
-                
-                # ── 4. cluster_features.csv ──────────────────────────────────────────────
-                feat_export = feat_final[["cv", "mean_harga", "trend_slope",
-                                           "cluster", "cluster_label", "dist", "is_centroid"]].copy()
-                feat_export.index.name = "komoditas"
-                feat_export.to_csv(tmp_path / "cluster_features.csv")
-                
-                # export centroid timeseries
-                for komo in centroids:
-                    slug   = komo.lower().replace(" ", "_")
-                    sub_df = (df_clean[df_clean["komoditas"] == komo]
-                              [["tanggal", "harga_per_kg"]].copy())
-                    sub_df.columns = ["ds", "y"]
-                    sub_df.to_csv(tmp_path / f"ts_centroid_{slug}.csv", index=False)
+            # Dump berkas model jangkar scaler ke memori sementara
+            joblib.dump(scaler, tmp_path / "minmax_scaler.joblib")
+            
+            # 1. data_preprocessed.csv
+            df_export = df_clean[["tanggal", "komoditas", "harga_per_kg"]].copy()
+            df_export.to_csv(tmp_path / "data_preprocessed.csv", index=False)
+            
+            # 2. cluster_assignments.csv
+            assignments = feat_final[["cluster", "cluster_label"]].copy()
+            assignments.index.name = "komoditas"
+            assignments.to_csv(tmp_path / "cluster_assignments.csv")
+            
+            # 3. centroid_representatives.csv
+            centroids = feat_final[feat_final["is_centroid"]].index.tolist()
+            pd.DataFrame({"komoditas": centroids}).to_csv(tmp_path / "centroid_representatives.csv", index=False)
+            
+            # 4. cluster_features.csv
+            feat_export = feat_final[["cv", "mean_harga", "trend_slope", "cluster", "cluster_label", "dist", "is_centroid"]].copy()
+            feat_export.index.name = "komoditas"
+            feat_export.to_csv(tmp_path / "cluster_features.csv")
+            
+            # 5. Centroid Timeseries
+            for komo in centroids:
+                slug = komo.lower().replace(" ", "_")
+                sub_df = df_clean[df_clean["komoditas"] == komo][["tanggal", "harga_per_kg"]].copy()
+                sub_df.columns = ["ds", "y"]
+                sub_df.to_csv(tmp_path / f"ts_centroid_{slug}.csv", index=False)
 
-                mlflow.log_artifacts(tmp_path.as_posix(), artifact_path="clustering_results")
-                log.info("✅ Semua file CSV & Scaler berhasil di-upload ke MLflow")
+            # Kirim seluruh berkas sekaligus ke dalam folder penampung khusus di awan
+            mlflow.log_artifacts(tmp_path.as_posix(), artifact_path="clustering_results")
+            log.info("   ✅ Seluruh file CSV paket klaster berhasil diterbangkan ke DagsHub.")
 
-    except Exception as e:
-        log.error(f"❌ MLflow Error: {e}")
+        # ── TAHAP 3: REGISTRASI MODEL SCALE INLINE TERINTEGRASI ──
+        log.info(f"   Mendaftarkan objek '{REGISTRY_NAME}' ke gerbang Model Registry...")
+        
+        # Mendaftarkan objek model secara langsung menggunakan parameter inline
+        # Ini taktik jitu memotong bug 'Unable to find a logged_model' akibat delay S3 DagsHub
+        mlflow.sklearn.log_model(
+            sk_model=scaler, 
+            artifact_path="scaler_model",
+            registered_model_name=REGISTRY_NAME
+        )
+
+        # Tarik info versi terbaru yang sukses diamankan server
+        versions = client.get_registered_model(REGISTRY_NAME).latest_versions
+        latest_version = versions[0].version if versions else "1"
+
+        # Kunci versi terbaru tersebut ke status PRODUCTION untuk kebutuhan API
+        client.set_registered_model_alias(
+            name=REGISTRY_NAME,
+            alias="production",
+            version=latest_version
+        )
+        log.info(f"🎉 SUKSES! {REGISTRY_NAME} v{latest_version} resmi mengudara dengan status @production!")
+        log.info(f"{"=" * 60}\n")
 # ─────────────────────────────────────────────────────────────────────────────
 # MAIN
 # ─────────────────────────────────────────────────────────────────────────────
@@ -301,10 +310,8 @@ def main():
     engine = get_db_engine()
     df_clean = load_data(engine)
     feat_df  = build_features(df_clean)
-    feat_final, X_scaled, scaler = run_clustering_pipeline(feat_df, args.k)
-
-    # ── Export & MLflow ────────────────────────────────────────────────────────────────
-    export_and_log_to_mlflow(df_clean, feat_final, scaler, args.mlflow_uri, args.k)
+    run_and_log_clustering_pipeline(df_clean, feat_df, args.k)
+    
     engine.dispose()
 
     log.info("=" * 60)
