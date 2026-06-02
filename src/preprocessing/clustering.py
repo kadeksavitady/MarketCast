@@ -137,7 +137,7 @@ def run_and_log_clustering_pipeline(df_clean: pd.DataFrame, feat_df: pd.DataFram
     log.info(f"{"=" * 60}")
 
     # Nama Run disesuaikan menjadi KMeans-Final-Orchestration agar terbaca config.py
-    with mlflow.start_run(run_name="KMeans-Final-Orchestration") as run:
+    with mlflow.start_run(run_name="KMeans-Final") as run:
         mlflow.log_param("k", k)
         mlflow.set_tags({
             "step": "preprocessing_clustering",
@@ -204,25 +204,21 @@ def run_and_log_clustering_pipeline(df_clean: pd.DataFrame, feat_df: pd.DataFram
         
         # Mendaftarkan objek model secara langsung menggunakan parameter inline
         # Ini taktik jitu memotong bug 'Unable to find a logged_model' akibat delay S3 DagsHub
-        mlflow.sklearn.log_model(
-            sk_model=scaler, 
-            artifact_path="scaler_model"
-        )
+    
+        # log.info(f"   Mendaftarkan '{REGISTRY_NAME}' ke gerbang Model Registry...")
+        # # 2. Daftarkan secara eksplisit menggunakan URI Run aktif
+        # model_uri = f"runs:/{run.info.run_id}/scaler_model"
+        # mv = mlflow.register_model(model_uri=model_uri, name=REGISTRY_NAME)
+        # log.info(f"   ✓ Model sukses terdaftar sebagai Version {mv.version}")
 
-        log.info(f"   Mendaftarkan '{REGISTRY_NAME}' ke gerbang Model Registry...")
-        # 2. Daftarkan secara eksplisit menggunakan URI Run aktif
-        model_uri = f"runs:/{run.info.run_id}/scaler_model"
-        mv = mlflow.register_model(model_uri=model_uri, name=REGISTRY_NAME)
-        log.info(f"   ✓ Model sukses terdaftar sebagai Version {mv.version}")
-
-        # Kunci versi terbaru tersebut ke status PRODUCTION untuk kebutuhan API
-        client.set_registered_model_alias(
-            name=REGISTRY_NAME,
-            alias="production",
-            version=mv.version
-        )
-        log.info(f"🎉 SUKSES! {REGISTRY_NAME} v{mv.version} resmi mengudara dengan status @production!")
-        log.info(f"{"=" * 60}\n")
+        # # Kunci versi terbaru tersebut ke status PRODUCTION untuk kebutuhan API
+        # client.set_registered_model_alias(
+        #     name=REGISTRY_NAME,
+        #     alias="production",
+        #     version=mv.version
+        # )
+        # log.info(f"🎉 SUKSES! {REGISTRY_NAME} v{mv.version} resmi mengudara dengan status @production!")
+        # log.info(f"{"=" * 60}\n")
 # ─────────────────────────────────────────────────────────────────────────────
 # MAIN
 # ─────────────────────────────────────────────────────────────────────────────
