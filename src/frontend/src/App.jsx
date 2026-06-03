@@ -4,11 +4,11 @@ import Sidebar from "./components/Sidebar";
 import Topbar from "./components/Topbar";
 import Dashboard from "./pages/Dashboard";
 import TrenHarga from "./pages/TrenHarga";
-import FAQ from "./pages/FAQ";
+import LandingPage from "./pages/LandingPage";
 
-export default function App() {
+// Layout wrapper untuk halaman app (dengan sidebar + topbar)
+function AppShell({ children }) {
   const { collapsed } = useSidebar();
-
   return (
     <div style={{ display: "flex", minHeight: "100vh" }}>
       <Sidebar />
@@ -23,14 +23,21 @@ export default function App() {
         }}
       >
         <Topbar />
-        <div style={{ padding: 28 }}>
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/tren" element={<TrenHarga />} />
-            <Route path="/faq" element={<FAQ />} />
-          </Routes>
-        </div>
+        <div style={{ padding: 28 }}>{children}</div>
       </div>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <Routes>
+      {/* Landing page — tanpa sidebar */}
+      <Route path="/" element={<LandingPage />} />
+
+      {/* App pages — dengan sidebar + topbar */}
+      <Route path="/app"  element={<AppShell><Dashboard /></AppShell>} />
+      <Route path="/tren" element={<AppShell><TrenHarga /></AppShell>} />
+    </Routes>
   );
 }

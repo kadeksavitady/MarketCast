@@ -37,6 +37,12 @@ export const getTren = async (id, hari) => {
   return res.json();
 };
 
+export const getTrenFunFact = async (komoditasId) => {
+  const res = await fetch(`${BASE_URL}/funfact/${komoditasId}`);
+  if (!res.ok) throw new Error(`API Error: ${res.status}`);
+  return res.json();
+};
+
 export const getHealth = async () => {
   const res = await fetch(`${BASE_URL}/health`);
   return res.json();
