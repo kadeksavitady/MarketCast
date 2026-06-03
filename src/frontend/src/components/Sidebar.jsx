@@ -1,14 +1,13 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import { useSidebar } from "../context/SidebarContext";
 import {
-  LayoutDashboard, TrendingUp, HelpCircle,
-  Settings, ShoppingBasket, ChevronRight,
+  LayoutDashboard, TrendingUp, ShoppingBasket, ChevronRight, Home,
 } from "lucide-react";
 
 const navItems = [
+  { id: "/",      icon: Home,            label: "Beranda" },
   { id: "/app",   icon: LayoutDashboard, label: "Dashboard" },
   { id: "/tren",  icon: TrendingUp,      label: "Market Trends" },
-  { id: "/",      icon: HelpCircle,      label: "FAQ & Tentang" },
 ];
 
 export default function Sidebar() {
@@ -73,26 +72,6 @@ export default function Sidebar() {
           </div>
         );
       })}
-
-      {/* Footer */}
-      <div style={{
-        ...s.footer,
-        alignItems: collapsed ? "center" : "flex-start",
-      }}>
-        <div
-          title={collapsed ? "Settings" : ""}
-          style={{
-            ...s.navItem,
-            justifyContent: collapsed ? "center" : "flex-start",
-            padding: collapsed ? "10px 0" : "10px 12px",
-          }}
-        >
-          <Settings size={18} color="rgba(255,255,255,0.4)" />
-          {!collapsed && (
-            <span style={{ marginLeft: 10 }}>Settings</span>
-          )}
-        </div>
-      </div>
     </aside>
   );
 }

@@ -1,168 +1,167 @@
 import { useEffect, useState } from "react";
+import { ShoppingBasket, BrainCircuit, BarChart2, Lightbulb, Check } from "lucide-react";
 
 const STEPS = [
-  { icon: "🛒", label: "Menganalisis keranjang belanja" },
-  { icon: "🧠", label: "Memuat model machine learning" },
-  { icon: "📊", label: "Menghitung prediksi harga" },
-  { icon: "💡", label: "Mengoptimasi rekomendasi substitusi" },
+  { Icon: ShoppingBasket, label: "Menganalisis keranjang belanja"   },
+  { Icon: BrainCircuit,   label: "Memuat model machine learning"    },
+  { Icon: BarChart2,      label: "Menghitung prediksi harga"        },
+  { Icon: Lightbulb,      label: "Mengoptimasi rekomendasi substitusi" },
 ];
 
 export default function PredictLoading() {
   const [currentStep, setCurrentStep] = useState(0);
-  const [progress, setProgress] = useState(5);
+  const [progress,    setProgress]    = useState(4);
 
   useEffect(() => {
-    const stepInterval = setInterval(() => {
-      setCurrentStep((prev) => (prev < STEPS.length - 1 ? prev + 1 : prev));
+    const stepT = setInterval(() => {
+      setCurrentStep((p) => (p < STEPS.length - 1 ? p + 1 : p));
     }, 2800);
 
-    const progressInterval = setInterval(() => {
-      setProgress((prev) => {
-        if (prev < 88) return prev + 0.8;
-        return prev;
-      });
-    }, 120);
+    const progT = setInterval(() => {
+      setProgress((p) => (p < 88 ? p + 0.7 : p));
+    }, 110);
 
-    return () => {
-      clearInterval(stepInterval);
-      clearInterval(progressInterval);
-    };
+    return () => { clearInterval(stepT); clearInterval(progT); };
   }, []);
 
   return (
     <>
       <style>{`
-        @keyframes mc-spin {
-          to { transform: rotate(360deg); }
+        @keyframes pl-fadeup { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:none} }
+        @keyframes pl-dot    {
+          0%,80%,100% { transform:scale(.4); opacity:.3; }
+          40%         { transform:scale(1);  opacity:1;  }
         }
-        @keyframes mc-fadeup {
-          from { opacity: 0; transform: translateY(6px); }
-          to   { opacity: 1; transform: translateY(0); }
+        @keyframes pl-shine  {
+          0%   { background-position:-300px 0; }
+          100% { background-position: 300px 0; }
         }
-        @keyframes mc-dot {
-          0%, 80%, 100% { transform: scale(0.4); opacity: 0.3; }
-          40%            { transform: scale(1);   opacity: 1; }
+        @keyframes pl-pulse-icon {
+          0%,100% { transform: scale(1);    opacity: 1;  }
+          50%     { transform: scale(1.25); opacity: .7; }
         }
-        @keyframes mc-glow {
-          0%, 100% { box-shadow: 0 0 0 0 rgba(27,67,50,0.25); }
-          50%       { box-shadow: 0 0 0 8px rgba(27,67,50,0); }
+        .pl-pulse-icon { animation: pl-pulse-icon 1.2s ease-in-out infinite; }
+        .pl-fadeup     { animation: pl-fadeup .35s ease forwards; }
+        .pl-dot-1      { animation: pl-dot 1.4s ease-in-out 0s   infinite; }
+        .pl-dot-2      { animation: pl-dot 1.4s ease-in-out .2s  infinite; }
+        .pl-dot-3      { animation: pl-dot 1.4s ease-in-out .4s  infinite; }
+        .pl-shine      {
+          background: linear-gradient(90deg,
+            #1B4332 0%, #2d6a4f 30%, #4ade80 50%, #2d6a4f 70%, #1B4332 100%);
+          background-size: 300px 100%;
+          animation: pl-shine 1.8s linear infinite;
         }
-        @keyframes mc-progress-shine {
-          0%   { background-position: -200% center; }
-          100% { background-position: 200% center; }
-        }
-        .mc-spin   { animation: mc-spin 1.1s linear infinite; display: inline-block; }
-        .mc-fadeup { animation: mc-fadeup 0.35s ease forwards; }
-        .mc-dot-1  { animation: mc-dot 1.4s ease-in-out 0s   infinite; }
-        .mc-dot-2  { animation: mc-dot 1.4s ease-in-out 0.2s infinite; }
-        .mc-dot-3  { animation: mc-dot 1.4s ease-in-out 0.4s infinite; }
-        .mc-glow   { animation: mc-glow 2s ease-in-out infinite; }
       `}</style>
 
       <div style={{
-        background: "var(--card-bg)",
-        borderRadius: "var(--radius)",
-        border: "1px solid var(--border)",
-        boxShadow: "var(--shadow-sm)",
+        background: "white", borderRadius: 18,
+        border: "1.5px solid #e8f5e9",
+        boxShadow: "0 2px 12px rgba(27,67,50,.06)",
         overflow: "hidden",
+        fontFamily: "'Plus Jakarta Sans','Segoe UI',system-ui,sans-serif",
       }}>
 
         {/* ── Header ── */}
         <div style={{
           padding: "18px 20px 16px",
-          borderBottom: "1px solid var(--border)",
+          borderBottom: "1px solid #f0fdf4",
           display: "flex", alignItems: "center", gap: 14,
+          background: "linear-gradient(135deg,#1B4332,#2d6a4f)",
         }}>
-          <div className="mc-glow" style={{
-            width: 44, height: 44, borderRadius: 12, flexShrink: 0,
-            background: "linear-gradient(135deg, var(--primary-dark), var(--primary))",
-            display: "flex", alignItems: "center", justifyContent: "center",
-          }}>
-            <span className="mc-spin" style={{ fontSize: 20 }}>⚙️</span>
+          {/* Spinning ring */}
+          <div style={{ position: "relative", flexShrink: 0 }}>
+            <div style={{
+                width:42, height:42, borderRadius:"50%",
+                background:"rgba(255,255,255,.12)",
+                display:"flex", alignItems:"center", justifyContent:"center",
+              }}>
+                <BarChart2 size={20} color="#F9A825" className="pl-pulse-icon" />
+              </div>
           </div>
-          <div>
-            <div style={{ fontSize: 15, fontWeight: 700, color: "var(--text-main)", marginBottom: 3 }}>
+
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 15, fontWeight: 800, color: "white", marginBottom: 4 }}>
               Menghitung Prediksi
             </div>
-            <div style={{ fontSize: 12, color: "var(--text-muted)", display: "flex", alignItems: "center", gap: 5 }}>
+            <div style={{ fontSize: 12, color: "rgba(255,255,255,.6)",
+              display: "flex", alignItems: "center", gap: 5 }}>
               <span>Mohon tunggu</span>
               {[1,2,3].map(i => (
-                <span key={i} className={`mc-dot-${i}`} style={{
-                  width: 5, height: 5, borderRadius: "50%",
-                  background: "var(--primary)", display: "inline-block",
+                <span key={i} className={`pl-dot-${i}`} style={{
+                  width: 4, height: 4, borderRadius: "50%",
+                  background: "#F9A825", display: "inline-block",
                 }} />
               ))}
             </div>
+          </div>
+
+          <div style={{ fontSize: 13, fontWeight: 800, color: "#F9A825" }}>
+            {Math.round(progress)}%
           </div>
         </div>
 
         {/* ── Steps ── */}
         <div style={{ padding: "16px 18px", display: "flex", flexDirection: "column", gap: 8 }}>
-          {STEPS.map((step, i) => {
-            const isDone    = i < currentStep;
-            const isActive  = i === currentStep;
-            const isPending = i > currentStep;
+          {STEPS.map(({ Icon, label }, i) => {
+            const isDone   = i < currentStep;
+            const isActive = i === currentStep;
+            const isPend   = i > currentStep;
 
             return (
               <div key={i}
-                className={isActive ? "mc-fadeup" : ""}
+                className={isActive ? "pl-fadeup" : ""}
                 style={{
                   display: "flex", alignItems: "center", gap: 12,
-                  padding: "10px 14px",
-                  borderRadius: "var(--radius-sm)",
-                  background: isDone
-                    ? "var(--primary-light)"
-                    : isActive
-                      ? "#f0fdf4"
-                      : "var(--bg)",
-                  border: `1.5px solid ${isDone ? "#a7f3d0" : isActive ? "var(--primary)" : "var(--border)"}`,
-                  opacity: isPending ? 0.38 : 1,
-                  transition: "all 0.3s ease",
-                }}
-              >
-                {/* Status indicator */}
-                <div style={{
-                  width: 28, height: 28, borderRadius: "50%", flexShrink: 0,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  background: isDone
-                    ? "var(--primary)"
-                    : isActive
-                      ? "var(--primary-dark)"
-                      : "#e2e8f0",
-                  transition: "background 0.3s ease",
+                  padding: "10px 14px", borderRadius: 12,
+                  background: isDone ? "#f0fdf4" : isActive ? "#f8fdf9" : "#fafafa",
+                  border: `1.5px solid ${isDone ? "#a7f3d0" : isActive ? "#1B4332" : "#f0f0f0"}`,
+                  opacity: isPend ? .35 : 1,
+                  transition: "all .3s ease",
                 }}>
-                  {isDone
-                    ? <span style={{ color: "white", fontSize: 12, fontWeight: 700 }}>✓</span>
-                    : isActive
-                      ? <span className="mc-spin" style={{ fontSize: 14, color: "white", lineHeight: 1 }}>◐</span>
-                      : <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600 }}>{i + 1}</span>
-                  }
+
+                {/* Icon circle */}
+                <div style={{
+                  width: 34, height: 34, borderRadius: 10, flexShrink: 0,
+                  background: isDone ? "#1B4332" : isActive ? "#1B4332" : "#e5e7eb",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  transition: "background .3s",
+                  position: "relative",
+                }}>
+                  {isDone ? (
+                    <Check size={15} color="white" strokeWidth={3} />
+                  ) : isActive ? (
+                    <Icon size={15} color="white" className="pl-pulse-icon" />
+                  ) : (
+                    <Icon size={15} color="#9ca3af" />
+                  )}
                 </div>
 
                 {/* Label */}
                 <div style={{ flex: 1 }}>
-                  <span style={{
-                    fontSize: 13,
-                    fontWeight: isActive ? 700 : isDone ? 600 : 400,
-                    color: isDone
-                      ? "var(--primary-dark)"
-                      : isActive
-                        ? "var(--text-main)"
-                        : "var(--text-muted)",
+                  <div style={{
+                    fontSize: 13, fontWeight: isActive ? 700 : isDone ? 600 : 400,
+                    color: isDone ? "#1B4332" : isActive ? "#1a1a1a" : "#9ca3af",
                   }}>
-                    {step.icon} {step.label}
-                  </span>
-                  {isActive && (
-                    <div style={{ fontSize: 11, color: "var(--primary)", marginTop: 2, fontWeight: 500 }}>
-                      Sedang diproses...
-                    </div>
-                  )}
+                    {label}
+                  </div>
                   {isDone && (
-                    <div style={{ fontSize: 11, color: "var(--primary-dark)", marginTop: 2, opacity: 0.7 }}>
+                    <div style={{ fontSize: 11, color: "#1B4332", opacity: .7, marginTop: 1 }}>
                       Selesai
                     </div>
                   )}
+                  {isActive && (
+                    <div style={{ fontSize: 11, color: "#1B4332", marginTop: 1, fontWeight: 600 }}>
+                      Sedang diproses...
+                    </div>
+                  )}
                 </div>
+
+                {/* Step number */}
+                {isPend && (
+                  <span style={{ fontSize: 11, color: "#9ca3af", fontWeight: 600 }}>
+                    {i + 1}
+                  </span>
+                )}
               </div>
             );
           })}
@@ -170,29 +169,15 @@ export default function PredictLoading() {
 
         {/* ── Progress bar ── */}
         <div style={{ padding: "0 18px 18px" }}>
-          <div style={{
-            display: "flex", justifyContent: "space-between",
-            fontSize: 11, color: "var(--text-muted)", marginBottom: 6,
-          }}>
-            <span>Memproses data</span>
-            <span style={{ fontWeight: 700, color: "var(--primary-dark)" }}>
-              {Math.round(progress)}%
-            </span>
-          </div>
-          <div style={{
-            height: 7, background: "var(--border)",
-            borderRadius: 20, overflow: "hidden",
-          }}>
-            <div style={{
+          <div style={{ height: 6, background: "#f0fdf4", borderRadius: 20, overflow: "hidden",
+            border: "1px solid #e8f5e9" }}>
+            <div className="pl-shine" style={{
               height: "100%", borderRadius: 20,
               width: `${progress}%`,
-              background: "linear-gradient(90deg, var(--primary-dark) 0%, var(--primary) 50%, #4ade80 100%)",
-              backgroundSize: "200% auto",
-              animation: "mc-progress-shine 2s linear infinite",
-              transition: "width 0.12s ease",
+              transition: "width .11s ease",
             }} />
           </div>
-          <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 6, textAlign: "center" }}>
+          <div style={{ fontSize: 11.5, color: "#9ca3af", marginTop: 8, textAlign: "center" }}>
             Model machine learning membutuhkan beberapa saat pada percobaan pertama
           </div>
         </div>
