@@ -63,10 +63,13 @@ from datetime import datetime
 from config import (
     MLFLOW_TRACKING_URI, MLFLOW_EXP_TOURNAMENT, MLFLOW_EXP_SPECIALIZE,
     init_mlflow,
-    YAML_MODEL_REGISTRY, DIR_REGISTRY, CSV_PREPROCESSED,
+    YAML_MODEL_REGISTRY,
     load_cluster_map, load_centroid_list,
     get_logger,
 )
+
+# DIR_REGISTRY didefinisikan lokal — tidak perlu dari config
+DIR_REGISTRY = YAML_MODEL_REGISTRY.parent
 from data_loader import load_preprocessed, load_all_series
 from model_sarima  import train_sarima
 from model_prophet import train_prophet
