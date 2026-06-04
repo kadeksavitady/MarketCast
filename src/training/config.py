@@ -150,16 +150,18 @@ def _download_clustering_artifacts() -> bool:
         # Cari run KMeans-Final terbaru di experiment siskaperbapo-clustering
         target_exp = MLFLOW_EXP_CLUSTERING
         exp = client.get_experiment_by_name(target_exp)
-        if exp is None:
+        runs = []
+        if exp is not None:
+            runs = client.search_runs(
+                    exp.experiment_id,
+                    filter_string="tags.mlflow.runName = \'KMeans-Final\'",
+                    order_by=["attributes.start_time DESC"],
+                    max_results=1,
+                )
+        else:
             _log.warning(f"Experiment '{target_exp}' tidak ditemukan di MLflow")
             return False
-
-        runs = client.search_runs(
-            exp.experiment_id,
-            filter_string="tags.mlflow.runName = \'KMeans-Final\'",
-            order_by=["attributes.start_time DESC"],
-            max_results=1,
-        )
+        
         if not runs:
             _log.warning("Tidak ada run KMeans-Final di MLflow")
             return False
