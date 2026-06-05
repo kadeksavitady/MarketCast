@@ -511,7 +511,8 @@ def train_prophet(
  
         log.info(f"\n  ── Agregat Weighted ──")
         log.info(f"  WMAPE={wmape:.2f}% | WSMAPE={wsmape:.2f}% | "
-                 f"WMAE={wmae:,.0f} | WRMSE={wrmse:,.0f}")
+                 f" WMAE={wmae:,.0f} | WRMSE={wrmse:,.0f} | "
+                 f"WMDA={wmda:.2f}")
  
         # ── Refit model final di full series ──────────────────
         log.info(f"\n  Refit final di full series ({len(series_full)} hari) "
