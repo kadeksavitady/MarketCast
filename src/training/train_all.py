@@ -103,8 +103,7 @@ def _register_to_mlflow_registry(model_uri: str, reg_name: str, alias_name: str,
     except Exception:
         log.info(f"  Registered model '{reg_name}' sudah ada, skip create.")
     
-    # 2. Buat versi baru langsung dari source artifact 
-    #    yang sesuai dengan source dalam format DagsHub
+    # 2. Buat versi baru langsung dari source artifact yang sesuai dengan source dalam format DagsHub
     run_id        = model_uri.split("/")[1]
     artifact_path = "/".join(model_uri.split("/")[2:])
     run_info   = client.get_run(run_id)
@@ -162,7 +161,6 @@ def run_tournament(models: list, komoditas_list: list,
     init_mlflow()
  
     TRAINING_MODE = "tournament"   # ← deklarasi eksplisit di sini
- 
     results  = []
     n_total  = len(models) * len(komoditas_list)
     n_done   = 0
@@ -196,10 +194,10 @@ def run_tournament(models: list, komoditas_list: list,
                 results.append(result)
                 m = result["metrics"]
                 log.info(
-                    f"  ✓ MAE={m['mae']:>10,.0f}  "
-                    f"MAPE={m['mape']:>6.2f}%  "
-                    f"SMAPE={m['smape']:>6.2f}%  "
-                    f"R²={m.get('r2', 0):>6.4f}"
+                    f"  ✓ MAPE={m['mape']:>6.2f}%  "
+                    f"MDA={m.get('mda', 0):>6.2f}%  "
+                    f"RMSE={m['rmse']:>8,.0f}  "
+                    f"MAE={m['mae']:>8,.0f}"
                 )
             except Exception as e:
                 n_failed += 1
@@ -294,7 +292,7 @@ def _print_tournament_leaderboard(results: list):
     log.info(f"\n{lb.to_string(index=False)}")
     log.info("\n── Best model per cluster ────────────────────────────────")
     best = lb.loc[lb.groupby("cluster")["mape"].idxmin()]
-    cols = [c for c in ['cluster','model','mape','smape','r2'] if c in best.columns]
+    cols = [c for c in ['cluster','model','mape','mda','rmse','mae'] if c in best.columns]
     log.info(f"\n{best[cols].to_string(index=False)}")
  
  
@@ -420,7 +418,7 @@ def run_specialize(champion_map: dict, all_data: dict,
             f"PERINGATAN: {len(empty_uris)} komoditas punya model_uri kosong: "
             f"{empty_uris}\nFastAPI AKAN crash saat load model ini."
         )
- 
+
     _save_registry(registry)
  
     log.info(f"\n{'='*65}")
@@ -465,7 +463,6 @@ def _save_registry(registry: dict):
         log.warning(f"Upload registry ke MLflow gagal (tidak kritis): {e}")
 
     log.info(f"Total komoditas terdaftar: {len(registry)}")
- 
  
 # ══════════════════════════════════════════════════════════════
 # MAIN
