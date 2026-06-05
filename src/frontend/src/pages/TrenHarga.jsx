@@ -442,9 +442,49 @@ return (
                     <p style={{ fontSize: 14, color: "rgba(255,255,255,.92)", lineHeight: 1.65, fontWeight: 500, marginBottom: 14, textAlign: "justify", padding: "0 4px" }}>
                       {funFact.teks_fun_fact || funFact.funfact || funFact.fun_fact || funFact.deskripsi || "Data menarik untuk komoditas ini sedang tidak tersedia."}
                     </p>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "rgba(255,255,255,.45)" }}>
-                      <span style={{ fontWeight: 600, color: "rgba(255,255,255,0.7)" }}>
-                      {funFact.label_cerdas_ml || "Surabaya"}</span>
+                    
+                    {/* Kumpulan Badge Label ML*/}
+                    <div style={{ 
+                      display: "flex", 
+                      flexWrap: "wrap", 
+                      justifyContent: "center", /* Ini yang bikin rata tengah */
+                      gap: "15px", /* Ini yang mengatur jarak antar kotak */
+                      marginTop: "12px", 
+                      marginBottom: "4px",
+                      width: "100%" 
+                    }}>
+                      {funFact.label_cerdas_ml ? (
+                        funFact.label_cerdas_ml.split(" · ").map((kata, index) => (
+                          <div key={index} style={{ 
+                            display: "inline-flex", 
+                            alignItems: "center", 
+                            fontSize: "12px", 
+                            padding: "6px 14px", /* Padding sedikit diperbesar biar lega */
+                            border: "1px solid #C4A46C", 
+                            borderRadius: "20px", 
+                            backgroundColor: "rgba(196, 164, 108, 0.05)",
+                            color: "#C4A46C",
+                            fontWeight: "700",
+                            letterSpacing: "0.5px"
+                          }}>
+                            {kata}
+                          </div>
+                        ))
+                      ) : (
+                        <div style={{ 
+                          display: "inline-flex", 
+                          alignItems: "center", 
+                          fontSize: "12px", 
+                          padding: "6px 14px",
+                          border: "1px solid #C4A46C", 
+                          borderRadius: "20px", 
+                          backgroundColor: "rgba(196, 164, 108, 0.05)",
+                          color: "#C4A46C",
+                          fontWeight: "700"
+                        }}>
+                          Surabaya
+                        </div>
+                      )}
                     </div>
                   </div>
                 ) : null}
