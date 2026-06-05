@@ -547,7 +547,8 @@ def train_prophet(
         plt.close(fig_comp)
         mlflow.log_artifact(comp_path, artifact_path="plots")
         
-        mlflow.prophet.log_model(final_model, artifact_path="model")
+        safe_name = komoditas.replace(" ", "_").replace("/", "_")
+        mlflow.prophet.log_model(final_model, name=f"Prophet_{safe_name}")
 
         run_id    = parent_run.info.run_id
         model_uri  = f"runs:/{run_id}/model"
