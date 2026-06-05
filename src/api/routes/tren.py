@@ -120,7 +120,7 @@ def get_fun_fact(komoditas_id: str):
         arah_tren = "cenderung datar tanpa pergerakan yang berarti"
     
     kalimat_fun_fact = (
-        f"💡 Info Pasar: Saat ini, rata-rata harga wajar untuk {nama_asli} berada di kisaran Rp{mean_harga:,.0f} per {satuan_barang}. "
+        f"Saat ini, rata-rata harga wajar untuk {nama_asli} berada di kisaran Rp{mean_harga:,.0f} per {satuan_barang}. "
         f"Berdasarkan catatan historis, harga komoditas ini {karakter_cv}. Untuk saat ini, pergerakannya di pasar {arah_tren}."
     )
     
