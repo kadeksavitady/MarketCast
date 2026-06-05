@@ -32,7 +32,7 @@ export default function Sidebar() {
         }}
       >
         <div style={s.logoIcon}>
-          <ShoppingBasket size={18} color="white" />
+          <img src="/logo-white.svg" style={{ width:42, height:42 }} alt="MarketCast" />
         </div>
         {!collapsed && (
           <div style={{ overflow: "hidden" }}>

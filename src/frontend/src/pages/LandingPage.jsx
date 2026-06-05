@@ -141,7 +141,7 @@ export default function LandingPage() {
           font-size:14px;font-weight:600;cursor:pointer;
           padding:5px 0;border-bottom:2px solid transparent;
           background:none;border-top:none;border-left:none;border-right:none;
-          font-family:inherit;transition:all .2s;
+          font-family:inherit;transition:all .2s,white-space:nowrap;
         }
 
         .lp-feature-card {
@@ -184,21 +184,32 @@ export default function LandingPage() {
 
       {/* ─── NAVBAR ─── */}
       <nav style={{
-        position:"fixed",top:0,left:0,right:0,zIndex:1000,height:68,
-        padding:"0 6%",display:"flex",alignItems:"center",justifyContent:"space-between",
+        position:"fixed",top:0,left:0,right:0,zIndex:1000,height:76,
+        padding:"0 3%",display:"flex",alignItems:"center",justifyContent:"space-between",
         background:navBg,backdropFilter:navBlur,boxShadow:navShad,transition:"all .35s",
       }}>
-        <div style={{ display:"flex",alignItems:"center",gap:10,cursor:"pointer" }} onClick={() => goTo("hero")}>
-          <div style={{ width:36,height:36,borderRadius:9,background:"linear-gradient(135deg,#1B4332,#2d6a4f)",display:"flex",alignItems:"center",justifyContent:"center" }}>
-            <ShoppingBasket size={17} color="#C8A96E" />
-          </div>
-          <div>
-            <div style={{ fontSize:16,fontWeight:900,color:over?"#1B4332":"white",lineHeight:1.1,transition:"color .35s" }}>MarketCast</div>
-            <div style={{ fontSize:10,color:over?"#9ca3af":"rgba(255,255,255,.45)",fontWeight:500,transition:"color .35s" }}>Kota Surabaya</div>
+        <div style={{ display:"flex",alignItems:"center",gap:5,cursor:"pointer",flexShrink:0 }} onClick={() => goTo("hero")}>
+            <img
+              src={scrolled ? "/logo.svg" : "/logo-white.svg"}
+              style={{ width: 80, height: 80, objectFit: "contain", transition: "opacity 0.3s ease" }}
+              alt="MarketCast"
+            />
+          <div style={{ fontSize:25, fontWeight:900, lineHeight:1, letterSpacing:"-.3px" }}>
+            {scrolled ? (
+              <>
+                <span style={{ color:"#1B4332", transition:"color .35s" }}>Market</span>
+                <span style={{ color:"#C8A96E", transition:"color .35s" }}>Cast</span>
+              </>
+            ) : (
+              <span style={{ color:"white", transition:"color .35s" }}>MarketCast</span>
+            )}
           </div>
         </div>
 
-        <div className="lp-hide-m" style={{ display:"flex",alignItems:"center",gap:30 }}>
+        <div className="lp-hide-m" style={{ 
+          display: "flex", alignItems: "center", gap: 30,
+          flexGrow: 1, justifyContent: "center", padding: "0 20px" 
+          }}>
           {NAV.map(n => (
             <button key={n.id} className="lp-navbtn"
               style={{ color:navText }}
@@ -335,10 +346,10 @@ export default function LandingPage() {
             <div style={{ fontSize:12,fontWeight:800,color:"#C8A96E",textTransform:"uppercase",letterSpacing:"3px",marginBottom:16 }}>Tentang MarketCast</div>
             <h2 style={{ fontSize:"clamp(24px,2.8vw,38px)",fontWeight:900,color:"#1C1917",marginBottom:20,lineHeight:1.25,letterSpacing:"-.4px" }}>Dibangun untuk Masyarakat Surabaya</h2>
             <p style={{ fontSize:15.5,color:"#6B5E52",lineHeight:1.82,marginBottom:20 }}>
-              MarketCast dikembangkan sebagai proyek berbasis pembelajaran di EEPIS Surabaya. Platform ini menggunakan machine learning untuk memprediksi harga 43 komoditas — membantu ibu rumah tangga, pengelola warung, hingga pedagang kecil merencanakan belanja lebih akurat.
+              MarketCast dikembangkan sebagai platform analitik digital yang memanfaatkan teknologi machine learning untuk memprediksi harga 43 komoditas pangan. Kehadiran platform ini dirancang untuk membantu ibu rumah tangga, pengelola warung, hingga pedagang kecil dalam merencanakan anggaran belanja secara lebih akurat dan terukur.
             </p>
             <p style={{ fontSize:15.5,color:"#6B5E52",lineHeight:1.82,marginBottom:32 }}>
-              Data diambil langsung dari Siskaperbapo Kota Surabaya dan diperbarui setiap hari, sehingga prediksi selalu relevan dengan kondisi pasar terkini.
+              Seluruh data harga diambil langsung dari Siskaperbapo Kota Surabaya dan diperbarui setiap hari, sehingga hasil prediksi yang disajikan selalu relevan dengan kondisi riil di pasar terkini.
             </p>
             <div style={{ display:"flex",flexDirection:"column",gap:14,marginBottom:36 }}>
               {[
@@ -458,13 +469,15 @@ export default function LandingPage() {
       <footer style={{ background:"#0F1A14",color:"rgba(255,255,255,.55)",padding:"52px 6% 28px" }}>
         <div className="lp-3col" style={{ display:"grid",gridTemplateColumns:"2fr 1fr 1fr",gap:52,maxWidth:1100,margin:"0 auto 40px" }}>
           <div>
-            <div style={{ display:"flex",alignItems:"center",gap:10,marginBottom:18 }}>
-              <div style={{ width:38,height:38,borderRadius:10,background:"linear-gradient(135deg,#1B4332,#2d6a4f)",display:"flex",alignItems:"center",justifyContent:"center" }}>
-                <ShoppingBasket size={18} color="#C8A96E" />
-              </div>
+            <div style={{ display:"flex",alignItems:"center",gap:5,marginBottom:9 }}>
+              <img
+                src="/logo-white.svg"
+                style={{ width: 80, height: 80, objectFit: "contain", transition: "opacity 0.3s ease" }}
+                alt="MarketCast"
+              />
               <div>
                 <div style={{ fontSize:17,fontWeight:900,color:"white" }}>MarketCast</div>
-                <div style={{ fontSize:10,color:"rgba(255,255,255,.25)" }}>Kota Surabaya</div>
+                <div style={{ fontSize:10,color:"rgba(255,255,255,.25)" }}>Platform Prediksi Harga Pangan</div>
               </div>
             </div>
             <p style={{ fontSize:13.5,lineHeight:1.8,maxWidth:300 }}>Platform prediksi harga bahan pangan berbasis machine learning untuk masyarakat Kota Surabaya.</p>
