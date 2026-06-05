@@ -126,7 +126,7 @@ def get_fun_fact(komoditas_id: str):
 
     # MEMBERSIHKAN LABEL CLUSTER
     raw_label = info_komoditas.get("cluster_label", "")
-    clean_label = raw_label.split(": ")[-1].replace(" & ", " · ").replace(" (", " · ").replace(")", "").replace("↑", "").replace("↓", "")
+    clean_label = raw_label.split(": ")[-1].replace(" & ", " · ").replace(" (", " · ").replace(")", "").replace("↑", "").replace("↓", "").replace("→", "")
 
     return {
         "komoditas": nama_asli,
