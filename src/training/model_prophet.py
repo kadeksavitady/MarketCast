@@ -565,8 +565,7 @@ def train_prophet(
         if tune_params:
             mlflow.log_params({f"tuning_{k}": v for k, v in tune_params.items()})
  
-    log.info(f"\n[{MODEL_NAME}] {komoditas} selesai. "
-             f"WMAPE={wmape:.2f}% | run_id={run_id[:8] if run_id else 'N/A'}...")
+    log.info(f"\n[{MODEL_NAME}] {komoditas} selesai. run_id={run_id[:8] if run_id else 'N/A'}...")
     
     return {
         "komoditas"      : komoditas,
