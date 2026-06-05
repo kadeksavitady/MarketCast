@@ -550,7 +550,10 @@ def train_sarima(
         for attempt in range(3):
             try:
                 safe_name = komoditas.replace(" ", "_").replace("/", "_")
-                mlflow.sklearn.log_model(final_model, name=f"SARIMA_{safe_name}")
+                mlflow.sklearn.log_model(
+                    sk_model=final_model,
+                    artifact_path=f"SARIMA_{safe_name}",
+                )
                 log.info(f"  Model artifact ter-upload (attempt {attempt+1})")
                 break
             except Exception as e:
