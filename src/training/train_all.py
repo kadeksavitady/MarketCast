@@ -63,17 +63,18 @@ from datetime import datetime
 from config import (
     MLFLOW_TRACKING_URI, MLFLOW_EXP_TOURNAMENT, MLFLOW_EXP_SPECIALIZE,
     init_mlflow,
-    YAML_MODEL_REGISTRY, DIR_REGISTRY, CSV_PREPROCESSED,
+    YAML_MODEL_REGISTRY,
     load_cluster_map, load_centroid_list,
-    CLUSTER_SHORT_TO_FULL, get_logger,
+    get_logger,
 )
+
+# DIR_REGISTRY didefinisikan lokal — tidak perlu dari config
+DIR_REGISTRY = YAML_MODEL_REGISTRY.parent
 from data_loader import load_preprocessed, load_all_series
 from model_sarima  import train_sarima
 from model_prophet import train_prophet
 from model_xgboost import train_xgboost
 import dagshub
- 
-dagshub.init(repo_owner='kadeksavitady', repo_name='MarketCast', mlflow=True)
  
 log = get_logger("train_all")
  
@@ -82,25 +83,57 @@ MODEL_REGISTRY = {
     "prophet" : train_prophet,
     "xgboost" : train_xgboost,
 }
- 
- 
+
 # ══════════════════════════════════════════════════════════════
-# HELPER: pemanggilan model dengan training_mode
+# HELPER: Pendaftaran Model ke MLflow Registry
 # ══════════════════════════════════════════════════════════════
- 
+def _register_to_mlflow_registry(model_uri: str, reg_name: str, alias_name: str, client) -> tuple:
+    """
+    Register model ke MLflow Model Registry.
+    Pakai create_registered_model + create_model_version (API lama)
+    karena DagHub tidak support MLflow 3.x logged-models API.
+    """
+    import mlflow
+    log.info(f"  Mendaftarkan ke DagsHub Registry sebagai '{reg_name}@{alias_name}'...")
+    
+    # 1. Pastikan registered model sudah ada (buat kalau belum)
+    try:
+        client.create_registered_model(reg_name)
+        log.info(f"  Registered model '{reg_name}' dibuat baru.")
+    except Exception:
+        log.info(f"  Registered model '{reg_name}' sudah ada, skip create.")
+    
+    # 2. Buat versi baru langsung dari source artifact yang sesuai dengan source dalam format DagsHub
+    run_id        = model_uri.split("/")[1]
+    artifact_path = "/".join(model_uri.split("/")[2:])
+    run_info   = client.get_run(run_id)
+    artifact_uri = run_info.info.artifact_uri
+    source       = f"{artifact_uri}/{artifact_path}"
+    
+    mv = client.create_model_version(
+        name   = reg_name,
+        source = source,
+        run_id = run_id,
+    )
+    log.info(f"  Model version {mv.version} dibuat dari source: {source}")
+    
+    # 3. Set alias
+    if alias_name:
+        client.set_registered_model_alias(
+            name    = reg_name,
+            alias   = alias_name,
+            version = mv.version,
+        )
+        log.info(f"  ✓ Alias @{alias_name} di-set ke version {mv.version}")
+    return reg_name, mv.version
+
+# ══════════════════════════════════════════════════════════════
+# HELPER: Pemanggilan Model dengan Arsitektur Unified Interface
+# ══════════════════════════════════════════════════════════════
 def _call_model(model_name: str, komoditas: str, data: dict,
                 mlflow_experiment: str, training_mode: str) -> dict:
     """
     Wrapper pemanggilan model yang meneruskan training_mode.
- 
-    KENAPA wrapper ini diperlukan:
-        Tidak semua model punya parameter training_mode — hanya SARIMA.
-        Prophet dan XGBoost tidak mengenal parameter ini.
-        Solusi: SARIMA menerima training_mode secara eksplisit.
-        Prophet/XGBoost signature-nya tidak berubah sama sekali.
- 
-        Dengan wrapper ini, train_all.py tidak perlu if/else per model —
-        cukup satu titik panggilan yang bersih.
  
     training_mode:
         "tournament"  → SARIMA pakai auto_arima (AIC stepwise)
@@ -108,39 +141,46 @@ def _call_model(model_name: str, komoditas: str, data: dict,
         (diabaikan oleh Prophet dan XGBoost)
     """
     fn = MODEL_REGISTRY[model_name]
- 
-    if model_name == "sarima":
-        # SARIMA menerima mode= secara eksplisit
-        return fn(
-            komoditas,
-            data,
-            mlflow_experiment=mlflow_experiment,
-            mode=training_mode,           # ← ini yang sebelumnya tidak pernah di-pass
-        )
-    else:
-        # Prophet dan XGBoost: interface tidak berubah
-        return fn(
-            komoditas,
-            data,
-            mlflow_experiment=mlflow_experiment,
-        )
- 
+    return fn(
+        komoditas,
+        data,
+        mlflow_experiment=mlflow_experiment,
+        mode=training_mode,
+    )
+
+def _select_champion_ranksum(df_res: pd.DataFrame) -> pd.DataFrame:
+    """
+    Rank-Sum Method untuk memilih champion per cluster.
+    """
+    results = []
+    
+    for cluster, group in df_res.groupby("cluster"):
+        g = group.copy()
+        
+        # Rank per metrik (method='min' = ties dapat rank sama)
+        g["rank_mape"] = g["metric_mape"].rank(ascending=True,  method="min")
+        g["rank_mda"]  = g["metric_mda"].rank( ascending=False, method="min")
+        g["rank_rmse"] = g["metric_rmse"].rank(ascending=True,  method="min")
+        
+        # Total rank — semakin kecil semakin baik
+        g["rank_total"] = g["rank_mape"] + g["rank_mda"] + g["rank_rmse"]
+        
+        results.append(g)
+    
+    return pd.concat(results)
  
 # ══════════════════════════════════════════════════════════════
-# TAHAP 2 — TURNAMEN BASELINE
+# TAHAP 2 — training_mode="tournament"
 # ══════════════════════════════════════════════════════════════
- 
 def run_tournament(models: list, komoditas_list: list,
                    all_data: dict, cluster_map: dict) -> list:
     """
     3 centroid × 3 model = 9 runs.
-    training_mode="tournament" → SARIMA pakai auto_arima.
     """
     import mlflow
     init_mlflow()
  
     TRAINING_MODE = "tournament"   # ← deklarasi eksplisit di sini
- 
     results  = []
     n_total  = len(models) * len(komoditas_list)
     n_done   = 0
@@ -149,7 +189,6 @@ def run_tournament(models: list, komoditas_list: list,
     log.info("=" * 65)
     log.info("  TAHAP 2 — TURNAMEN BASELINE MODEL")
     log.info(f"  {len(models)} model × {len(komoditas_list)} centroid = {n_total} runs")
-    log.info(f"  SARIMA mode : auto_arima (AIC stepwise)")
     log.info(f"  Experiment  : {MLFLOW_EXP_TOURNAMENT}")
     log.info(f"  MLflow      : {MLFLOW_TRACKING_URI}")
     log.info("=" * 65)
@@ -175,9 +214,10 @@ def run_tournament(models: list, komoditas_list: list,
                 results.append(result)
                 m = result["metrics"]
                 log.info(
-                    f"  ✓ MAE={m['mae']:>10,.0f}  "
-                    f"MAPE={m['mape']:>6.2f}%  "
-                    f"SMAPE={m['smape']:>6.2f}%"
+                    f"  ✓ MAPE={m['mape']:>6.2f}%  "
+                    f"MDA={m.get('mda', 0):>6.2f}%  "
+                    f"RMSE={m['rmse']:>8,.0f}  "
+                    f"MAE={m['mae']:>8,.0f}"
                 )
             except Exception as e:
                 n_failed += 1
@@ -185,11 +225,111 @@ def run_tournament(models: list, komoditas_list: list,
                 log.debug(traceback.format_exc())
  
     _print_tournament_leaderboard(results)
+    
+    # ══════════════════════════════════════════════════════════════
+    # LOGIKA AUTO-REGISTRY — SEMUA MODEL + @champion untuk juara
+    # ══════════════════════════════════════════════════════════════
+    from mlflow.tracking import MlflowClient
+    client = MlflowClient()
+
+    TARGET_METRIC = "mape"
+
+    log.info(f"\n  ── AUTO-REGISTER SEMUA MODEL + CHAMPION ──")
+
+    df_res = pd.DataFrame([
+        {
+            "cluster"    : r["data"]["cluster"],
+            "model_name" : r["model_name"],
+            "model_uri"  : r["model_uri"],
+            "metric_mape": r["metrics"]["mape"],
+            "metric_mda" : r["metrics"].get("mda", 0.0),
+            "metric_rmse": r["metrics"]["rmse"],
+        } for r in results
+        if r.get("model_uri", "")
+    ])
+    df_res = df_res[df_res["model_uri"].str.len() > 0]
+
+    if df_res.empty:
+        log.error("Semua model_uri kosong — tidak ada yang bisa diregister.")
+    else:
+        # ── RANK-SUM METHOD untuk pilih champion ─────────────────────────
+        # Referensi: Makridakis et al. (2000) M3-Competition;
+        #            Hyndman & Koehler (2006), IJF.
+        df_ranked_list = []
+        for cluster, group in df_res.groupby("cluster"):
+            g = group.copy()
+            g["rank_mape"] = g["metric_mape"].rank(ascending=True,  method="min")
+            g["rank_mda"]  = g["metric_mda"].rank( ascending=False, method="min")
+            g["rank_rmse"] = g["metric_rmse"].rank(ascending=True,  method="min")
+            g["rank_total"] = g["rank_mape"] + g["rank_mda"] + g["rank_rmse"]
+            df_ranked_list.append(g)
+        df_ranked = pd.concat(df_ranked_list)
+
+        # Log rank-sum leaderboard per cluster
+        log.info("\n  ── RANK-SUM LEADERBOARD ──")
+        for cluster, group in df_ranked.groupby("cluster"):
+            group_sorted = group.sort_values("rank_total")
+            min_rank     = group_sorted["rank_total"].min()
+            log.info(f"\n  {cluster}:")
+            for _, row in group_sorted.iterrows():
+                log.info(
+                    f"    {row['model_name'].upper():10s} | "
+                    f"MAPE={row['metric_mape']:6.2f}% (r{int(row['rank_mape'])}) | "
+                    f"MDA={row['metric_mda']:5.1f}% (r{int(row['rank_mda'])}) | "
+                    f"RMSE={row['metric_rmse']:8.0f} (r{int(row['rank_rmse'])}) | "
+                    f"Total={int(row['rank_total'])}"
+                    + (" ← @champion" if row["rank_total"] == min_rank else "")
+                )
+
+        # Tentukan champion per cluster (rank_total terkecil)
+        best_idx = df_ranked.groupby("cluster")["rank_total"].idxmin()
+
+        # Mapping cluster string → nama registry
+        def cluster_to_reg_name(cluster_str: str) -> str:
+            try:
+                num = int(cluster_str[1])   # "C0_..." → 0
+                return f"cluster {num + 1}" # 0→"cluster 1", dst
+            except (IndexError, ValueError):
+                return cluster_str
+
+        # Register SEMUA model — juara dapat @champion, lainnya tidak
+        for idx, row in df_ranked.iterrows():
+            cluster_str = row["cluster"]
+            model_name  = row["model_name"]
+            model_uri   = row["model_uri"]
+            is_champion = idx in best_idx.values
+
+            reg_name = cluster_to_reg_name(cluster_str)
+            alias    = "champion" if is_champion else None
+
+            log.info(
+                f"  Register: {model_name.upper()} → '{reg_name}' "
+                f"(rank_total={int(row['rank_total'])} | "
+                f"MAPE={row['metric_mape']:.2f}% | "
+                f"MDA={row['metric_mda']:.1f}% | "
+                f"RMSE={row['metric_rmse']:.0f})"
+                + (" ← @champion" if is_champion else "")
+            )
+
+            try:
+                reg_n, version = _register_to_mlflow_registry(
+                    model_uri  = model_uri,
+                    reg_name   = reg_name,
+                    alias_name = alias,
+                    client     = client,
+                )
+                log.info(
+                    f"  ✓ Registry: {reg_n} v{version}"
+                    + (f" @champion" if alias else "")
+                )
+            except Exception as e:
+                log.error(f"  ✗ Gagal register {model_name} ke {reg_name}: {e}")
+        
     log.info(f"\n✓ Tournament: {len(results)}/{n_total} runs | {n_failed} gagal")
+    log.info(f"  → Juara berhasil diregister dengan alias @champion")
     log.info(f"  → Buka MLflow UI: {MLFLOW_TRACKING_URI}")
-    log.info(f"  → Pilih juara per cluster, lalu jalankan --mode specialize")
+    log.info(f"  → Lanjut jalankan: python src/training/train_all.py --mode specialize")
     return results
- 
  
 def _print_tournament_leaderboard(results: list):
     if not results:
@@ -203,29 +343,23 @@ def _print_tournament_leaderboard(results: list):
     log.info(f"\n{lb.to_string(index=False)}")
     log.info("\n── Best model per cluster ────────────────────────────────")
     best = lb.loc[lb.groupby("cluster")["mape"].idxmin()]
-    log.info(f"\n{best[['cluster','model','mape','smape']].to_string(index=False)}")
+    cols = [c for c in ['cluster','model','mape','mda','rmse','mae'] if c in best.columns]
+    log.info(f"\n{best[cols].to_string(index=False)}")
  
  
 # ══════════════════════════════════════════════════════════════
-# TAHAP 3a — SPESIALISASI
+# TAHAP 3a — training_mode="specialize"
 # ══════════════════════════════════════════════════════════════
- 
 def run_specialize(champion_map: dict, all_data: dict,
                    cluster_map: dict) -> dict:
     """
     Training SEMUA komoditas (centroid + non-centroid) dengan model champion.
-    training_mode="specialize" → SARIMA pakai GridSearch 36 kombinasi + prior.
- 
-    KENAPA centroid juga di-retrain di sini:
-        Centroid yang di-train di Tournament punya model_uri valid,
-        tapi mode-nya "tournament" (auto_arima).
-        Di Specialize, centroid di-retrain dengan mode="specialize"
-        (GridSearch) sehingga semua komoditas — termasuk centroid —
-        punya model yang lebih optimal untuk production serving.
     """
     import mlflow
+    from mlflow.tracking import MlflowClient
     init_mlflow()
  
+    client = MlflowClient()
     TRAINING_MODE = "specialize"   # ← deklarasi eksplisit di sini
  
     centroid_list   = load_centroid_list()
@@ -235,7 +369,6 @@ def run_specialize(champion_map: dict, all_data: dict,
     log.info("=" * 65)
     log.info("  TAHAP 3a — SPESIALISASI")
     log.info(f"  {len(full_train_list)} komoditas total (centroid + non-centroid)")
-    log.info(f"  SARIMA mode : GridSearch 36 kombinasi + prior knowledge cluster")
     log.info(f"  Champion map: {champion_map}")
     log.info(f"  Experiment  : {MLFLOW_EXP_SPECIALIZE}")
     log.info("=" * 65)
@@ -287,7 +420,22 @@ def run_specialize(champion_map: dict, all_data: dict,
                 )
                 n_failed += 1
                 continue
- 
+
+            # Map nama model agar kapitalisasinya sesuai dengan gambar (SARIMA, XGBoost, Prophet)
+            model_map = {"sarima": "SARIMA", "xgboost": "XGBoost", "prophet": "Prophet"}
+            proper_model_name = model_map.get(model_name.lower(), model_name.upper())
+            
+            # Format reg_name sesuai gambar: ModelName_Nama Komoditas Asli (spasi tetap dipertahankan)
+            reg_name = f"{proper_model_name}_{komoditas}"
+
+            # ── Panggil Fungsi Helper Registry ──
+            _, mv_version = _register_to_mlflow_registry(
+                model_uri=model_uri, 
+                reg_name=reg_name, 
+                alias_name="production", 
+                client=client
+            )
+
             registry[komoditas] = {
                 "cluster"      : cluster_short,
                 "model"        : model_name,
@@ -296,8 +444,10 @@ def run_specialize(champion_map: dict, all_data: dict,
                 "mape"         : result["metrics"]["mape"],
                 "mae"          : result["metrics"]["mae"],
                 "is_centroid"  : is_centroid,
+                "registry_name" : reg_name,    # ── Menyimpan nama registry untuk backup
+                "version"       : mv_version, # ── Menyimpan versi model
             }
-            log.info(f"  ✓ MAPE={result['metrics']['mape']:.2f}%  uri={model_uri}")
+            log.info(f"  ✓ MAPE={result['metrics']['mape']:.2f}%  uri={model_uri} | Registry: {reg_name}@production (v{mv_version})")
  
         except Exception as e:
             n_failed += 1
@@ -311,11 +461,11 @@ def run_specialize(champion_map: dict, all_data: dict,
             f"PERINGATAN: {len(empty_uris)} komoditas punya model_uri kosong: "
             f"{empty_uris}\nFastAPI AKAN crash saat load model ini."
         )
- 
+
     _save_registry(registry)
  
     log.info(f"\n{'='*65}")
-    log.info(f"  SPESIALISASI SELESAI")
+    log.info(f"  SPESIALISASI SELESAI ")
     log.info(f"  Berhasil : {len(registry)}/{n_total}")
     log.info(f"  Gagal    : {n_failed}")
     log.info(f"  Coverage : {len([k for k, v in registry.items() if v.get('model_uri')])} "
@@ -323,8 +473,7 @@ def run_specialize(champion_map: dict, all_data: dict,
     log.info(f"  Registry : {YAML_MODEL_REGISTRY}")
     log.info(f"{'='*65}")
     return registry
- 
- 
+
 def _save_registry(registry: dict):
     DIR_REGISTRY.mkdir(parents=True, exist_ok=True)
     output = {
@@ -339,21 +488,32 @@ def _save_registry(registry: dict):
         },
         "models": registry,
     }
+    # Simpan ke disk lokal
     with open(YAML_MODEL_REGISTRY, "w", encoding="utf-8") as f:
         yaml.dump(output, f, allow_unicode=True, sort_keys=False, indent=2)
     log.info(f"Registry disimpan: {YAML_MODEL_REGISTRY}")
+
+    # Upload ke MLflow sebagai artifact — agar semua anggota tim bisa akses
+    try:
+        import mlflow, tempfile, os
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_yaml = os.path.join(tmpdir, "model_registry_map.yaml")
+            with open(tmp_yaml, "w", encoding="utf-8") as f:
+                yaml.dump(output, f, allow_unicode=True, sort_keys=False, indent=2)
+                mlflow.log_artifact(tmp_yaml, artifact_path="registry")
+        log.info("✅ Registry di-upload ke MLflow artifacts")
+    except Exception as e:
+        log.warning(f"Upload registry ke MLflow gagal (tidak kritis): {e}")
+
     log.info(f"Total komoditas terdaftar: {len(registry)}")
- 
  
 # ══════════════════════════════════════════════════════════════
 # MAIN
 # ══════════════════════════════════════════════════════════════
- 
 def load_champion_from_registry() -> dict:
     """Baca alias @champion dari MLflow Model Registry."""
     import mlflow
-    from config import DAGSHUB_USER, DAGSHUB_REPO
-    dagshub.init(DAGSHUB_REPO, DAGSHUB_USER, mlflow=True)
+    init_mlflow()   # idempoten — aman dipanggil ulang
     client = mlflow.tracking.MlflowClient()
  
     champion_map = {}
@@ -373,7 +533,6 @@ def load_champion_from_registry() -> dict:
         log.warning(f"Gagal baca Registry: {e}")
     return champion_map
  
- 
 def parse_champion(champion_args: list) -> dict:
     if not champion_args:
         return {}
@@ -382,16 +541,8 @@ def parse_champion(champion_args: list) -> dict:
         if "=" not in item:
             raise ValueError(f"Format salah: '{item}'. Harus: C0_LabilDatar=xgboost")
         cluster, model = item.split("=", 1)
-        cluster = cluster.strip()
-        model   = model.strip()
-        if model not in MODEL_REGISTRY:
-            raise ValueError(
-                f"Model '{model}' tidak dikenal. "
-                f"Pilihan: {list(MODEL_REGISTRY.keys())}"
-            )
-        result[cluster] = model
+        result[cluster.strip()] = model.strip()
     return result
- 
  
 def main():
     parser = argparse.ArgumentParser(description="MarketCast Training Pipeline")
@@ -405,10 +556,8 @@ def main():
     parser.add_argument("--champion",
                         action="append",
                         metavar="CLUSTER=MODEL")
-    parser.add_argument("--csv", default=None)
     args = parser.parse_args()
  
-    csv_path      = CSV_PREPROCESSED
     cluster_map   = load_cluster_map()
     centroid_list = load_centroid_list()
  
@@ -423,7 +572,7 @@ def main():
                           if args.model == "all" else [args.model])
         komoditas_list = ([args.komoditas] if args.komoditas else centroid_list)
  
-        df       = load_preprocessed(csv_path)
+        df       = load_preprocessed()   # baca dari Neon DB via config DATABASE_URL
         all_data = load_all_series(df, komoditas_list, cluster_map)
  
         results = run_tournament(models, komoditas_list, all_data, cluster_map)
@@ -438,16 +587,13 @@ def main():
             champion_map = load_champion_from_registry()
         if not champion_map:
             log.error(
-                "Mode specialize butuh --champion. Contoh:\n"
-                "  --champion C0_LabilDatar=sarima "
-                "--champion C1_LabilInflasi=prophet "
-                "--champion C2_StabilMahal=xgboost"
+                "Mode specialize butuh mapping champion dari tournament!"
             )
             sys.exit(1)
- 
+
         log.info(f"Champion map: {champion_map}")
  
-        df            = load_preprocessed(csv_path)
+        df            = load_preprocessed()   # baca dari Neon DB
         all_komoditas = df["komoditas"].unique().tolist()
         all_data      = load_all_series(df, all_komoditas, cluster_map)
  
@@ -455,7 +601,6 @@ def main():
         if not registry:
             log.error("Registry kosong — tidak ada model berhasil ditraining.")
             sys.exit(1)
- 
  
 if __name__ == "__main__":
     main()

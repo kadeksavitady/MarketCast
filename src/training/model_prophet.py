@@ -459,22 +459,23 @@ def train_prophet(
                     "fourier_order_monthly"  : fo_used,
                 })
  
-                result = evaluate_split_prophet(model_split, dates_test, test)
+                metrics = evaluate_split_prophet(model_split, dates_test, test)
                 mlflow.log_metrics({
-                    f"split_{i}_mae"  : result["mae"],
-                    f"split_{i}_rmse" : result["rmse"],
-                    f"split_{i}_mape" : result["mape"],
-                    f"split_{i}_smape": result["smape"],
+                    f"split_{i}_mae"  : metrics["mae"],
+                    f"split_{i}_rmse" : metrics["rmse"],
+                    f"split_{i}_mape" : metrics["mape"],
+                    f"split_{i}_smape": metrics["smape"],
+                    f"split_{i}_mda": metrics["mda"]
                 })
  
                 log.info(
-                    f"  MAE={result['mae']:>10,.0f} | "
-                    f"MAPE={result['mape']:>6.2f}% | "
-                    f"SMAPE={result['smape']:>6.2f}%"
+                    f"MAPE={metrics['mape']:>6.2f}% | "
+                    f"RMSE={metrics['rmse']:>6.2f} | "
+                    f"MDA: {metrics['mda']:>6.2f}"
                 )
  
                 split_results.append({
-                    **result,
+                    **metrics,
                     "split_idx"  : i,
                     "mode"       : sp["mode"],
                     "cps"        : cps_used,
@@ -487,28 +488,31 @@ def train_prophet(
                     "model"      : model_split,
                 })
  
-        # ── Weighted MAPE agregat ─────────────────────────────
+        # ── Weighted MAPE agregat ─────────────────────────────────────────────
         wmape  = sum(w * r["mape"]  for w, r in zip(split_weights, split_results))
         wsmape = sum(w * r["smape"] for w, r in zip(split_weights, split_results))
         wmae   = sum(w * r["mae"]   for w, r in zip(split_weights, split_results))
         wrmse  = sum(w * r["rmse"]  for w, r in zip(split_weights, split_results))
- 
+        wmda   = sum(w * r["mda"]   for w, r in zip(split_weights, split_results))
+
         agg_metrics = {
             "wmape" : round(wmape,  4),
             "wsmape": round(wsmape, 4),
             "wmae"  : round(wmae,   2),
             "wrmse" : round(wrmse,  2),
-            # Alias untuk kompatibilitas dengan train_all.py leaderboard
-            "mape"  : round(wmape,  4),
+            "wmda"  : round(wmda,   2),
+            "mape"  : round(wmape,  4),   # alias untuk train_all.py leaderboard
             "smape" : round(wsmape, 4),
             "mae"   : round(wmae,   2),
             "rmse"  : round(wrmse,  2),
+            "mda"   : round(wmda, 2)
         }
         mlflow.log_metrics(agg_metrics)
  
         log.info(f"\n  ── Agregat Weighted ──")
         log.info(f"  WMAPE={wmape:.2f}% | WSMAPE={wsmape:.2f}% | "
-                 f"WMAE={wmae:,.0f} | WRMSE={wrmse:,.0f}")
+                 f" WMAE={wmae:,.0f} | WRMSE={wrmse:,.0f} | "
+                 f"WMDA={wmda:.2f}")
  
         # ── Refit model final di full series ──────────────────
         log.info(f"\n  Refit final di full series ({len(series_full)} hari) "
@@ -547,10 +551,11 @@ def train_prophet(
         plt.close(fig_comp)
         mlflow.log_artifact(comp_path, artifact_path="plots")
         
-        mlflow.prophet.log_model(final_model, artifact_path="model")
+        safe_name = komoditas.replace(" ", "_").replace("/", "_")
+        mlflow.prophet.log_model(final_model, name=f"Prophet_{safe_name}")
 
         run_id    = parent_run.info.run_id
-        model_uri  = f"runs:/{run_id}/model"
+        model_uri = f"runs:/{run_id}/Prophet_{safe_name}"
 
         mlflow.log_params({
             "final_cps"           : best_cps,
@@ -560,9 +565,8 @@ def train_prophet(
         if tune_params:
             mlflow.log_params({f"tuning_{k}": v for k, v in tune_params.items()})
  
-    log.info(f"\n[{MODEL_NAME}] {komoditas} selesai. "
-             f"WMAPE={wmape:.2f}% | run_id={run_id[:8] if run_id else 'N/A'}...")
- 
+    log.info(f"\n[{MODEL_NAME}] {komoditas} selesai. run_id={run_id[:8] if run_id else 'N/A'}...")
+    
     return {
         "komoditas"      : komoditas,
         "model"          : final_model,

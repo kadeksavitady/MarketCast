@@ -12,7 +12,6 @@ import numpy as np
 import pandas as pd
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
-from sklearn.preprocessing import RobustScaler
 
 warnings.filterwarnings("ignore")
 logging.basicConfig(
@@ -57,16 +56,16 @@ EXCLUDE_KOMODITAS = set()  # tambah di sini kalau ada yang perlu di-skip
 # ─────────────────────────────────────────────────────────────
 # 1. LOAD DATA
 # ─────────────────────────────────────────────────────────────
-
-def load_from_neon() -> pd.DataFrame:
+def get_db_engine():
     load_dotenv()
     db_url = os.getenv("DATABASE_URL")
     if not db_url:
         raise EnvironmentError("DATABASE_URL tidak ditemukan di .env")
+    return create_engine(db_url)
 
-    engine = create_engine(db_url)
+def load_from_neon(engine) -> pd.DataFrame:
     query = """
-        SELECT tanggal_data, komoditas, kategori, harga_per_kg
+        SELECT tanggal_data, komoditas, kategori, satuan_original, faktor_konversi, harga_per_kg
         FROM harga_historis
         ORDER BY komoditas, tanggal_data
     """
@@ -77,7 +76,6 @@ def load_from_neon() -> pd.DataFrame:
 # ─────────────────────────────────────────────────────────────
 # 2. VALIDASI & FILTER
 # ─────────────────────────────────────────────────────────────
-
 def filter_invalid(df: pd.DataFrame) -> pd.DataFrame:
     before = df['komoditas'].nunique()
 
@@ -99,7 +97,6 @@ def filter_invalid(df: pd.DataFrame) -> pd.DataFrame:
 # ─────────────────────────────────────────────────────────────
 # 3. KONVERSI HARGA 0 → NaN
 # ─────────────────────────────────────────────────────────────
-
 def zero_to_nan(df: pd.DataFrame) -> pd.DataFrame:
     mask = df['harga_per_kg'] <= 0
     n_zero = mask.sum()
@@ -107,7 +104,7 @@ def zero_to_nan(df: pd.DataFrame) -> pd.DataFrame:
         df = df.copy()
         df.loc[mask, 'harga_per_kg'] = np.nan
         log.info(f"  Konversi harga ≤0 → NaN: {n_zero} baris")
-        # Log per komoditas
+        # Log pelacakan granular per komoditas
         per_komo = df[mask].groupby('komoditas').size()
         for k, n in per_komo.items():
             log.info(f"    {k}: {n} baris")
@@ -118,7 +115,6 @@ def zero_to_nan(df: pd.DataFrame) -> pd.DataFrame:
 # ─────────────────────────────────────────────────────────────
 # 4. FILL NaN BERDASARKAN KATEGORI
 # ─────────────────────────────────────────────────────────────
-
 def fill_missing(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     df['tanggal_data'] = pd.to_datetime(df['tanggal_data'])
@@ -168,7 +164,6 @@ def fill_missing(df: pd.DataFrame) -> pd.DataFrame:
 # ─────────────────────────────────────────────────────────────
 # 5. IQR CLIPPING (outlier)
 # ─────────────────────────────────────────────────────────────
-
 def iqr_clip(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     n_clipped = 0
@@ -186,53 +181,41 @@ def iqr_clip(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 # ─────────────────────────────────────────────────────────────
-# 6. EXPORT
+# 6. EXPORT: NEON DB (DATA)
 # ─────────────────────────────────────────────────────────────
-
-def robust_scale(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Scale harga_per_kg per komoditas dengan RobustScaler.
-    RobustScaler pakai median dan IQR — robust terhadap outlier
-    yang lolos dari clipping (lebih cocok dari MinMaxScaler untuk data harga).
-    Hasil disimpan di kolom baru 'harga_scaled', kolom asli tetap ada.
-    """
-    df = df.copy()
-    scaled_list = []
-    for komoditas, group in df.groupby("komoditas"):
-        group   = group.copy()
-        scaler  = RobustScaler()
-        values  = group["harga_per_kg"].values.reshape(-1, 1)
-        group["harga_scaled"] = scaler.fit_transform(values).flatten()
-        scaled_list.append(group)
-    df_scaled = pd.concat(scaled_list, ignore_index=True)
-    log.info(f"  RobustScaler: harga_scaled ditambahkan untuk {df_scaled['komoditas'].nunique()} komoditas")
-    return df_scaled
-
-
-def export(df: pd.DataFrame, output_path: Path) -> None:
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    df_export = (df[['tanggal_data', 'komoditas', 'kategori', 'harga_per_kg']]
-                 .rename(columns={'tanggal_data': 'tanggal'}))
-    df_export.to_csv(output_path, index=False)
-    log.info(f"✅ Export: {output_path} — {len(df_export):,} baris | {df_export['komoditas'].nunique()} komoditas")
+def export_results(df: pd.DataFrame, engine) -> None:
+    # ── PUSH DATA KE NEON DB ──
+    try:
+        log.info("  Mengirim data bersih ke tabel 'harga_historis_clean' di Neon PostgreSQL...")
+        
+        # Rapikan nama kolom (tanggal_data -> tanggal) agar seragam untuk pipeline selanjutnya
+        df_export = df[['tanggal_data', 'komoditas', 'kategori', 'harga_per_kg', 'satuan_original', 'faktor_konversi']].copy()
+        df_export.rename(columns={'tanggal_data': 'tanggal'}, inplace=True)
+        
+        # if_exists='replace' akan menimpa tabel lama jika ada. Sangat aman untuk pipeline batch!
+        df_export.to_sql('harga_historis_clean', engine, if_exists='replace', index=False)
+        log.info(f"✅ Data bersih ({len(df_export):,} baris) berhasil disimpan ke Database!")
+    except Exception as e:
+        log.error(f"❌ Gagal push ke Database: {e}")
+        return # Hentikan jika DB gagal, percuma lanjut ke MLflow
 
 # ─────────────────────────────────────────────────────────────
 # MAIN
 # ─────────────────────────────────────────────────────────────
-
 def main():
     log.info("=" * 60)
     log.info("  DATA CLEANING PIPELINE — MarketCast")
     log.info("=" * 60)
 
-    output_path = Path("data/processed/harga_historis_clean.csv")
+    engine = get_db_engine()
 
     # Pipeline
-    df = load_from_neon()
+    df = load_from_neon(engine)
     df = filter_invalid(df)
     df = zero_to_nan(df)
-
+    
     nan_before = df['harga_per_kg'].isna().sum()
+
     log.info(f"\n── Fill Missing Values ({nan_before} NaN total) ──")
     df = fill_missing(df)
 
@@ -243,12 +226,14 @@ def main():
     log.info("\n── IQR Clipping ──")
     df = iqr_clip(df)
 
-    log.info("\n── Export ──")
-    export(df, output_path)
+    log.info("\n── Exporting (Database) ──")
+    export_results(df, engine)
 
+    engine.dispose() # Putuskan koneksi DB dengan aman
+    
     log.info("=" * 60)
     log.info("  Selesai. Jalankan clustering.py dengan:")
-    log.info(f"  --csv-path {output_path} --source csv")
+    log.info("  Data ada di Neon DB.")
     log.info("=" * 60)
 
 if __name__ == "__main__":

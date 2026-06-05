@@ -20,13 +20,13 @@ INFRASTRUKTUR DOCKER (docker-compose.yml):
 import os
 import logging
 from dotenv import load_dotenv
-load_dotenv()
 import numpy as np
 import pandas as pd
 from pathlib import Path
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 
-# ─────────────────────────────────────────────────────────────
+load_dotenv()
+
 # KONEKSI DATABASE
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
@@ -50,6 +50,7 @@ _LOCAL_URI   = "http://localhost:5000"
 
 MLFLOW_TRACKING_URI   = os.getenv("MLFLOW_TRACKING_URI",
                                    _DAGSHUB_URI if DAGSHUB_TOKEN else _LOCAL_URI)
+MLFLOW_EXP_CLUSTERING = "MarketCast-Clustering"
 MLFLOW_EXP_TOURNAMENT = "MarketCast-Tournament"
 MLFLOW_EXP_SPECIALIZE = "MarketCast-Specialization"
 
@@ -58,24 +59,11 @@ MLFLOW_EXP_SPECIALIZE = "MarketCast-Specialization"
 _MLFLOW_INITIALIZED = False
 _ACTIVE_URI         = ""
 
-
 def init_mlflow() -> str:
     """
     Inisialisasi koneksi MLflow — idempoten, aman dipanggil berkali-kali.
-
-    KENAPA IDEMPOTEN PENTING:
-        train_all.py memanggil init_mlflow() di run_tournament/run_specialize.
-        Lalu tiap model (train_sarima, train_prophet, train_xgboost) juga
-        memanggil init_mlflow() di dalam fungsinya sendiri.
-        Tanpa flag, dagshub.init() terpanggil 10× per tournament run —
-        menyebabkan re-print "Initialized MLflow..." berulang dan
-        potensi reset credential di tengah jalan.
-
-        Dengan flag _MLFLOW_INITIALIZED: pemanggilan pertama melakukan setup,
-        pemanggilan berikutnya langsung return URI yang sudah aktif.
-
-    Returns:
-        str: URI aktif (DagsHub atau lokal)
+    Karena dengan flag _MLFLOW_INITIALIZED: pemanggilan pertama melakukan setup,
+    pemanggilan berikutnya langsung return URI yang sudah aktif (DagsHub atau lokal)
     """
     global _MLFLOW_INITIALIZED, _ACTIVE_URI
     import mlflow
@@ -98,11 +86,11 @@ def init_mlflow() -> str:
                 mlflow     = True,
             )
             _ACTIVE_URI = _DAGSHUB_URI
-            _log.info(f"MLflow → DagsHub: {_ACTIVE_URI}")
+            _log.info(f"MLflow → DagsHub Terinisialisasi: {_ACTIVE_URI}")
 
         except ImportError:
             _log.warning(
-                "dagshub tidak terinstall. pip install dagshub\n"
+                "dagshub tidak terinstall sehingga perlu pip install dagshub\n"
                 "Fallback ke MLflow lokal."
             )
             _ACTIVE_URI = _LOCAL_URI
@@ -126,14 +114,10 @@ def init_mlflow() -> str:
 # ─────────────────────────────────────────────────────────────
 # PATH — semua relatif terhadap root repo
 # ─────────────────────────────────────────────────────────────
-DIR_CLUSTERING = Path("outputs/clustering")   # output Tahap 0
-DIR_MODELS     = Path("outputs/models")       # model pkl lokal (opsional)
-DIR_REGISTRY   = Path("outputs/registry")     # model_registry_map.yaml
-
-CSV_PREPROCESSED   = DIR_CLUSTERING / "data_preprocessed.csv"
-CSV_CLUSTER_ASSIGN = DIR_CLUSTERING / "cluster_assignments.csv"
-CSV_CENTROID       = DIR_CLUSTERING / "centroid_representatives.csv"
-YAML_MODEL_REGISTRY = DIR_REGISTRY  / "model_registry_map.yaml"
+DIR_OUTPUTS_BASE = Path("outputs")
+CSV_CLUSTER_ASSIGN = DIR_OUTPUTS_BASE / "clustering_results" / "cluster_assignments.csv"
+CSV_CENTROID       = DIR_OUTPUTS_BASE / "clustering_results" / "centroid_representatives.csv"
+YAML_MODEL_REGISTRY = DIR_OUTPUTS_BASE / "registry" / "model_registry_map.yaml"
 
 SATUAN_TO_KG = {
     "kg"        : 1.000,
@@ -149,63 +133,67 @@ FORECAST_DAYS  = 30     # hari ke depan yang diprediksi (semua model)
 MIN_TRAIN_ROWS = 180    # minimum data train = 6 bulan (guard data terlalu pendek)
 
 # ─────────────────────────────────────────────────────────────
-# CLUSTER MAP — fallback hardcode
-# ─────────────────────────────────────────────────────────────
-# Dipakai HANYA jika cluster_assignments.csv belum ada
-# (misalnya: pertama kali setup, atau saat testing tanpa run preprocessing).
-# Sumber aktual: load_cluster_map() baca dari CSV hasil pipeline.
-#
-# Hasil clustering K-Means K=3 dari preprocessing_clustering.py:
-#   Cluster 0: CV tinggi (avg 0.358), tren datar  → komoditas volatile
-#   Cluster 1: CV menengah (avg 0.095), tren naik → komoditas inflasi
-#   Cluster 2: CV rendah (avg 0.030), harga mahal → komoditas stabil
-CLUSTER_MAP_FALLBACK = {
-    "Cluster 0: Labil & Murah (\u2192Datar)": [
-        "Cabe Merah Besar", "Cabe Merah Keriting",
-        "Cabe Rawit Merah", "Tomat Merah",
-    ],
-    "Cluster 1: Labil & Murah (\u2191Inflasi)": [
-        "Bawang Merah", "Bawang Putih Sinco/Honan",
-        "Beras Medium", "Beras Premium",
-        "Daging Ayam Ras", "Gula Kristal Putih",
-        "Ikan Bandeng", "Ikan Cakalang", "Ikan Kembung",
-        "Ikan Tongkol", "Ikan Tuna",
-        "Indomie Rasa Kari Ayam", "Jagung Pipilan Kering",
-        "Kedelai Impor", "Kedelai Lokal",
-        "Minyak Goreng Curah", "Minyak Goreng Kemasan Premium",
-        "Minyak Goreng Kemasan Sederhana", "Minyak Goreng MINYAKITA",
-        "Susu Kental Manis Merk Bendera", "Susu Kental Manis Merk Indomilk",
-        "Telur Ayam Kampung", "Telur Ayam Ras",
-        "Terigu Protein Sedang (Kemasan)",
-    ],
-    "Cluster 2: Stabil & Mahal (\u2192Datar)": [
-        "Daging Ayam Kampung", "Daging Sapi Paha Belakang",
-        "Ikan Asin Teri",
-        "Susu Bubuk Merk Bendera (Instant)",
-        "Susu Bubuk Merk Indomilk (Instant)",
-    ],
-}
-
-# Lookup dua arah: label pendek ↔ nama cluster penuh
-# Label pendek dipakai di MLflow tags dan CLI --champion
-CLUSTER_SHORT_TO_FULL = {
-    "C0_LabilDatar"  : "Cluster 0: Labil & Murah (\u2192Datar)",
-    "C1_LabilInflasi": "Cluster 1: Labil & Murah (\u2191Inflasi)",
-    "C2_StabilMahal" : "Cluster 2: Stabil & Mahal (\u2192Datar)",
-}
-CLUSTER_FULL_TO_SHORT = {v: k for k, v in CLUSTER_SHORT_TO_FULL.items()}
-
-
-# ─────────────────────────────────────────────────────────────
 # DYNAMIC CLUSTER LOADER
 # ─────────────────────────────────────────────────────────────
-def load_cluster_map(csv_path: Path = CSV_CLUSTER_ASSIGN) -> dict:
-    if not csv_path.exists():
-        logging.getLogger("config").warning(
-            f"{csv_path} tidak ditemukan — pakai CLUSTER_MAP_FALLBACK"
-        )
-        return CLUSTER_MAP_FALLBACK
+def _download_clustering_artifacts() -> bool:
+    """
+    Download clustering artifacts dari MLflow DagHub ke outputs/clustering/.
+    Dipanggil otomatis kalau CSV tidak ada di disk lokal.
+    Return True kalau berhasil, False kalau gagal.
+    """
+    _log = logging.getLogger("config")
+    try:
+        import mlflow
+        init_mlflow()
+        client = mlflow.tracking.MlflowClient()
 
+        # Cari run KMeans-Final terbaru di experiment siskaperbapo-clustering
+        target_exp = MLFLOW_EXP_CLUSTERING
+        exp = client.get_experiment_by_name(target_exp)
+        runs = []
+        if exp is not None:
+            runs = client.search_runs(
+                    exp.experiment_id,
+                    filter_string="tags.mlflow.runName = \'KMeans-Final\'",
+                    order_by=["attributes.start_time DESC"],
+                    max_results=1,
+                )
+        else:
+            _log.warning(f"Experiment '{target_exp}' tidak ditemukan di MLflow")
+            return False
+        
+        if not runs:
+            _log.warning("Tidak ada run KMeans-Final di MLflow")
+            return False
+        run_id = runs[0].info.run_id
+        _log.info(f"Download clustering artifacts dari run {run_id[:8]}...")
+
+        DIR_OUTPUTS_BASE.mkdir(parents=True, exist_ok=True)
+        # Unduh berkas langsung dari cloud ke folder kerja outputs
+        mlflow.artifacts.download_artifacts(
+            run_id=run_id,
+            artifact_path="clustering_results",
+            dst_path=str(DIR_OUTPUTS_BASE),
+        )
+        _log.info(f"✅ Clustering artifacts berhasil di-download ke {DIR_OUTPUTS_BASE}")
+        return True
+
+    except Exception as e:
+        _log.warning(f"Gagal download clustering artifacts: {e}")
+        return False
+
+
+def load_cluster_map(csv_path: Path = CSV_CLUSTER_ASSIGN) -> dict:
+    _log = logging.getLogger("config")
+
+    # Kalau CSV tidak ada, coba download dari MLflow dulu
+    if not csv_path.exists():
+        _log.info(f"{csv_path} tidak ada — mencoba download dari MLflow...")
+        success = _download_clustering_artifacts()
+        if not success or not csv_path.exists():
+            _log.warning("Download gagal — pakai CLUSTER_MAP_FALLBACK")
+            raise FileNotFoundError(f"Berkas {csv_path.name} tidak berhasil disinkronkan dari MLflow.")
+        
     df            = pd.read_csv(csv_path)
     col_komoditas = next((c for c in df.columns if "komoditas" in c.lower()),
                          "komoditas")
@@ -219,23 +207,25 @@ def load_cluster_map(csv_path: Path = CSV_CLUSTER_ASSIGN) -> dict:
         cluster   = str(row[col_cluster]).strip()
         komoditas = str(row[col_komoditas]).strip()
         result.setdefault(cluster, []).append(komoditas)
-    return result
 
+    _log.info(f"Cluster map loaded: {len(result)} cluster, "
+              f"{sum(len(v) for v in result.values())} komoditas")
+    return result
 
 def load_centroid_list(csv_path: Path = CSV_CENTROID) -> list:
     """
-    Baca centroid_representatives.csv.
+    Baca centroid_representatives.csv langsung dari hasil unduhan terpusat MLflow.
     Return: list 3 nama komoditas yang menjadi wakil setiap cluster.
-
-    Fallback: ambil elemen pertama tiap cluster dari CLUSTER_MAP_FALLBACK
-    jika CSV belum ada.
     """
+    load_cluster_map()
     if not csv_path.exists():
-        return [members[0] for members in CLUSTER_MAP_FALLBACK.values()]
+        raise RuntimeError(
+                f"Berkas '{csv_path.name}' tidak tersedia di folder outputs/clustering_results/. "
+                "Jalankan src/preprocessing/clustering.py terlebih dahulu."
+            )
     df  = pd.read_csv(csv_path)
     col = next((c for c in df.columns if "komoditas" in c.lower()), df.columns[0])
     return df[col].str.strip().tolist()
-
 
 # ─────────────────────────────────────────────────────────────
 # CLUSTER LOOKUP UTILS
@@ -248,15 +238,24 @@ def get_cluster(komoditas: str, cluster_map: dict = None) -> str:
             return cluster
     return "unknown"
 
-
 def get_cluster_short(komoditas: str, cluster_map: dict = None) -> str:
     """
     Return label pendek cluster (C0_LabilDatar, dst).
     Dipakai sebagai tag di MLflow dan argumen --champion di CLI.
     """
     full = get_cluster(komoditas, cluster_map)
-    return CLUSTER_FULL_TO_SHORT.get(full, full)
 
+    # Dynamic mapping: ekstrak nomor cluster dari label string
+    import re
+    match = re.match(r"Cluster\s+(\d+):\s*(.+)", full)
+    if match:
+        cid   = match.group(1)
+        desc  = match.group(2).strip()
+        # Buat slug dari deskripsi: "Labil & Mahal (→Datar)" → "LabilMahalDatar"
+        slug  = re.sub(r"[^a-zA-Z0-9]", "", desc.replace("→", "").replace("↑", "").replace("↓", ""))
+        return f"C{cid}_{slug}"
+    # Fallback: return full label kalau tidak bisa di-parse
+    return full
 
 # ─────────────────────────────────────────────────────────────
 # LOGGING
@@ -273,29 +272,38 @@ def get_logger(name: str) -> logging.Logger:
     )
     return logging.getLogger(name)
 
-
 # ─────────────────────────────────────────────────────────────
 # METRICS
 # ─────────────────────────────────────────────────────────────
 def compute_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict:
+    from sklearn.metrics import mean_absolute_error, mean_squared_error
+    
     y_true = np.array(y_true, dtype=float)
     y_pred = np.array(y_pred, dtype=float)
 
-    mae   = mean_absolute_error(y_true, y_pred)
-    rmse  = np.sqrt(mean_squared_error(y_true, y_pred))
-
+    # Parameter
+    mae  = mean_absolute_error(y_true, y_pred)
+    rmse = np.sqrt(mean_squared_error(y_true, y_pred))
     nonzero = y_true != 0
     mape    = (np.mean(np.abs(
                    (y_true[nonzero] - y_pred[nonzero]) / y_true[nonzero]
-               )) * 100) if nonzero.any() else 0.0
-
+               )) * 100) if nonzero.any() else 0.0    
     smape = np.mean(
         2 * np.abs(y_pred - y_true) / (np.abs(y_true) + np.abs(y_pred) + 1e-8)
     ) * 100
+    # Parameter Arah Tren (Tie-Breaker: Mean Directional Accuracy)
+    if len(y_true) > 1:
+        diff_true = np.sign(y_true[1:] - y_true[:-1])
+        diff_pred = np.sign(y_pred[1:] - y_true[:-1])
+        mda = np.mean(diff_true == diff_pred) * 100
+    else:
+        mda = 0.0
 
+    # Mengembalikan dictionary yang terurut berdasarkan prioritas evaluasi
     return {
-        "mae"  : round(float(mae),   2),
-        "rmse" : round(float(rmse),  2),
         "mape" : round(float(mape),  4),
+        "mda"  : round(float(mda),   2),
+        "rmse" : round(float(rmse),  2),
+        "mae"  : round(float(mae),   2),
         "smape": round(float(smape), 4),
     }

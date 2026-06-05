@@ -93,9 +93,9 @@ async def scrape_harian(page, tgl_str):
     rows_data = []
     try:
         log.info(f"🌐 Membuka Siskaperbapo untuk {tgl_str}...")
-        await page.goto(BASE_URL, wait_until="domcontentloaded", timeout=TIMEOUT_MS)
+        await page.goto(BASE_URL, wait_until="networkidle", timeout=TIMEOUT_MS)
 
-        date_input = await page.wait_for_selector("input[name='tanggal']")
+        date_input = await page.wait_for_selector("input[name='tanggal']", timeout=TIMEOUT_MS)
         await date_input.evaluate(f"""
             (el) => {{
                 el.value = '{tgl_str}';
@@ -203,7 +203,10 @@ async def job_update_harian():
     log.info(f"🚀 Memulai Pipeline Otomatis Harian: {hari_ini}")
 
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
+        browser = await p.chromium.launch(
+            headless=True,
+            args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-blink-features=AutomationControlled"]
+        )
         context = await browser.new_context(
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
             viewport={'width': 1920, 'height': 1080}
