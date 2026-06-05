@@ -89,23 +89,46 @@ MODEL_REGISTRY = {
 # ══════════════════════════════════════════════════════════════
 def _register_to_mlflow_registry(model_uri: str, reg_name: str, alias_name: str, client) -> tuple:
     """
-    Mendaftarkan model ke MLflow Model Registry dengan nama dan alias dinamis.
-    - Specialize -> alias: 'production'
-    - Tournament -> alias: 'champion'
+    Register model ke MLflow Model Registry.
+    Pakai create_registered_model + create_model_version (API lama)
+    karena DagHub tidak support MLflow 3.x logged-models API.
     """
     import mlflow
-    
     log.info(f"  Mendaftarkan ke DagsHub Registry sebagai '{reg_name}@{alias_name}'...")
     
-    # 1. Register Model
-    mv = mlflow.register_model(model_uri=model_uri, name=reg_name)
-
-    # 2. Set Alias
-    client.set_registered_model_alias(
-        name=reg_name,
-        alias=alias_name,
-        version=mv.version
+    # 1. Pastikan registered model sudah ada (buat kalau belum)
+    try:
+        client.create_registered_model(reg_name)
+        log.info(f"  Registered model '{reg_name}' dibuat baru.")
+    except Exception:
+        log.info(f"  Registered model '{reg_name}' sudah ada, skip create.")
+    
+    # 2. Buat versi baru langsung dari source artifact
+    #    model_uri format: "runs:/{run_id}/{artifact_path}"
+    #    DagHub butuh source dalam format path artifact langsung
+    run_id        = model_uri.split("/")[1]
+    artifact_path = "/".join(model_uri.split("/")[2:])
+    
+    # Ambil artifact URI aktual dari run
+    run_info   = client.get_run(run_id)
+    artifact_uri = run_info.info.artifact_uri
+    source       = f"{artifact_uri}/{artifact_path}"
+    
+    mv = client.create_model_version(
+        name   = reg_name,
+        source = source,
+        run_id = run_id,
     )
+    log.info(f"  Model version {mv.version} dibuat dari source: {source}")
+    
+    # 3. Set alias
+    client.set_registered_model_alias(
+        name    = reg_name,
+        alias   = alias_name,
+        version = mv.version,
+    )
+    log.info(f"  ✓ Alias @{alias_name} di-set ke version {mv.version}")
+    
     return reg_name, mv.version
 
 # ══════════════════════════════════════════════════════════════
