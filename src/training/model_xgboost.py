@@ -565,8 +565,7 @@ def train_xgboost(
         run_id    = parent_run.info.run_id
         model_uri = f"runs:/{run_id}/XGBoost_{safe_name}"
 
-    log.info(f"\n[{MODEL_NAME}] {komoditas} selesai. "
-             f"WMAPE={wmape:.2f}% | run_id={run_id[:8]}...")
+    log.info(f"\n[{MODEL_NAME}] {komoditas} selesai. run_id={run_id[:8]}...")
 
     return {
         "komoditas"      : komoditas,
