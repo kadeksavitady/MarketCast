@@ -35,7 +35,6 @@ from config import (
 
 log = get_logger("data_loader")
 
-
 # ══════════════════════════════════════════════════════════════
 # 1. LOAD DARI NEON DB
 # ══════════════════════════════════════════════════════════════
@@ -64,11 +63,11 @@ def load_preprocessed() -> pd.DataFrame:
     try:
         df = pd.read_sql(
             """
-            SELECT tanggal_data  AS tanggal,
+            SELECT tanggal,
                    komoditas,
                    harga_per_kg
             FROM   harga_historis_clean
-            ORDER  BY komoditas, tanggal_data
+            ORDER  BY komoditas, tanggal
             """,
             engine,
         )
