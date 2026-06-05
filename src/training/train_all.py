@@ -170,13 +170,12 @@ def _select_champion_ranksum(df_res: pd.DataFrame) -> pd.DataFrame:
     return pd.concat(results)
  
 # ══════════════════════════════════════════════════════════════
-# TAHAP 2 — TURNAMEN BASELINE
+# TAHAP 2 — training_mode="tournament"
 # ══════════════════════════════════════════════════════════════
 def run_tournament(models: list, komoditas_list: list,
                    all_data: dict, cluster_map: dict) -> list:
     """
     3 centroid × 3 model = 9 runs.
-    training_mode="tournament" → SARIMA pakai auto_arima.
     """
     import mlflow
     init_mlflow()
@@ -239,47 +238,76 @@ def run_tournament(models: list, komoditas_list: list,
 
     df_res = pd.DataFrame([
         {
-            "cluster"   : r["data"]["cluster"],
-            "model_name": r["model_name"],
-            "model_uri" : r["model_uri"],
-            "metric_val": r["metrics"][TARGET_METRIC],
+            "cluster"    : r["data"]["cluster"],
+            "model_name" : r["model_name"],
+            "model_uri"  : r["model_uri"],
+            "metric_mape": r["metrics"]["mape"],
+            "metric_mda" : r["metrics"].get("mda", 0.0),
+            "metric_rmse": r["metrics"]["rmse"],
         } for r in results
+        if r.get("model_uri", "")
     ])
-
-    # Filter model_uri kosong
     df_res = df_res[df_res["model_uri"].str.len() > 0]
 
     if df_res.empty:
         log.error("Semua model_uri kosong — tidak ada yang bisa diregister.")
     else:
-        # Tentukan juara per cluster (MAPE terkecil)
-        best_idx   = df_res.groupby("cluster")["metric_val"].idxmin()
-        best_clusters = set(df_res.loc[best_idx, "cluster"].tolist())
+        # ── RANK-SUM METHOD untuk pilih champion ─────────────────────────
+        # Referensi: Makridakis et al. (2000) M3-Competition;
+        #            Hyndman & Koehler (2006), IJF.
+        df_ranked_list = []
+        for cluster, group in df_res.groupby("cluster"):
+            g = group.copy()
+            g["rank_mape"] = g["metric_mape"].rank(ascending=True,  method="min")
+            g["rank_mda"]  = g["metric_mda"].rank( ascending=False, method="min")
+            g["rank_rmse"] = g["metric_rmse"].rank(ascending=True,  method="min")
+            g["rank_total"] = g["rank_mape"] + g["rank_mda"] + g["rank_rmse"]
+            df_ranked_list.append(g)
+        df_ranked = pd.concat(df_ranked_list)
 
-        # Mapping cluster string → nomor untuk nama registry
-        # Ambil nomor dari karakter ke-7 nama cluster (C0_, C1_, C2_)
+        # Log rank-sum leaderboard per cluster
+        log.info("\n  ── RANK-SUM LEADERBOARD ──")
+        for cluster, group in df_ranked.groupby("cluster"):
+            group_sorted = group.sort_values("rank_total")
+            min_rank     = group_sorted["rank_total"].min()
+            log.info(f"\n  {cluster}:")
+            for _, row in group_sorted.iterrows():
+                log.info(
+                    f"    {row['model_name'].upper():10s} | "
+                    f"MAPE={row['metric_mape']:6.2f}% (r{int(row['rank_mape'])}) | "
+                    f"MDA={row['metric_mda']:5.1f}% (r{int(row['rank_mda'])}) | "
+                    f"RMSE={row['metric_rmse']:8.0f} (r{int(row['rank_rmse'])}) | "
+                    f"Total={int(row['rank_total'])}"
+                    + (" ← @champion" if row["rank_total"] == min_rank else "")
+                )
+
+        # Tentukan champion per cluster (rank_total terkecil)
+        best_idx = df_ranked.groupby("cluster")["rank_total"].idxmin()
+
+        # Mapping cluster string → nama registry
         def cluster_to_reg_name(cluster_str: str) -> str:
-            # Format cluster: "C0_StabilMahal..." → ambil angka setelah "C"
             try:
                 num = int(cluster_str[1])   # "C0_..." → 0
-                return f"cluster {num + 1}" # 0→"cluster 1", 1→"cluster 2", dst
+                return f"cluster {num + 1}" # 0→"cluster 1", dst
             except (IndexError, ValueError):
-                return cluster_str  # fallback ke nama asli
+                return cluster_str
 
         # Register SEMUA model — juara dapat @champion, lainnya tidak
-        for _, row in df_res.iterrows():
+        for idx, row in df_ranked.iterrows():
             cluster_str = row["cluster"]
             model_name  = row["model_name"]
             model_uri   = row["model_uri"]
-            metric_val  = row["metric_val"]
-            is_champion = _ in best_idx.values
+            is_champion = idx in best_idx.values
 
-            reg_name  = cluster_to_reg_name(cluster_str)
-            alias     = "champion" if is_champion else None
+            reg_name = cluster_to_reg_name(cluster_str)
+            alias    = "champion" if is_champion else None
 
             log.info(
                 f"  Register: {model_name.upper()} → '{reg_name}' "
-                f"({TARGET_METRIC}={metric_val:.4f})"
+                f"(rank_total={int(row['rank_total'])} | "
+                f"MAPE={row['metric_mape']:.2f}% | "
+                f"MDA={row['metric_mda']:.1f}% | "
+                f"RMSE={row['metric_rmse']:.0f})"
                 + (" ← @champion" if is_champion else "")
             )
 
@@ -287,13 +315,15 @@ def run_tournament(models: list, komoditas_list: list,
                 reg_n, version = _register_to_mlflow_registry(
                     model_uri  = model_uri,
                     reg_name   = reg_name,
-                    alias_name = alias,   # None = tidak diberi alias
+                    alias_name = alias,
                     client     = client,
                 )
-                log.info(f"  ✓ Registry: {reg_n} v{version}"
-                        + (f" @champion" if alias else ""))
+                log.info(
+                    f"  ✓ Registry: {reg_n} v{version}"
+                    + (f" @champion" if alias else "")
+                )
             except Exception as e:
-                log.error(f"  ✗ Gagal register {model_name} ke {reg_name}: {e}")       
+                log.error(f"  ✗ Gagal register {model_name} ke {reg_name}: {e}")
         
     log.info(f"\n✓ Tournament: {len(results)}/{n_total} runs | {n_failed} gagal")
     log.info(f"  → Juara berhasil diregister dengan alias @champion")
@@ -318,20 +348,12 @@ def _print_tournament_leaderboard(results: list):
  
  
 # ══════════════════════════════════════════════════════════════
-# TAHAP 3a — SPESIALISASI
+# TAHAP 3a — training_mode="specialize"
 # ══════════════════════════════════════════════════════════════
 def run_specialize(champion_map: dict, all_data: dict,
                    cluster_map: dict) -> dict:
     """
     Training SEMUA komoditas (centroid + non-centroid) dengan model champion.
-    training_mode="specialize" → SARIMA pakai GridSearch 36 kombinasi + prior.
- 
-    KENAPA centroid juga di-retrain di sini:
-        Centroid yang di-train di Tournament punya model_uri valid,
-        tapi mode-nya "tournament" (auto_arima).
-        Di Specialize, centroid di-retrain dengan mode="specialize"
-        (GridSearch) sehingga semua komoditas — termasuk centroid —
-        punya model yang lebih optimal untuk production serving.
     """
     import mlflow
     from mlflow.tracking import MlflowClient
