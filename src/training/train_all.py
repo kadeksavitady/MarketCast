@@ -103,13 +103,10 @@ def _register_to_mlflow_registry(model_uri: str, reg_name: str, alias_name: str,
     except Exception:
         log.info(f"  Registered model '{reg_name}' sudah ada, skip create.")
     
-    # 2. Buat versi baru langsung dari source artifact
-    #    model_uri format: "runs:/{run_id}/{artifact_path}"
-    #    DagHub butuh source dalam format path artifact langsung
+    # 2. Buat versi baru langsung dari source artifact 
+    #    yang sesuai dengan source dalam format DagsHub
     run_id        = model_uri.split("/")[1]
     artifact_path = "/".join(model_uri.split("/")[2:])
-    
-    # Ambil artifact URI aktual dari run
     run_info   = client.get_run(run_id)
     artifact_uri = run_info.info.artifact_uri
     source       = f"{artifact_uri}/{artifact_path}"
@@ -122,13 +119,13 @@ def _register_to_mlflow_registry(model_uri: str, reg_name: str, alias_name: str,
     log.info(f"  Model version {mv.version} dibuat dari source: {source}")
     
     # 3. Set alias
-    client.set_registered_model_alias(
-        name    = reg_name,
-        alias   = alias_name,
-        version = mv.version,
-    )
-    log.info(f"  ✓ Alias @{alias_name} di-set ke version {mv.version}")
-    
+    if alias_name:
+        client.set_registered_model_alias(
+            name    = reg_name,
+            alias   = alias_name,
+            version = mv.version,
+        )
+        log.info(f"  ✓ Alias @{alias_name} di-set ke version {mv.version}")
     return reg_name, mv.version
 
 # ══════════════════════════════════════════════════════════════
@@ -138,15 +135,6 @@ def _call_model(model_name: str, komoditas: str, data: dict,
                 mlflow_experiment: str, training_mode: str) -> dict:
     """
     Wrapper pemanggilan model yang meneruskan training_mode.
- 
-    KENAPA wrapper ini diperlukan:
-        Tidak semua model punya parameter training_mode — hanya SARIMA.
-        Prophet dan XGBoost tidak mengenal parameter ini.
-        Solusi: SARIMA menerima training_mode secara eksplisit.
-        Prophet/XGBoost signature-nya tidak berubah sama sekali.
- 
-        Dengan wrapper ini, train_all.py tidak perlu if/else per model —
-        cukup satu titik panggilan yang bersih.
  
     training_mode:
         "tournament"  → SARIMA pakai auto_arima (AIC stepwise)
