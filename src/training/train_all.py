@@ -221,53 +221,73 @@ def run_tournament(models: list, komoditas_list: list,
     _print_tournament_leaderboard(results)
     
     # ══════════════════════════════════════════════════════════════
-    # LOGIKA AUTO-REGISTRY @CHAMPION (THE FINAL JUDGE)
+    # LOGIKA AUTO-REGISTRY — SEMUA MODEL + @champion untuk juara
     # ══════════════════════════════════════════════════════════════
     from mlflow.tracking import MlflowClient
     client = MlflowClient()
-    
-    # TODO: Metrik bisa diubah sesuai hasil riset jurnalmu nanti (misal "rmse")
-    TARGET_METRIC = "mape" 
-    
-    log.info(f"\n  ── AUTO-REGISTER CHAMPION (Berdasarkan {TARGET_METRIC.upper()}) ──")
-    
-    # Ekstrak hasil ke DataFrame untuk mempermudah pencarian juara
+
+    TARGET_METRIC = "mape"
+
+    log.info(f"\n  ── AUTO-REGISTER SEMUA MODEL + CHAMPION ──")
+
     df_res = pd.DataFrame([
         {
-            "cluster": r["data"]["cluster"],
+            "cluster"   : r["data"]["cluster"],
             "model_name": r["model_name"],
-            "model_uri": r["model_uri"],
-            "metric_val": r["metrics"][TARGET_METRIC]
+            "model_uri" : r["model_uri"],
+            "metric_val": r["metrics"][TARGET_METRIC],
         } for r in results
     ])
-    
+
+    # Filter model_uri kosong
     df_res = df_res[df_res["model_uri"].str.len() > 0]
+
     if df_res.empty:
         log.error("Semua model_uri kosong — tidak ada yang bisa diregister.")
-    if not df_res.empty:
-        # Cari index dengan nilai metrik TERKECIL untuk masing-masing cluster
-        best_idx = df_res.groupby("cluster")["metric_val"].idxmin()
-        best_models = df_res.loc[best_idx]
-        
-        # Daftarkan masing-masing juara ke Registry
-        for _, row in best_models.iterrows():
-            cluster_name = row['cluster']
-            winner_model = row['model_name']
-            model_uri = row['model_uri']
-            metric_val = row['metric_val']
-            
-            # Format reg_name sesuai gambar: Murni nama clusternya saja (tanpa Champion_)
-            reg_name = f"{cluster_name}"
-            
-            reg_name, version = _register_to_mlflow_registry(
-                                    model_uri=model_uri,
-                                    reg_name=reg_name,
-                                    alias_name="champion",
-                                    client=client
-                                )           
-            log.info(f"  ✓ Registry: {reg_name} v{version} @champion")
-            log.info(f" Juara {cluster_name} adalah {winner_model.upper()} ({TARGET_METRIC}={metric_val:.4f})")
+    else:
+        # Tentukan juara per cluster (MAPE terkecil)
+        best_idx   = df_res.groupby("cluster")["metric_val"].idxmin()
+        best_clusters = set(df_res.loc[best_idx, "cluster"].tolist())
 
+        # Mapping cluster string → nomor untuk nama registry
+        # Ambil nomor dari karakter ke-7 nama cluster (C0_, C1_, C2_)
+        def cluster_to_reg_name(cluster_str: str) -> str:
+            # Format cluster: "C0_StabilMahal..." → ambil angka setelah "C"
+            try:
+                num = int(cluster_str[1])   # "C0_..." → 0
+                return f"cluster {num + 1}" # 0→"cluster 1", 1→"cluster 2", dst
+            except (IndexError, ValueError):
+                return cluster_str  # fallback ke nama asli
+
+        # Register SEMUA model — juara dapat @champion, lainnya tidak
+        for _, row in df_res.iterrows():
+            cluster_str = row["cluster"]
+            model_name  = row["model_name"]
+            model_uri   = row["model_uri"]
+            metric_val  = row["metric_val"]
+            is_champion = _ in best_idx.values
+
+            reg_name  = cluster_to_reg_name(cluster_str)
+            alias     = "champion" if is_champion else None
+
+            log.info(
+                f"  Register: {model_name.upper()} → '{reg_name}' "
+                f"({TARGET_METRIC}={metric_val:.4f})"
+                + (" ← @champion" if is_champion else "")
+            )
+
+            try:
+                reg_n, version = _register_to_mlflow_registry(
+                    model_uri  = model_uri,
+                    reg_name   = reg_name,
+                    alias_name = alias,   # None = tidak diberi alias
+                    client     = client,
+                )
+                log.info(f"  ✓ Registry: {reg_n} v{version}"
+                        + (f" @champion" if alias else ""))
+            except Exception as e:
+                log.error(f"  ✗ Gagal register {model_name} ke {reg_name}: {e}")       
+        
     log.info(f"\n✓ Tournament: {len(results)}/{n_total} runs | {n_failed} gagal")
     log.info(f"  → Juara berhasil diregister dengan alias @champion")
     log.info(f"  → Buka MLflow UI: {MLFLOW_TRACKING_URI}")
