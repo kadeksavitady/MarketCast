@@ -555,8 +555,7 @@ def train_sarima(
             "final_seas_order" : str(best_seas),
         })
  
-    log.info(f"\n[{MODEL_NAME}] {komoditas} selesai. "
-             f"WMAPE={wmape:.2f}% | run_id={run_id[:8]}...")
+    log.info(f"\n[{MODEL_NAME}] {komoditas} selesai. run_id={run_id[:8]}...")
  
     return {
         "komoditas"      : komoditas,
