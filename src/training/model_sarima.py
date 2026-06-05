@@ -437,24 +437,23 @@ def train_sarima(
                 })
  
                 # ── Evaluate ──────────────────────────────────────────────────
-                result = evaluate_split(model, train, test)
+                metrics = evaluate_split(model, train, test)
                 mlflow.log_metrics({
-                    f"split_{i}_mae"  : result["mae"],
-                    f"split_{i}_rmse" : result["rmse"],
-                    f"split_{i}_mape" : result["mape"],
-                    f"split_{i}_smape": result["smape"],
-                    f"split_{i}_r2"   : result.get("r2", 0.0),
+                    f"split_{i}_mae"  : metrics["mae"],
+                    f"split_{i}_rmse" : metrics["rmse"],
+                    f"split_{i}_mape" : metrics["mape"],
+                    f"split_{i}_smape": metrics["smape"],
+                    f"split_{i}_mda": metrics["mda"]
                 })
  
                 log.info(
-                    f"  MAE={result['mae']:>10,.0f} | "
-                    f"MAPE={result['mape']:>6.2f}% | "
-                    f"SMAPE={result['smape']:>6.2f}% |" 
-                    f"R²={result.get('r2', 0):>6.4f}"
+                    f"MAPE={metrics['mape']:>6.2f}% | "
+                    f"RMSE={metrics['rmse']:>6.2f} | "
+                    f"MDA: {metrics['mda']:>6.2f}"
                 )
  
                 split_results.append({
-                    **result,
+                    **metrics,
                     "split_idx" : i,
                     "mode"      : sp["mode"],
                     "order"     : order,
@@ -468,45 +467,30 @@ def train_sarima(
                 })
  
         # ── Weighted MAPE agregat ─────────────────────────────────────────────
-        wmape = sum(
-            w * r["mape"]
-            for w, r in zip(split_weights, split_results)
-        )
-        wsmape = sum(
-            w * r["smape"]
-            for w, r in zip(split_weights, split_results)
-        )
-        wmae = sum(
-            w * r["mae"]
-            for w, r in zip(split_weights, split_results)
-        )
-        wrmse = sum(
-            w * r["rmse"]
-            for w, r in zip(split_weights, split_results)
-        )
-        wr2 = sum(
-            w * r.get("r2", 0.0)
-            for w, r in zip(split_weights, split_results)
-        )
- 
+        wmape  = sum(w * r["mape"]  for w, r in zip(split_weights, split_results))
+        wsmape = sum(w * r["smape"] for w, r in zip(split_weights, split_results))
+        wmae   = sum(w * r["mae"]   for w, r in zip(split_weights, split_results))
+        wrmse  = sum(w * r["rmse"]  for w, r in zip(split_weights, split_results))
+        wmda   = sum(w * r["mda"]   for w, r in zip(split_weights, split_results))
+
         agg_metrics = {
             "wmape" : round(wmape,  4),
             "wsmape": round(wsmape, 4),
             "wmae"  : round(wmae,   2),
             "wrmse" : round(wrmse,  2),
-            "wr2"   : round(wr2,    4),
-            # Alias untuk kompatibilitas dengan train_all.py leaderboard
-            "mape"  : round(wmape,  4),
+            "wmda"  : round(wmda,   2),
+            "mape"  : round(wmape,  4),   # alias untuk train_all.py leaderboard
             "smape" : round(wsmape, 4),
             "mae"   : round(wmae,   2),
             "rmse"  : round(wrmse,  2),
-            "r2"    : round(wr2,    4),
+            "mda"   : round(wmda, 2)
         }
         mlflow.log_metrics(agg_metrics)
  
         log.info(f"\n  ── Agregat Weighted ──")
         log.info(f"  WMAPE={wmape:.2f}% | WSMAPE={wsmape:.2f}% | "
-                 f"WMAE={wmae:,.0f} | WRMSE={wrmse:,.0f} | WR²={wr2:.4f}")
+                 f" WMAE={wmae:,.0f} | WRMSE={wrmse:,.0f} | "
+                 f"WMDA={wmda:.2f}")
  
         # ── Refit model final di full series ──────────────────────────────────
         # Pakai order dari split terakhir (paling representatif data terkini)
