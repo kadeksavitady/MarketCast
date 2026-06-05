@@ -555,7 +555,7 @@ def train_xgboost(
 
         # ── Log model ─────────────────────────────────────────────────────────
         safe_name = komoditas.replace(" ", "_").replace("/", "_")
-        mlflow.sklearn.log_model(final_model, name=f"XGBoost_{safe_name}")
+        mlflow.xgboost.log_model(final_model, name=f"XGBoost_{safe_name}")
 
         run_id    = parent_run.info.run_id
         model_uri = f"runs:/{run_id}/XGBoost_{safe_name}"
