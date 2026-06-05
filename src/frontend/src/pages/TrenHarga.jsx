@@ -444,8 +444,8 @@ return (
                     </p>
                     <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "rgba(255,255,255,.45)" }}>
                       <span>📍</span>
-                      <span style={{ fontWeight: 600, color: "rgba(255,255,255,0.7)" }}>{selectedKomoditas.nama}</span>
-                      <span>· {funFact.label_cerdas_ml || "Surabaya"}</span>
+                      <span style={{ fontWeight: 600, color: "rgba(255,255,255,0.7)" }}>
+                      {funFact.label_cerdas_ml || "Surabaya"}</span>
                     </div>
                   </div>
                 ) : null}
