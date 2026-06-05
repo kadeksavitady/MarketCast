@@ -147,6 +147,27 @@ def _call_model(model_name: str, komoditas: str, data: dict,
         mlflow_experiment=mlflow_experiment,
         mode=training_mode,
     )
+
+def _select_champion_ranksum(df_res: pd.DataFrame) -> pd.DataFrame:
+    """
+    Rank-Sum Method untuk memilih champion per cluster.
+    """
+    results = []
+    
+    for cluster, group in df_res.groupby("cluster"):
+        g = group.copy()
+        
+        # Rank per metrik (method='min' = ties dapat rank sama)
+        g["rank_mape"] = g["metric_mape"].rank(ascending=True,  method="min")
+        g["rank_mda"]  = g["metric_mda"].rank( ascending=False, method="min")
+        g["rank_rmse"] = g["metric_rmse"].rank(ascending=True,  method="min")
+        
+        # Total rank — semakin kecil semakin baik
+        g["rank_total"] = g["rank_mape"] + g["rank_mda"] + g["rank_rmse"]
+        
+        results.append(g)
+    
+    return pd.concat(results)
  
 # ══════════════════════════════════════════════════════════════
 # TAHAP 2 — TURNAMEN BASELINE
