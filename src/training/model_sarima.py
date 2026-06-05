@@ -549,7 +549,8 @@ def train_sarima(
         import time
         for attempt in range(3):
             try:
-                mlflow.sklearn.log_model(final_model, artifact_path="model")
+                safe_name = komoditas.replace(" ", "_").replace("/", "_")
+                mlflow.sklearn.log_model(final_model, name=f"SARIMA_{safe_name}")
                 log.info(f"  Model artifact ter-upload (attempt {attempt+1})")
                 break
             except Exception as e:
@@ -560,7 +561,7 @@ def train_sarima(
                     log.error(f"  Upload gagal setelah 3 attempt: {e}")
  
         run_id    = parent_run.info.run_id
-        model_uri = f"runs:/{run_id}/model"
+        model_uri = f"runs:/{run_id}/SARIMA_{safe_name}"
  
         mlflow.log_params({
             "final_order"      : str(best_order),
