@@ -276,26 +276,34 @@ def get_logger(name: str) -> logging.Logger:
 # METRICS
 # ─────────────────────────────────────────────────────────────
 def compute_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict:
-    from sklearn.metrics import r2_score
+    from sklearn.metrics import mean_absolute_error, mean_squared_error
+    
     y_true = np.array(y_true, dtype=float)
     y_pred = np.array(y_pred, dtype=float)
 
-    mae   = mean_absolute_error(y_true, y_pred)
-    rmse  = np.sqrt(mean_squared_error(y_true, y_pred))
+    # Parameter
+    mae  = mean_absolute_error(y_true, y_pred)
+    rmse = np.sqrt(mean_squared_error(y_true, y_pred))
     nonzero = y_true != 0
     mape    = (np.mean(np.abs(
                    (y_true[nonzero] - y_pred[nonzero]) / y_true[nonzero]
-               )) * 100) if nonzero.any() else 0.0
+               )) * 100) if nonzero.any() else 0.0    
     smape = np.mean(
         2 * np.abs(y_pred - y_true) / (np.abs(y_true) + np.abs(y_pred) + 1e-8)
     ) * 100
-    # R² — seberapa baik model menjelaskan variansi data
-    r2 = r2_score(y_true, y_pred) if len(y_true) > 1 else 0.0
+    # Parameter Arah Tren (Tie-Breaker: Mean Directional Accuracy)
+    if len(y_true) > 1:
+        diff_true = np.sign(y_true[1:] - y_true[:-1])
+        diff_pred = np.sign(y_pred[1:] - y_true[:-1])
+        mda = np.mean(diff_true == diff_pred) * 100
+    else:
+        mda = 0.0
 
+    # Mengembalikan dictionary yang terurut berdasarkan prioritas evaluasi
     return {
-        "mae"  : round(float(mae),   2),
-        "rmse" : round(float(rmse),  2),
         "mape" : round(float(mape),  4),
+        "mda"  : round(float(mda),   2),
+        "rmse" : round(float(rmse),  2),
+        "mae"  : round(float(mae),   2),
         "smape": round(float(smape), 4),
-        "r2"   : round(float(r2),    4),
     }
