@@ -551,7 +551,7 @@ def train_prophet(
         mlflow.prophet.log_model(final_model, name=f"Prophet_{safe_name}")
 
         run_id    = parent_run.info.run_id
-        model_uri  = f"runs:/{run_id}/model"
+        model_uri = f"runs:/{run_id}/Prophet_{safe_name}"
 
         mlflow.log_params({
             "final_cps"           : best_cps,
