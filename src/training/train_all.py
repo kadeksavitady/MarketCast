@@ -420,7 +420,8 @@ def run_specialize(champion_map: dict, all_data: dict,
  
         cluster_short = data["cluster"]
         model_name    = champion_map.get(cluster_short)
- 
+        applied_mode  = cluster_best_mode.get(cluster_short, "specialize")
+
         if model_name is None:
             log.warning(
                 f"Skip {komoditas}: tidak ada champion untuk cluster "
@@ -432,6 +433,7 @@ def run_specialize(champion_map: dict, all_data: dict,
         is_centroid = komoditas in centroid_list
         n_done += 1
         label = "[CENTROID]" if is_centroid else ""
+        mode_label = "[TUNED]" if applied_mode == "specialize" else "[DEFAULT]"
         log.info(f"[{n_done}/{n_total}] {model_name.upper()} × {komoditas} "
                  f"[{cluster_short}] {label}")
  
@@ -440,7 +442,7 @@ def run_specialize(champion_map: dict, all_data: dict,
             result = _call_model(
                 model_name, komoditas, data,
                 mlflow_experiment=MLFLOW_EXP_SPECIALIZE,
-                training_mode=TRAINING_MODE,
+                training_mode=applied_mode,
             )
  
             run_id    = result.get("run_id",    "")
