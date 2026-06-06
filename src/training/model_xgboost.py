@@ -59,29 +59,18 @@ RANDOM_SEARCH_SPACE = {
 # ═════════════════════════════════════════════════════════════════════════════
 # 1. FEATURE ENGINEERING
 # ═════════════════════════════════════════════════════════════════════════════
-
 def build_features(series: np.ndarray, dates: pd.DatetimeIndex) -> pd.DataFrame:
     """
     Bangun feature matrix dari time series harga.
-
-    Fitur:
-        lag_1 .. lag_LAG_MAX   : harga LAG hari lalu
-        rolling_mean_7/30      : rata-rata harga 7 dan 30 hari terakhir
-        rolling_std_7/30       : std harga 7 dan 30 hari terakhir
-        month                  : bulan (1–12)
-        dayofweek              : hari dalam minggu (0=Senin)
-        days_since_start       : counter linear, encode tren global
     """
     df = pd.DataFrame({"harga": series}, index=dates)
-
+    # fitur yang dipakai
     for lag in range(1, LAG_MAX + 1):
         df[f"lag_{lag}"] = df["harga"].shift(lag)
-
     df["rolling_mean_7"]  = df["harga"].shift(1).rolling(7).mean()
     df["rolling_mean_30"] = df["harga"].shift(1).rolling(30).mean()
     df["rolling_std_7"]   = df["harga"].shift(1).rolling(7).std()
     df["rolling_std_30"]  = df["harga"].shift(1).rolling(30).std()
-
     df["month"]            = df.index.month
     df["dayofweek"]        = df.index.dayofweek
     df["days_since_start"] = (df.index - df.index[0]).days
@@ -89,7 +78,6 @@ def build_features(series: np.ndarray, dates: pd.DatetimeIndex) -> pd.DataFrame:
     df["target"] = df["harga"]
     df.dropna(inplace=True)
     return df
-
 
 def get_feature_cols() -> list:
     lag_cols     = [f"lag_{i}" for i in range(1, LAG_MAX + 1)]
@@ -102,7 +90,6 @@ def get_feature_cols() -> list:
 # ═════════════════════════════════════════════════════════════════════════════
 # 2. SPLIT GENERATOR — Hybrid Expanding + Sliding
 # ═════════════════════════════════════════════════════════════════════════════
-
 def build_splits(
     series: np.ndarray,
     dates: pd.DatetimeIndex,
@@ -175,7 +162,6 @@ def build_splits(
 
     return splits
 
-
 def compute_weighted_mape(split_metrics: List[Dict]) -> float:
     n       = len(split_metrics)
     weights = SPLIT_WEIGHTS[:n]
@@ -222,7 +208,6 @@ def _direct_forecast(
         preds.append(float(model.predict(last_row)[0]))
 
     return np.array(preds)
-
 
 def _recursive_forecast(
     model,
@@ -306,7 +291,6 @@ def tune_xgboost_randomized(
 # ═════════════════════════════════════════════════════════════════════════════
 # 5. MAIN TRAINING FUNCTION
 # ═════════════════════════════════════════════════════════════════════════════
-
 def train_xgboost(
     komoditas: str,
     data: dict,
@@ -584,7 +568,6 @@ def train_xgboost(
 # ═════════════════════════════════════════════════════════════════════════════
 # 6. PLOTS
 # ═════════════════════════════════════════════════════════════════════════════
-
 def _plot_xgboost_cv(
     komoditas, series_full, dates_full,
     split_results, future_forecast, cluster,
@@ -627,7 +610,6 @@ def _plot_xgboost_cv(
     ax.grid(alpha=0.2)
     plt.tight_layout()
     return fig
-
 
 def _plot_importance(model, feature_cols: list, komoditas: str):
     importances = model.feature_importances_
