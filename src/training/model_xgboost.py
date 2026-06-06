@@ -183,11 +183,6 @@ def _direct_forecast(
     test_dates: pd.DatetimeIndex,
     feature_cols: list,
 ) -> np.ndarray:
-    """
-    Direct multi-step forecast untuk evaluasi per split.
-    Setiap titik test diprediksi dari lag train asli — tidak ada error akumulasi.
-    Lebih fair untuk perbandingan antar model.
-    """
     preds     = []
     train_arr = np.array(train_series)
 
@@ -203,7 +198,6 @@ def _direct_forecast(
         if len(feat_df) == 0:
             preds.append(float(train_arr[-1]))
             continue
-
         last_row = feat_df.iloc[[-1]][feature_cols].values
         preds.append(float(model.predict(last_row)[0]))
 
@@ -216,11 +210,6 @@ def _recursive_forecast(
     n_steps: int,
     feature_cols: list,
 ) -> np.ndarray:
-    """
-    Recursive multi-step forecast untuk future 30 hari.
-    Prediksi t+1 dipakai sebagai input t+2 — error akumulasi tidak terhindarkan
-    tapi ini satu-satunya opsi untuk prediksi masa depan.
-    """
     history      = list(series_full)
     last_date    = dates_full[-1]
     preds        = []
@@ -248,21 +237,12 @@ def _recursive_forecast(
 # ═════════════════════════════════════════════════════════════════════════════
 # 4. RANDOMIZED SEARCH TUNING
 # ═════════════════════════════════════════════════════════════════════════════
-
 def tune_xgboost_randomized(
     X_train: np.ndarray,
     y_train: np.ndarray,
     n_iter: int = 30,
     cv_splits: int = 3,
 ) -> Tuple[dict, float]:
-    """
-    RandomizedSearch dengan TimeSeriesSplit untuk XGBoost.
-    n_iter=30 identik dengan Optuna untuk perbandingan fair.
-
-    Menggunakan TimeSeriesSplit agar tidak ada data leakage temporal.
-
-    Returns: (best_params, best_neg_mape)
-    """
     base_model = XGBRegressor(random_state=42, n_jobs=-1)
     tscv       = TimeSeriesSplit(n_splits=cv_splits)
 
@@ -281,7 +261,6 @@ def tune_xgboost_randomized(
 
     best_params = search.best_params_
     best_score  = -search.best_score_   # neg → positif = MAPE
-
     log.info(f"  RandomizedSearch selesai | best MAPE(CV)={best_score:.4f}%")
     log.info(f"  Best params: {best_params}")
 
