@@ -14,7 +14,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from typing import List, Dict, Optional, Tuple
- 
+
 from prophet import Prophet
  
 from config import (
@@ -55,8 +55,7 @@ INDONESIAN_HOLIDAYS = pd.DataFrame({
 })
  
 # ══════════════════════════════════════════════════════════════
-# 1. SPLIT GENERATOR — sama persis dengan model_sarima.py
-#    agar CV scheme konsisten antar semua baseline model
+# 1. SPLIT GENERATOR
 # ══════════════════════════════════════════════════════════════
 def build_splits(
     series: np.ndarray,
@@ -162,14 +161,11 @@ def fit_prophet_default(
 ) -> Tuple[Prophet, float, float, int]:
     """
     Fit Prophet dengan parameter default per cluster.
-
-    Returns: (model, cps_used, sps_used, fourier_order_used)
     """
     cps = cps_override if cps_override is not None \
           else CLUSTER_CPS_DEFAULT.get(cluster, 0.05)
     sps = sps_override if sps_override is not None else 10.0
     fo  = 5
- 
     df_train = pd.DataFrame({"ds": dates_train, "y": train})
     model    = _build_prophet_model(cps, sps, fo)
     model.fit(df_train)
@@ -186,8 +182,6 @@ def fit_prophet_optuna(
 ) -> Tuple[Prophet, dict, float]:
     """
     Mode tunning memakai optuna
-
-    Returns: (best_model, best_params, best_mape)
     """
     try:
         import optuna
@@ -195,7 +189,6 @@ def fit_prophet_optuna(
     except ImportError:
         raise ImportError(
             "Optuna belum terinstall. Jalankan: pip install optuna\n"
-            "Optuna dibutuhkan untuk mode=specialize Prophet."
         )
  
     df_train = pd.DataFrame({"ds": dates_train, "y": train})
@@ -207,7 +200,7 @@ def fit_prophet_optuna(
  
     def objective(trial) -> float:
         nonlocal best_mape, no_improve_count
- 
+
         # Early stopping manual (Optuna tidak punya callback di semua versi)
         if no_improve_count >= patience:
             raise optuna.exceptions.TrialPruned()
@@ -224,15 +217,12 @@ def fit_prophet_optuna(
             pred    = m.predict(df_test)["yhat"].values
             metrics = compute_metrics(test, pred)
             mape    = metrics["mape"]
- 
             if mape < best_mape:
                 best_mape        = mape
                 no_improve_count = 0
             else:
                 no_improve_count += 1
- 
             return mape
- 
         except Exception:
             no_improve_count += 1
             return 999.0
@@ -242,12 +232,10 @@ def fit_prophet_optuna(
         sampler=optuna.samplers.TPESampler(seed=42),
     )
     study.optimize(objective, n_trials=n_trials, show_progress_bar=False)
- 
     bp      = study.best_params
     best_cps = bp["changepoint_prior_scale"]
     best_sps = bp["seasonality_prior_scale"]
     best_fo  = bp["fourier_order_monthly"]
- 
     log.info(f"  Optuna best: cps={best_cps:.4f} sps={best_sps:.2f} "
              f"fo={best_fo} MAPE={study.best_value:.2f}%  "
              f"(trials={len(study.trials)})")
@@ -255,7 +243,6 @@ def fit_prophet_optuna(
     # Refit dengan best params
     best_model = _build_prophet_model(best_cps, best_sps, best_fo)
     best_model.fit(df_train)
- 
     return best_model, {
         "changepoint_prior_scale": best_cps,
         "seasonality_prior_scale": best_sps,
@@ -309,8 +296,6 @@ def train_prophet(
     seasonality_prior_scale: float = None,
 ) -> dict:
     """
-    Train Prophet dengan Hybrid Expanding+Sliding CV.
- 
     mode="tournament":
         Fit Prophet dengan parameter default per cluster.
         5 split (atau fallback 3). Semua split di-log sebagai nested runs.
@@ -320,13 +305,6 @@ def train_prophet(
         Optuna tuning pada split terakhir (paling representatif).
         Best params dipakai untuk refit di semua split → weighted MAPE.
         Refit final di full series dengan best params.
- 
-    Parameters:
-        changepoint_prior_scale : opsional override (untuk manual experiment)
-        seasonality_prior_scale : opsional override (untuk manual experiment)
-        mode                    : dikontrol dari train_all._call_model()
- 
-    Returns dict: model, metrics, forecast, run_id, model_uri, data
     """
     init_mlflow()
     mlflow.set_experiment(mlflow_experiment or "MarketCast-Tournament")
