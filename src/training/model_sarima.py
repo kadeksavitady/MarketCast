@@ -93,14 +93,10 @@ def build_splits(
                  f"test_window={test_window}")
  
     # ── Expanding boundary ────────────────────────────────────────────────────
-    # Split 1-3: expanding (train end = min_train + (i-1)*test_window)
-    # Split 4-5: sliding   (train start geser, window size tetap)
     expanding_splits = 3
     sliding_splits   = n_splits - expanding_splits
- 
     splits       = []
     train_start  = 0
- 
     for i in range(1, n_splits + 1):
         if i <= expanding_splits:
             # Expanding: train start tetap, train end gerak maju
