@@ -173,9 +173,7 @@ def _calculate_hybrid_score(metrics: dict) -> float:
 # ══════════════════════════════════════════════════════════════
 def run_tournament(models: list, komoditas_list: list,
                    all_data: dict, cluster_map: dict) -> list:
-    """
-    3 centroid × 3 model = 9 runs.
-    """
+    """ 3 centroid × 3 model = 9 runs """
     import mlflow
     init_mlflow()
  
@@ -231,10 +229,7 @@ def run_tournament(models: list, komoditas_list: list,
     from mlflow.tracking import MlflowClient
     client = MlflowClient()
 
-    TARGET_METRIC = "mape"
-
     log.info(f"\n  ── AUTO-REGISTER SEMUA MODEL + CHAMPION ──")
-
     df_res = pd.DataFrame([
         {
             "cluster"    : r["data"]["cluster"],
@@ -334,7 +329,7 @@ def _print_tournament_leaderboard(results: list):
               "model": r["model_name"], **r["metrics"]} for r in results]
     lb   = pd.DataFrame(rows).sort_values(["cluster", "mape"])
     log.info("\n" + "=" * 65)
-    log.info("  LEADERBOARD TURNAMEN (sorted by MAPE per cluster)")
+    log.info("  LEADERBOARD TURNAMEN (sorted per cluster)")
     log.info("=" * 65)
     log.info(f"\n{lb.to_string(index=False)}")
     log.info("\n── Best model per cluster ────────────────────────────────")
@@ -357,7 +352,6 @@ def run_specialize(champion_map: dict, all_data: dict,
  
     client = MlflowClient()
     TRAINING_MODE = "specialize"   # ← deklarasi eksplisit di sini
- 
     centroid_list   = load_centroid_list()
     all_komoditas   = list(all_data.keys())
     full_train_list = all_komoditas   # centroid tidak di-filter
@@ -368,7 +362,50 @@ def run_specialize(champion_map: dict, all_data: dict,
     log.info(f"  Champion map: {champion_map}")
     log.info(f"  Experiment  : {MLFLOW_EXP_SPECIALIZE}")
     log.info("=" * 65)
- 
+
+    # ──────────────────────────────────────────────────────────────
+    # FASE 2.5: ARENA VALIDASI (Mengadu Default vs Tuned pada Centroid)
+    # ──────────────────────────────────────────────────────────────
+    log.info("\n  ── FASE 2.5: ARENA VALIDASI (DEFAULT vs TUNED) ──")
+    cluster_best_mode = {}
+    
+    for cluster_short, model_name in champion_map.items():
+        # Cari nama komoditas centroid untuk klaster ini
+        centroid_name = [k for k, v in all_data.items() if v["cluster"] == cluster_short and k in centroid_list]
+        if not centroid_name:
+            cluster_best_mode[cluster_short] = "specialize" # Fallback
+            continue
+            
+        centroid_name = centroid_name[0]
+        data_centroid = all_data[centroid_name]
+
+        log.info(f"\n  > Validasi Klaster {cluster_short} ({model_name.upper()} pada {centroid_name})")
+        
+        try:
+            # 1. Jalankan mode Default (Champion)
+            res_def = _call_model(model_name, centroid_name, data_centroid, MLFLOW_EXP_SPECIALIZE, "tournament")
+            score_def = _calculate_hybrid_score(res_def["metrics"])
+            
+            # 2. Jalankan mode Tuned (Challenger)
+            res_tun = _call_model(model_name, centroid_name, data_centroid, MLFLOW_EXP_SPECIALIZE, "specialize")
+            score_tun = _calculate_hybrid_score(res_tun["metrics"])
+            
+            log.info(f"    - Skor Default : {score_def:.2f} (MAPE: {res_def['metrics']['mape']:.2f}%, MDA: {res_def['metrics'].get('mda',0):.1f}%)")
+            log.info(f"    - Skor Tuned   : {score_tun:.2f} (MAPE: {res_tun['metrics']['mape']:.2f}%, MDA: {res_tun['metrics'].get('mda',0):.1f}%)")
+            
+            # 3. Pengambilan Keputusan (Skor lebih tinggi = lebih baik)
+            if score_tun > score_def:
+                log.info(f"    ✓ TUNED MENANG! Klaster {cluster_short} akan dilatih menggunakan Hyperparameter Tuning.")
+                cluster_best_mode[cluster_short] = "specialize"
+            else:
+                log.info(f"    ✗ DEFAULT LEBIH BAIK/SERI. Klaster {cluster_short} akan dikunci pada parameter Default (mencegah overfitting).")
+                cluster_best_mode[cluster_short] = "tournament"
+                
+        except Exception as e:
+            log.error(f"    ✗ Validasi gagal ({e}), fallback ke mode specialize.")
+            cluster_best_mode[cluster_short] = "specialize"
+
+    log.info("\n  ── FASE 3.0: EKSEKUSI KOMODITAS KESELURUHAN ──")
     registry = {}
     n_done   = 0
     n_failed = 0
