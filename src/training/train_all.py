@@ -18,15 +18,11 @@ DUA MODE EKSEKUSI:
         Output: leaderboard → pilih 1 juara per cluster di DagsHub MLflow UI
 
     --mode specialize  (Tahap 3a)
-        SEMUA komoditas (centroid + non-centroid) × model juara cluster masing-masing
-        Hyperparameter tuning diaktifkan per model:
-            SARIMA   → GridSearch 36 kombinasi + prior knowledge cluster
-            Prophet  → Optuna TPE 15 trial + early stopping (patience=5)
-            XGBoost  → Optuna TPE 30 trial + early stopping (patience=5)
+        Fase 2.5: Validasi Tuning pada Centroid (Default vs Tuned) [CHAMPION vs CHALLENGER]
+        Fase 3.0: SEMUA komoditas di-training menggunakan mode pemenang 
+                  dari Fase 2.5 (mencegah degradasi performa/overfitting).
         Experiment: MarketCast-Specialization
         Output: model_registry_map.yaml → dipakai FastAPI & business logic
-        Catatan: centroid di-retrain ulang di sini (bukan skip) agar semua
-                 komoditas punya model_uri valid di registry untuk FastAPI serving
 
 ARSITEKTUR PEMANGGILAN MODEL:
     Semua model dipanggil via _call_model() — satu titik dispatch yang
@@ -134,11 +130,6 @@ def _call_model(model_name: str, komoditas: str, data: dict,
                 mlflow_experiment: str, training_mode: str) -> dict:
     """
     Wrapper pemanggilan model yang meneruskan training_mode.
- 
-    training_mode:
-        "tournament"  → SARIMA pakai auto_arima (AIC stepwise)
-        "specialize"  → SARIMA pakai GridSearch 36 kombinasi + prior cluster
-        (diabaikan oleh Prophet dan XGBoost)
     """
     fn = MODEL_REGISTRY[model_name]
     return fn(
@@ -153,22 +144,30 @@ def _select_champion_ranksum(df_res: pd.DataFrame) -> pd.DataFrame:
     Rank-Sum Method untuk memilih champion per cluster.
     """
     results = []
-    
     for cluster, group in df_res.groupby("cluster"):
-        g = group.copy()
-        
+        g = group.copy()  
         # Rank per metrik (method='min' = ties dapat rank sama)
         g["rank_mape"] = g["metric_mape"].rank(ascending=True,  method="min")
         g["rank_mda"]  = g["metric_mda"].rank( ascending=False, method="min")
         g["rank_rmse"] = g["metric_rmse"].rank(ascending=True,  method="min")
-        
         # Total rank — semakin kecil semakin baik
         g["rank_total"] = g["rank_mape"] + g["rank_mda"] + g["rank_rmse"]
-        
-        results.append(g)
-    
+        results.append(g)   
     return pd.concat(results)
  
+# ══════════════════════════════════════════════════════════════
+# HELPER: Evaluasi Komposit Hibrida (Validasi Tuning)
+# ══════════════════════════════════════════════════════════════
+def _calculate_hybrid_score(metrics: dict) -> float:
+    """
+    Menghitung skor gabungan MAPE dan MDA. SEMAKIN TINGGI SEMAKIN BAIK.
+    Formula: Skor = (0.60 * Akurasi_Nominal) + (0.40 * MDA)
+    """
+    mape = metrics.get("mape", 100)
+    mda = metrics.get("mda", 0.0)
+    akurasi_nominal = max(0, 100 - mape)
+    return (0.60 * akurasi_nominal) + (0.40 * mda)
+
 # ══════════════════════════════════════════════════════════════
 # TAHAP 2 — training_mode="tournament"
 # ══════════════════════════════════════════════════════════════
@@ -252,9 +251,6 @@ def run_tournament(models: list, komoditas_list: list,
     if df_res.empty:
         log.error("Semua model_uri kosong — tidak ada yang bisa diregister.")
     else:
-        # ── RANK-SUM METHOD untuk pilih champion ─────────────────────────
-        # Referensi: Makridakis et al. (2000) M3-Competition;
-        #            Hyndman & Koehler (2006), IJF.
         df_ranked_list = []
         for cluster, group in df_res.groupby("cluster"):
             g = group.copy()
