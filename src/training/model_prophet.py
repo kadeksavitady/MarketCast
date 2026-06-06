@@ -3,14 +3,6 @@ src/training/model_prophet.py
 ==============================
 Baseline 2: Prophet — Hybrid Expanding+Sliding CV
 ────────────────────────────────────────────────────────────
-POSISI DALAM PIPELINE:
-    ← Input : data dict dari data_loader.prepare_series()
-              training_mode dari train_all._call_model()
-    → Output: dict {model, metrics, forecast, run_id, ...}
-              MLflow runs di DagsHub (nested per split)
-MLflow logging:
-    Parent run : weighted metrics + best params + future forecast
-    Child run  : per-split metrics + params (nested)
 """
 import warnings
 import logging
