@@ -71,7 +71,6 @@ PARAM_GRID = {
 # ═════════════════════════════════════════════════════════════════════════════
 # 1. SPLIT GENERATOR — Hybrid Expanding + Sliding
 # ═════════════════════════════════════════════════════════════════════════════
- 
 def build_splits(
     series: np.ndarray,
     dates: pd.DatetimeIndex,
@@ -79,30 +78,6 @@ def build_splits(
     test_window: int = TEST_WINDOW,
     min_train: int = MIN_TRAIN,
 ) -> List[Dict]:
-    """
-    Generate split indices untuk Hybrid Expanding + Sliding.
- 
-    Expanding: train start tetap di awal, train end bergerak maju.
-    Sliding  : train start bergeser, train end tetap bergeser serentak.
-    Titik transisi: setelah split ke-3 (default) beralih ke sliding.
- 
-    Fallback data pendek:
-        Kalau n hari < min_train + test_window * n_splits:
-        Turunkan ke 3 split, min_train = 60% data, test = 30 hari.
- 
-    Returns:
-        List of dict, tiap dict berisi:
-            split_idx : int (1-based)
-            mode      : "expanding" | "sliding"
-            train_idx : slice
-            test_idx  : slice
-            train_start: date
-            train_end  : date
-            test_start : date
-            test_end   : date
-            n_train    : int
-            n_test     : int
-    """
     n = len(series)
     required = min_train + test_window * n_splits
  
@@ -173,7 +148,6 @@ def build_splits(
  
     return splits
  
- 
 def compute_weighted_mape(split_metrics: List[Dict]) -> float:
     """
     Weighted MAPE dengan bobot decay [0.10, 0.15, 0.20, 0.25, 0.30].
@@ -191,7 +165,6 @@ def compute_weighted_mape(split_metrics: List[Dict]) -> float:
 # ═════════════════════════════════════════════════════════════════════════════
 # 2. SARIMA FITTING HELPERS
 # ═════════════════════════════════════════════════════════════════════════════
- 
 def fit_auto_arima(train: np.ndarray) -> Tuple[object, tuple, tuple]:
     """
     auto_arima untuk mode tournament.
@@ -228,13 +201,10 @@ def fit_prior_with_gridsearch(
 ) -> Tuple[object, tuple, tuple, float]:
     """
     Mode specialize: GridSearch 36 kombinasi di sekitar prior knowledge.
- 
     Strategi:
         1. Mulai dari prior order cluster → pastikan konvergen.
         2. Grid search semua 36 kombinasi, pilih AIC terkecil.
         3. Fallback ke prior kalau semua gagal.
- 
-    Returns: (best_model, best_order, best_seasonal_order, best_aic)
     """
     prior_pdq = PRIOR_ORDER.get(cluster, (1, 1, 1))
     log.info(f"  Prior order untuk {cluster}: {prior_pdq}")
@@ -285,14 +255,12 @@ def fit_prior_with_gridsearch(
         except Exception as e:
             log.error(f"  Prior fallback juga gagal: {e}")
             raise
- 
     return best_model, best_order, best_seas, best_aic
  
- 
+
 # ═════════════════════════════════════════════════════════════════════════════
 # 3. EVALUASI PER SPLIT
 # ═════════════════════════════════════════════════════════════════════════════
- 
 def evaluate_split(
     model,
     train: np.ndarray,
@@ -309,7 +277,6 @@ def evaluate_split(
         log.warning(f"  Forecast gagal ({e}), pakai last value.")
         forecast  = np.full(len(test), train[-1])
         conf_int  = np.column_stack([forecast * 0.9, forecast * 1.1])
- 
     metrics = compute_metrics(test, forecast)
     return {
         **metrics,
@@ -322,7 +289,6 @@ def evaluate_split(
 # ═════════════════════════════════════════════════════════════════════════════
 # 4. MAIN TRAINING FUNCTION
 # ═════════════════════════════════════════════════════════════════════════════
- 
 def train_sarima(
     komoditas: str,
     data: dict,
@@ -330,19 +296,14 @@ def train_sarima(
     mode: str = "tournament",   # "tournament" | "specialize"
 ) -> dict:
     """
-    Train SARIMA dengan Hybrid Expanding + Sliding CV.
- 
     mode="tournament":
         - auto_arima untuk pilih order
         - 5 split (atau fallback)
         - Log semua split sebagai nested runs
- 
     mode="specialize":
         - GridSearch 36 kombinasi dengan prior knowledge
         - 5 split (atau fallback)
         - Log best order + tuning summary
- 
-    Returns dict: model, metrics, forecast, run_id, model_uri
     """
     init_mlflow()
     mlflow.set_experiment(mlflow_experiment or "MarketCast-Tournament")
@@ -392,7 +353,6 @@ def train_sarima(
  
         # ── Per-split training ────────────────────────────────────────────────
         split_results = []
- 
         for sp in splits:
             i           = sp["split_idx"]
             train       = series_full[sp["train_start"]:sp["train_end"]]
@@ -422,11 +382,9 @@ def train_sarima(
                 if mode == "tournament":
                     model, order, seas_order = fit_auto_arima(train)
                     best_aic = round(model.aic(), 4)
- 
                 else:   # specialize
                     model, order, seas_order, best_aic = \
                         fit_prior_with_gridsearch(train, cluster)
- 
                 log.info(f"  Order: SARIMA{order}x{seas_order} | AIC={best_aic:.2f}")
  
                 mlflow.log_params({
@@ -576,22 +534,17 @@ def train_sarima(
 # ═════════════════════════════════════════════════════════════════════════════
 # 5. PLOT
 # ═════════════════════════════════════════════════════════════════════════════
- 
 def _plot_sarima_cv(
     komoditas, series_full, dates_full,
     split_results, future_forecast, future_ci, cluster,
 ):
-    """
-    Plot gabungan semua split CV + future forecast.
-    Tiap split ditampilkan dengan warna berbeda.
-    """
+    """Plot gabungan semua split CV + future forecast."""
     SPLIT_COLORS = ["#E74C3C", "#E67E22", "#F1C40F", "#27AE60", "#2980B9"]
     fig, ax = plt.subplots(figsize=(16, 6))
  
     # Aktual full series (90 hari terakhir untuk readability)
     ax.plot(dates_full[-90:], series_full[-90:],
             color="#2C3E50", lw=1.5, label="Aktual", zorder=5)
- 
     # Tiap split forecast
     for i, r in enumerate(split_results):
         color = SPLIT_COLORS[i % len(SPLIT_COLORS)]
@@ -603,7 +556,6 @@ def _plot_sarima_cv(
         ax.fill_between(r["dates_test"],
                         r["conf_int"][:, 0], r["conf_int"][:, 1],
                         color=color, alpha=0.08)
- 
     # Future forecast
     last_date    = dates_full[-1]
     future_dates = pd.date_range(
@@ -616,7 +568,6 @@ def _plot_sarima_cv(
     ax.fill_between(future_dates,
                     future_ci[:, 0], future_ci[:, 1],
                     color="#8E44AD", alpha=0.12)
- 
     ax.set_title(
         f"SARIMA — {komoditas}  [cluster: {cluster}]\n"
         f"Hybrid Expanding+Sliding | {len(split_results)} splits",
