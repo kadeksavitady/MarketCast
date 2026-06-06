@@ -3,17 +3,17 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --bg: #f4f6f9;
-  --sidebar-bg: #ffffff;
+  --bg: #f8faf8;
   --card-bg: #ffffff;
-  --border: #e8ecf0;
-  --primary: #00c896;
-  --primary-light: #e6faf5;
-  --primary-dark: #009e77;
-  --accent: #ff6b35;
-  --text-main: #1a2332;
-  --text-sub: #6b7a8d;
-  --text-muted: #9aa5b4;
+  --border: #e8f5e9;
+  --primary: #4ADE80;
+  --primary-mid: #2d6a4f;
+  --primary-dark: #1B4332;
+  --primary-light: #f0fdf4;
+  --accent: #F9A825;
+  --text-main: #1a1a1a;
+  --text-sub: #6b7280;
+  --text-muted: #9ca3af;
   --red: #ef4444;
   --yellow: #f59e0b;
   --blue: #3b82f6;

@@ -17,12 +17,10 @@ def predict_budget(payload: PredictRequest):
             
         info = COMMODITY_CATALOG[item.komoditas_id]
         
-        # 🚨 PERBAIKAN: Gunakan info["nama"], tangkap error dengan tegas
         try:
             harga_satuan = predict_harga_satuan(info["nama"])
         except Exception as e:
-            # Logger kita taruh tepat di sini sebelum HTTPException dilempar
-            logger.error(f"🚨 TRACEBACK ERROR PREDIKSI: {str(e)}") 
+            logger.error(f"Prediction error for {info['nama']}: {e}")
             raise HTTPException(status_code=400, detail=f"Gagal memprediksi harga {info['nama']}: {str(e)}")
             
         subtotal = harga_satuan * item.jumlah
