@@ -1,9 +1,5 @@
 import { Lightbulb, AlertTriangle, XCircle, CheckCircle, Trash2, MinusCircle } from "lucide-react";
-
-function formatRp(val) {
-  if (!val && val !== 0) return "Rp 0";
-  return "Rp " + Math.round(val).toLocaleString("id-ID");
-}
+import { formatRp } from "../utils/format";
 
 function getSaranKurangi(hasilPredict, budget) {
   if (!hasilPredict?.detail_keranjang?.length) return null;

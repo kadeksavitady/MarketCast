@@ -18,13 +18,10 @@ def build_substitution_dynamic(keranjang: List[CartItem], detail: List[ItemResul
 
         for slug, info in COMMODITY_CATALOG.items():
             if info["kategori"] == kategori_target and slug != current_id:
-                # 🚨 PERBAIKAN 1: Gunakan info["nama"]
-                # 🚨 PERBAIKAN 2: Gunakan try-except agar tidak crash jika model rusak
                 try:
                     sub_harga = predict_harga_satuan(info["nama"])
                 except Exception as e:
-                    logger.warning(f"Melewati {info['nama']} untuk substitusi karena gagal prediksi: {e}")
-                    # Gunakan harga referensi dari katalog jika MLflow gagal
+                    logger.warning(f"Skipping {info['nama']} for substitution (prediction failed): {e}")
                     sub_harga = float(info.get("harga_ref", 0.0))
                 
                 # Jangan hitung hemat jika harga pengganti 0 (data tidak valid)

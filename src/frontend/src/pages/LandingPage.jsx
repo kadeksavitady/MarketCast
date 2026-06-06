@@ -9,9 +9,9 @@ import {
 function useScrolled(threshold = 80) {
   const [scrolled, setScrolled] = useState(false);
   useEffect(() => {
-    const fn = () => setScrolled(window.scrollY > threshold);
-    window.addEventListener("scroll", fn, { passive: true });
-    return () => window.removeEventListener("scroll", fn);
+    const onScroll = () => setScrolled(window.scrollY > threshold);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
   }, [threshold]);
   return scrolled;
 }
@@ -85,15 +85,14 @@ export default function LandingPage() {
   const [faqRef,   faqInView]       = useInView(0.1);
   const [ctaRef,   ctaInView]       = useInView(0.15);
 
-  const c43    = useCounter(43,    statsInView);
-  const c56100 = useCounter(80000, statsInView);
-  const c5     = useCounter(5,     statsInView);
+  const komoditasCount        = useCounter(43,    statsInView);
+  const penggunaPotensialCount = useCounter(80000, statsInView);
+  const tahunDataCount         = useCounter(5,     statsInView);
 
-  const over = scrolled;
-  const navText = over ? "#1C1917"              : "rgba(255,255,255,.9)";
-  const navBg   = over ? "rgba(250,250,248,.97)": "transparent";
-  const navBlur = over ? "blur(14px)"           : "none";
-  const navShad = over ? "0 1px 24px rgba(0,0,0,.08)" : "none";
+  const navText = scrolled ? "#1C1917"              : "rgba(255,255,255,.9)";
+  const navBg   = scrolled ? "rgba(250,250,248,.97)": "transparent";
+  const navBlur = scrolled ? "blur(14px)"           : "none";
+  const navShad = scrolled ? "0 1px 24px rgba(0,0,0,.08)" : "none";
 
   return (
     <div style={{ fontFamily:"'Plus Jakarta Sans','Segoe UI',system-ui,sans-serif",
@@ -272,9 +271,9 @@ export default function LandingPage() {
       <div ref={statsRef} style={{ background:"#1B4332",padding:"40px 6%" }}>
         <div className="lp-4col" style={{ display:"grid",gridTemplateColumns:"repeat(4,1fr)",maxWidth:1100,margin:"0 auto" }}>
           {[
-            { v:c43,                             s:"",       l:"Komoditas"    },
-            { v:c56100.toLocaleString("id-ID"),  s:"+",      l:"Data Historis"},
-            { v:c5,                              s:" Tahun", l:"Data Tersedia"},
+            { v:komoditasCount,                             s:"",       l:"Komoditas"    },
+            { v:penggunaPotensialCount.toLocaleString("id-ID"),  s:"+",      l:"Data Historis"},
+            { v:tahunDataCount,                              s:" Tahun", l:"Data Tersedia"},
             { v: (
                 <div style={{
                   display:"inline-flex", alignItems:"center", gap:10,

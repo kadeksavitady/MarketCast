@@ -17,7 +17,7 @@ export default function Sidebar() {
 
   return (
     <aside style={{
-      ...s.sidebar,
+      ...styles.sidebar,
       width: collapsed ? 64 : 230,
     }}>
 
@@ -26,25 +26,25 @@ export default function Sidebar() {
         onClick={toggle}
         title={collapsed ? "Buka sidebar" : "Sembunyikan sidebar"}
         style={{
-          ...s.logoRow,
+          ...styles.logoRow,
           justifyContent: collapsed ? "center" : "flex-start",
           marginBottom: 28,
         }}
       >
-        <div style={s.logoIcon}>
+        <div style={styles.logoIcon}>
           <img src="/logo-white.svg" style={{ width:42, height:42 }} alt="MarketCast" />
         </div>
         {!collapsed && (
           <div style={{ overflow: "hidden" }}>
-            <div style={s.logoText}>MarketCast</div>
-            <div style={s.logoSub}>Kota Surabaya</div>
+            <div style={styles.logoText}>MarketCast</div>
+            <div style={styles.logoSub}>Kota Surabaya</div>
           </div>
         )}
       </div>
 
       {/* Nav label */}
       {!collapsed && (
-        <p style={s.navLabel}>MENU</p>
+        <p style={styles.navLabel}>MENU</p>
       )}
 
       {/* Nav items */}
@@ -56,8 +56,8 @@ export default function Sidebar() {
             onClick={() => navigate(id)}
             title={collapsed ? label : ""}
             style={{
-              ...s.navItem,
-              ...(active ? s.navActive : {}),
+              ...styles.navItem,
+              ...(active ? styles.navActive : {}),
               justifyContent: collapsed ? "center" : "flex-start",
               padding: collapsed ? "10px 0" : "10px 12px",
             }}
@@ -76,7 +76,7 @@ export default function Sidebar() {
   );
 }
 
-const s = {
+const styles = {
   sidebar: {
     minHeight: "100vh",
     background: "#1B4332",

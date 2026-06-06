@@ -10,13 +10,7 @@ import {
 } from "recharts";
 import ChartSkeleton from "../components/ChartSkeleton";
 import ErrorCard from "../components/ErrorCard";
-
-// ── Helpers ────────────────────────────────────────────────────────
-
-function formatRp(val) {
-  if (!val && val !== 0) return "Rp 0";
-  return "Rp " + Math.round(val).toLocaleString("id-ID");
-}
+import { formatRp } from "../utils/format";
 
 function formatTanggal(str) {
   const d = new Date(str);
@@ -108,13 +102,13 @@ export default function TrenHarga() {
 
   // ── Close dropdown on outside click ──
   useEffect(() => {
-    const fn = (e) => {
+    const onClickOutside = (e) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
         setDropdownOpen(false);
       }
     };
-    document.addEventListener("mousedown", fn);
-    return () => document.removeEventListener("mousedown", fn);
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
   }, []);
 
   // ── Load highlights dengan health check ──
@@ -225,7 +219,7 @@ export default function TrenHarga() {
   const lastHarga   = trenData?.data_historis?.slice(-1)[0]?.harga;
   const nextHarga   = trenData?.forecast_30_hari?.[29]?.harga;
   const forecastPct = trenData?.forecast_trend_percentage ?? null;
-  const satuanLabel = selectedKomoditas?.satuan || trenData?.satuan || "kg";
+  const satuanLabel = selectedKomoditas?.satuan || "kg";
 
 return (
     <>

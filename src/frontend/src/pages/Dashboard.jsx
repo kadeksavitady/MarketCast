@@ -1,16 +1,20 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { getKomoditas, getKategori, predictBelanja } from "../services/api";
+import {
+  getKomoditas, getKategori, predictBelanja, withTimeout,
+} from "../services/api";
 import {
   ShoppingCart, Wallet, X, Plus, Minus,
   ChevronRight, Package, Beef, Droplets, Egg,
   Leaf, Fish, Wheat, Cookie, FlameKindling,
-  TrendingUp, TrendingDown,
 } from "lucide-react";
 import SmartSubstitution from "../components/SmartSubstitution";
 import { ICON_CATALOG } from "../assets/iconCatalog";
 import PredictLoading from "../components/PredictLoading";
 import ErrorCard from "../components/ErrorCard";
-import { withTimeout } from "../services/api";
+import { formatRp } from "../utils/format";
+import StatCard from "../components/StatCard";
+import Toast from "../components/Toast";
+import KomoditasModal from "../components/KomoditasModal";
 
 // Icon mapping per kategori
 const KATEGORI_ICON = {
@@ -32,10 +36,6 @@ const KATEGORI_ICON = {
   "BARANG PENTING LAINNYA": { icon: Package, bg: "#f1f5f9", color: "#475569" },
 };
 
-function formatRp(val) {
-  if (!val && val !== 0) return "Rp 0";
-  return "Rp " + Math.round(val).toLocaleString("id-ID");
-}
 
 export default function Dashboard() {
   const [kategoriList,    setKategoriList]    = useState([]);
@@ -577,155 +577,19 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* ════════════════ MODAL ════════════════ */}
-        {showModal && (
-          <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.4)", zIndex:200,
-            display:"flex", alignItems:"center", justifyContent:"center",
-            backdropFilter:"blur(6px)" }}
-            onClick={() => setShowModal(false)}>
-            <div style={{ background:"white", borderRadius:22,
-              boxShadow:"0 24px 70px rgba(0,0,0,.18)", width:440, maxHeight:"80vh",
-              display:"flex", flexDirection:"column", overflow:"hidden" }}
-              onClick={(e) => e.stopPropagation()}>
+        <KomoditasModal
+          open={showModal}
+          onClose={() => setShowModal(false)}
+          selectedKat={selectedKat}
+          katIconMeta={KATEGORI_ICON[selectedKat?.kategori]}
+          loadingKomoditas={loadingKomoditas}
+          komoditasList={komoditasList}
+          onAdd={addToKeranjang}
+        />
 
-              {/* Modal header */}
-              <div style={{ padding:"20px 22px", borderBottom:"1px solid #f0fdf4",
-                display:"flex", alignItems:"center", justifyContent:"space-between",
-                background:"linear-gradient(135deg,#1B4332,#2d6a4f)" }}>
-                <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-                  {KATEGORI_ICON[selectedKat?.kategori] && (() => {
-                    const meta = KATEGORI_ICON[selectedKat.kategori];
-                    const Icon = meta.icon;
-                    return (
-                      <div style={{ width:34, height:34, borderRadius:10, background:"rgba(255,255,255,.15)",
-                        display:"flex", alignItems:"center", justifyContent:"center" }}>
-                        {ICON_CATALOG[selectedKat.kategori]
-                          ? <img src={ICON_CATALOG[selectedKat.kategori]}
-                              style={{ width:20, height:20, objectFit:"contain" }} alt="" />
-                          : <Icon size={18} color="white" />
-                        }
-                      </div>
-                    );
-                  })()}
-                  <div>
-                    <div style={{ fontSize:15, fontWeight:800, color:"white" }}>
-                      {selectedKat?.kategori}
-                    </div>
-                    <div style={{ fontSize:11.5, color:"rgba(255,255,255,.6)" }}>
-                      Pilih komoditas untuk ditambahkan
-                    </div>
-                  </div>
-                </div>
-                <button onClick={() => setShowModal(false)} style={{ width:32, height:32,
-                  border:"none", background:"rgba(255,255,255,.15)", borderRadius:10,
-                  cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center",
-                  color:"white", transition:"background .15s" }}
-                  onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,.25)"}
-                  onMouseLeave={e=>e.currentTarget.style.background="rgba(255,255,255,.15)"}>
-                  <X size={15} />
-                </button>
-              </div>
-
-              {/* Modal body */}
-              <div style={{ padding:16, overflowY:"auto", maxHeight:"60vh" }}>
-                {loadingKomoditas ? (
-                  <div style={{ textAlign:"center", padding:"32px 0", color:"#9ca3af" }}>
-                    <div style={{ display:"flex", alignItems:"center", gap:8,
-                      justifyContent:"center", fontSize:14 }}>
-                      <span className="db-pulse-dot" style={{ width:8, height:8,
-                        borderRadius:"50%", background:"#1B4332", display:"inline-block" }} />
-                      Memuat komoditas...
-                    </div>
-                  </div>
-                ) : (
-                  <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-                    {komoditasList.map((item) => (
-                      <div key={item.id} className="db-item-row" onClick={() => addToKeranjang(item)}>
-                        <div>
-                          <div style={{ fontSize:14, fontWeight:700, color:"#1a1a1a" }}>
-                            {item.nama}
-                          </div>
-                          <div style={{ fontSize:12, color:"#9ca3af",
-                            fontFamily:"DM Mono,monospace", marginTop:2 }}>
-                            {formatRp(item.harga_ref)}/{item.satuan}
-                          </div>
-                        </div>
-                        <button style={{ background:"#1B4332", color:"white", border:"none",
-                          width:32, height:32, borderRadius:10, cursor:"pointer",
-                          display:"flex", alignItems:"center", justifyContent:"center",
-                          boxShadow:"0 2px 8px rgba(27,67,50,.25)", transition:"all .15s" }}
-                          onMouseEnter={e=>e.currentTarget.style.background="#2d6a4f"}
-                          onMouseLeave={e=>e.currentTarget.style.background="#1B4332"}>
-                          <Plus size={15} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* TOAST */}
-        {toast.msg && <AppToast msg={toast.msg} type={toast.type} />}
+        {toast.msg && <Toast msg={toast.msg} type={toast.type} />}
       </div>
     </>
-  );
-}
-
-// ── StatCard ────────────────────────────────────────────────────────
-
-function StatCard({ label, value, valueColor, badge, badgeColor, accent, barColor }) {
-  return (
-    <div className="db-stat-card">
-      {/* Accent blob */}
-      <div style={{ position:"absolute", top:-10, right:-10, width:70, height:70,
-        borderRadius:"50%", background:accent, opacity:.45, pointerEvents:"none" }} />
-      <div style={{ fontSize:11, color:"#9ca3af", fontWeight:700, textTransform:"uppercase",
-        letterSpacing:"1px", marginBottom:10 }}>{label}</div>
-      <div style={{ fontSize:22, fontWeight:900, letterSpacing:"-.5px",
-        color:valueColor, marginBottom:8 }}>{value}</div>
-      <span style={{ fontSize:11, fontWeight:700, padding:"3px 10px", borderRadius:20,
-        background:badgeColor.bg, color:badgeColor.text,
-        border:`1px solid ${badgeColor.border}` }}>
-        {badge}
-      </span>
-      {/* Accent bar */}
-      <div style={{ position:"absolute", bottom:0, left:0, right:0, height:3,
-        background:barColor, borderRadius:"0 0 18px 18px" }} />
-    </div>
-  );
-}
-
-// ── AppToast ────────────────────────────────────────────────────────
-
-function AppToast({ msg, type }) {
-  const cfg = {
-    success: { bg:"#f0fdf4", border:"#a7f3d0", color:"#1B4332",   icon:"✅", title:"Berhasil"  },
-    warning: { bg:"#fffbeb", border:"#fde68a", color:"#92400e",   icon:"⚠️", title:"Perhatian"  },
-    error:   { bg:"#fef2f2", border:"#fecaca", color:"#dc2626",   icon:"❌", title:"Gagal"      },
-    info:    { bg:"#eff6ff", border:"#bfdbfe", color:"#1d4ed8",   icon:"ℹ️", title:"Info"       },
-  }[type] || {};
-
-  return (
-    <div className="db-toast" style={{
-      position:"fixed", bottom:28, right:28, zIndex:999,
-      display:"flex", alignItems:"flex-start", gap:12,
-      background:cfg.bg, border:`1.5px solid ${cfg.border}`,
-      borderLeft:`4px solid ${cfg.border}`, borderRadius:14,
-      padding:"14px 18px",
-      boxShadow:"0 8px 24px rgba(0,0,0,.12), 0 2px 8px rgba(0,0,0,.06)",
-      maxWidth:320, minWidth:240,
-    }}>
-      <span style={{ fontSize:18, lineHeight:1.2, flexShrink:0 }}>{cfg.icon}</span>
-      <div>
-        <div style={{ fontSize:13.5, fontWeight:800, color:cfg.color, marginBottom:2 }}>
-          {cfg.title}
-        </div>
-        <div style={{ fontSize:12.5, color:cfg.color, opacity:.8, lineHeight:1.5 }}>{msg}</div>
-      </div>
-    </div>
   );
 }
 
