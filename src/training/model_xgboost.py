@@ -404,6 +404,7 @@ def train_xgboost(
 
         # ── Per-split training & evaluasi ─────────────────────────────────────
         split_results = []
+        all_actuals, all_preds = [], []
 
         for sp in splits:
             i            = sp["split_idx"]
@@ -513,39 +514,45 @@ def train_xgboost(
             FORECAST_DAYS, feature_cols,
         )
 
-        # ── Visualisasi Poin A - F ──
+        # ── Visualisasi & Logging (Evaluasi Poin A - F) ───────────────────────
         slug = komoditas.replace(" ", "_").replace("/", "_")
-        for fig_func, name, folder in [(_plot_importance(final_model, feature_cols, komoditas), "imp", "plots"), (_plot_xgboost_cv(komoditas, series_full, dates_full, split_results, future_forecast, cluster), "cv", "plots"), (_plot_xgb_diagnostics(all_actuals, all_preds, komoditas), "diag", "diagnostics")]:
-            fig_func.savefig(f"/tmp/xgb_{name}_{slug}.png", bbox_inches="tight"); plt.close(fig_func); mlflow.log_artifact(f"/tmp/xgb_{name}_{slug}.png", folder)
+        safe_name = slug # Konsistensi penamaan registry
 
-        try:
-            fig_shap = _plot_shap(final_model, feat_full[feature_cols], komoditas)
-            fig_shap.savefig(f"/tmp/xgb_shap_{slug}.png", bbox_inches="tight"); plt.close(fig_shap); mlflow.log_artifact(f"/tmp/xgb_shap_{slug}.png", "diagnostics")
-        except Exception: pass
-
-        mlflow.xgboost.log_model(final_model, name=f"XGBoost_{slug}")
-        run_id, model_uri = parent_run.info.run_id, f"runs:/{parent_run.info.run_id}/XGBoost_{slug}"
-
-        # ── Plots ─────────────────────────────────────────────────────────────
-        slug = komoditas.replace(" ", "_").replace("/", "_")
-
+        # 1. Feature Importance Plot (Poin A)
         fig_imp = _plot_importance(final_model, feature_cols, komoditas)
         imp_path = f"/tmp/xgb_importance_{slug}.png"
         fig_imp.savefig(imp_path, dpi=120, bbox_inches="tight")
         plt.close(fig_imp)
         mlflow.log_artifact(imp_path, artifact_path="plots")
 
-        fig = _plot_xgboost_cv(
+        # 2. Forecast CV Backtesting Plot (Poin B)
+        fig_cv = _plot_xgboost_cv(
             komoditas, series_full, dates_full,
-            split_results, future_forecast, cluster,
+            split_results, future_forecast, cluster
         )
-        plot_path = f"/tmp/xgb_{slug}.png"
-        fig.savefig(plot_path, dpi=120, bbox_inches="tight")
-        plt.close(fig)
-        mlflow.log_artifact(plot_path, artifact_path="plots")
+        cv_path = f"/tmp/xgb_cv_{slug}.png"
+        fig_cv.savefig(cv_path, dpi=120, bbox_inches="tight")
+        plt.close(fig_cv)
+        mlflow.log_artifact(cv_path, artifact_path="plots")
 
-        # ── Log model ─────────────────────────────────────────────────────────
-        safe_name = komoditas.replace(" ", "_").replace("/", "_")
+        # 3. Diagnostik: Distribusi Error & Actual vs Prediction (Poin C & D)
+        fig_diag = _plot_xgb_diagnostics(all_actuals, all_preds, komoditas)
+        diag_path = f"/tmp/xgb_diag_{slug}.png"
+        fig_diag.savefig(diag_path, dpi=120, bbox_inches="tight")
+        plt.close(fig_diag)
+        mlflow.log_artifact(diag_path, artifact_path="diagnostics")
+
+        # 4. SHAP Summary Plot (Poin F)
+        try:
+            fig_shap = _plot_shap(final_model, feat_full[feature_cols], komoditas)
+            shap_path = f"/tmp/xgb_shap_{slug}.png"
+            fig_shap.savefig(shap_path, dpi=120, bbox_inches="tight")
+            plt.close(fig_shap)
+            mlflow.log_artifact(shap_path, artifact_path="diagnostics")
+        except Exception as e:
+            log.warning(f"  SHAP Plot gagal dieksekusi: {e}")
+
+        # ── Log Model ke MLflow Registry ──────────────────────────────────────
         mlflow.xgboost.log_model(final_model, name=f"XGBoost_{safe_name}")
 
         run_id    = parent_run.info.run_id
@@ -553,6 +560,7 @@ def train_xgboost(
 
     log.info(f"\n[{MODEL_NAME}] {komoditas} selesai. run_id={run_id[:8]}...")
 
+    # ── Return Final Dictionary ───────────────────────────────────────────────
     return {
         "komoditas"      : komoditas,
         "model"          : final_model,
