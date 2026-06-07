@@ -426,6 +426,8 @@ def train_prophet(
                 })
  
                 metrics = evaluate_split_prophet(model_split, dates_test, test)
+                ci_cov = compute_ci_coverage(test, metrics["ci_lower"], metrics["ci_upper"])
+                metrics["ci_coverage"] = ci_cov
                 mlflow.log_metrics({
                     f"split_{i}_mae"  : metrics["mae"],
                     f"split_{i}_rmse" : metrics["rmse"],
@@ -497,31 +499,25 @@ def train_prophet(
             periods=FORECAST_DAYS, freq="D",
         )
         future_pred = final_model.predict(pd.DataFrame({"ds": future_dates}))
+
+        # ── Plot & Logging Artifacts (Poin A - J) ─────────────
+        slug = komoditas.replace(" ", "_").replace("/", "_")
+        # Plot 1: Forecast CV Backtesting (Poin A, B, D, E)
+        fig_cv = _plot_prophet_cv(komoditas, series_full, dates_full, split_results, future_pred, cluster)
+        cv_path = f"/tmp/prophet_cv_{slug}.png"
+        fig_cv.savefig(cv_path, dpi=120, bbox_inches="tight"); plt.close(fig_cv)
+        mlflow.log_artifact(cv_path, artifact_path="plots")
  
-        # ── Plot ──────────────────────────────────────────────
-        fig = _plot_prophet_cv(
-            komoditas, series_full, dates_full,
-            split_results, future_pred, cluster,
-        )
-        safe_name = komoditas.replace(" ", "_").replace("/", "_")
-        plot_path = f"/tmp/prophet_{safe_name}.png"
-        fig.savefig(plot_path, dpi=120, bbox_inches="tight")
-        plt.close(fig)
-        mlflow.log_artifact(plot_path, artifact_path="plots")
- 
-        # Component plot (dekomposisi trend + seasonality)
-        comp_df  = future_pred
-        fig_comp = final_model.plot_components(comp_df)
-        comp_path = f"/tmp/prophet_components_{safe_name}.png"
-        fig_comp.savefig(comp_path, dpi=100, bbox_inches="tight")
-        plt.close(fig_comp)
+        # Plot 2: Component Plot - Trend, Weekly, Monthly, Yearly, Holiday (Poin F, G, H, I)
+        fig_comp = final_model.plot_components(future_pred)
+        comp_path = f"/tmp/prophet_components_{slug}.png"
+        fig_comp.savefig(comp_path, dpi=100, bbox_inches="tight"); plt.close(fig_comp)
         mlflow.log_artifact(comp_path, artifact_path="plots")
         
-        safe_name = komoditas.replace(" ", "_").replace("/", "_")
-        mlflow.prophet.log_model(final_model, name=f"Prophet_{safe_name}")
-
-        run_id    = parent_run.info.run_id
-        model_uri = f"runs:/{run_id}/Prophet_{safe_name}"
+        # Registrasi Model
+        mlflow.prophet.log_model(final_model, artifact_path=f"Prophet_{slug}")
+        run_id = parent_run.info.run_id
+        model_uri = f"runs:/{run_id}/Prophet_{slug}"
 
         mlflow.log_params({
             "final_cps"           : best_cps,
