@@ -278,7 +278,9 @@ def run_and_log_clustering_pipeline(
                 "cluster", "cluster_label", "dist", "is_centroid"
             ]].copy()
             assignments.index.name = "komoditas"
-            assignments.to_csv(tmp_path / "cluster_assignments.csv")
+            model_artifacts_dir = tmp_path / "model_artifacts"
+            os.makedirs(model_artifacts_dir, exist_ok=True)
+            assignments.to_csv(model_artifacts_dir / "cluster_assignments.csv")
 
             # data_preprocessed.csv
             df_export = df_clean[["tanggal", "komoditas", "harga_per_kg"]].copy()
@@ -338,7 +340,7 @@ def run_and_log_clustering_pipeline(
             f"✅ {REGISTRY_NAME} v{mv.version} @production — "
             f"siap dipakai FastAPI backend."
         )
-                
+
 # ─────────────────────────────────────────────────────────────────────────────
 # MAIN
 # ─────────────────────────────────────────────────────────────────────────────
