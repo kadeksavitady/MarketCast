@@ -476,7 +476,24 @@ def train_sarima(
             return_conf_int=True,
             alpha=0.05,
         )
- 
+
+        # ── Step 3: Diagnostik Residual ──────────────────────────────────────
+        diag_metrics, diag_plots = compute_diagnostics(
+            final_model, series_full, komoditas
+        )
+        if diag_metrics:
+            mlflow.log_metrics(diag_metrics)
+        for dp in diag_plots:
+            mlflow.log_artifact(dp, artifact_path="diagnostics")
+
+        # Weighted CI coverage
+        wci_cov = sum(
+            w * r.get("ci_coverage", 0.0)
+            for w, r in zip(split_weights, split_results)
+        )
+        agg_metrics["ci_coverage"] = round(wci_cov, 2)
+        mlflow.log_metric("ci_coverage_weighted", wci_cov)
+
         # ── Plot ──────────────────────────────────────────────────────────────
         fig = _plot_sarima_cv(
             komoditas, series_full, dates_full,
