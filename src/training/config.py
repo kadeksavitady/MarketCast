@@ -115,7 +115,7 @@ def init_mlflow() -> str:
 # PATH — semua relatif terhadap root repo
 # ─────────────────────────────────────────────────────────────
 DIR_OUTPUTS_BASE = Path("outputs")
-CSV_CLUSTER_ASSIGN = DIR_OUTPUTS_BASE / "clustering_results" / "cluster_assignments.csv"
+CSV_CLUSTER_ASSIGN = DIR_OUTPUTS_BASE / "clustering_results" / "model_artifacts"/ "cluster_assignments.csv"
 CSV_CENTROID       = DIR_OUTPUTS_BASE / "clustering_results" / "centroid_representatives.csv"
 YAML_MODEL_REGISTRY = DIR_OUTPUTS_BASE / "registry" / "model_registry_map.yaml"
 
