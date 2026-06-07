@@ -132,12 +132,14 @@ def _call_model(model_name: str, komoditas: str, data: dict,
     Wrapper pemanggilan model yang meneruskan training_mode.
     """
     fn = MODEL_REGISTRY[model_name]
-    return fn(
-        komoditas,
-        data,
-        mlflow_experiment=mlflow_experiment,
-        mode=training_mode,
-    )
+    if model_name == "sarima":
+        return fn(komoditas, data,
+                  mlflow_experiment=mlflow_experiment,
+                  mode=training_mode)
+    else:
+        # Prophet & XGBoost: tidak ada parameter mode
+        return fn(komoditas, data,
+                  mlflow_experiment=mlflow_experiment)
 
 def _select_champion_ranksum(df_res: pd.DataFrame) -> pd.DataFrame:
     """
