@@ -19,6 +19,7 @@ import numpy as np
 import pandas as pd
 import mlflow
 import mlflow.sklearn
+import mlflow.pyfunc
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
