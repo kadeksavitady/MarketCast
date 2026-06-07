@@ -196,10 +196,6 @@ def fit_prior_with_gridsearch(
 ) -> Tuple[object, tuple, tuple, float]:
     """
     Mode specialize: GridSearch 36 kombinasi di sekitar prior knowledge.
-    Strategi:
-        1. Mulai dari prior order cluster → pastikan konvergen.
-        2. Grid search semua 36 kombinasi, pilih AIC terkecil.
-        3. Fallback ke prior kalau semua gagal.
     """
     prior_pdq = PRIOR_ORDER.get(cluster, (1, 1, 1))
     log.info(f"  Prior order untuk {cluster}: {prior_pdq}")
@@ -483,23 +479,48 @@ def train_sarima(
  
         # ── Log model ─────────────────────────────────────────────────────────
         # Retry logic untuk upload artifact ke DagHub (antisipasi timeout)
-        import time
+        import pickle, tempfile, os, time
+        import mlflow.pyfunc
+        class SARIMAWrapper(mlflow.pyfunc.PythonModel):
+            """Wrapper pmdarima → MLflow pyfunc agar bisa di-register."""
+            def load_context(self, context):
+                import pickle
+                with open(context.artifacts["sarima_pkl"], "rb") as f:
+                    self.model = pickle.load(f)
+
+            def predict(self, context, model_input):
+                import pandas as pd
+                n = int(model_input["n_periods"].iloc[0])
+                forecast, ci = self.model.predict(
+                    n_periods=n, return_conf_int=True, alpha=0.05)
+                return pd.DataFrame({
+                    "forecast" : forecast,
+                    "lower_ci" : ci[:, 0],
+                    "upper_ci" : ci[:, 1],
+                })
+
+        safe_name = komoditas.replace(" ", "_").replace("/", "_")
         for attempt in range(3):
             try:
-                safe_name = komoditas.replace(" ", "_").replace("/", "_")
-                mlflow.sklearn.log_model(
-                    sk_model=final_model,
-                    artifact_path=f"SARIMA_{safe_name}",
-                )
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    pkl_path = os.path.join(tmpdir, "model.pkl")
+                    with open(pkl_path, "wb") as f:
+                        pickle.dump(final_model, f)
+                    mlflow.pyfunc.log_model(
+                        artifact_path=f"SARIMA_{safe_name}",
+                        python_model=SARIMAWrapper(),
+                        artifacts={"sarima_pkl": pkl_path},
+                        pip_requirements=["pmdarima", "pandas", "numpy"],
+                    )
                 log.info(f"  Model artifact ter-upload (attempt {attempt+1})")
                 break
             except Exception as e:
                 if attempt < 2:
-                    log.warning(f"  Upload gagal attempt {attempt+1}: {e} — retry dalam 5 detik")
+                    log.warning(f"  Upload gagal attempt {attempt+1}: {e} — retry 5 detik")
                     time.sleep(5)
                 else:
                     log.error(f"  Upload gagal setelah 3 attempt: {e}")
- 
+
         run_id    = parent_run.info.run_id
         model_uri = f"runs:/{run_id}/SARIMA_{safe_name}"
  
