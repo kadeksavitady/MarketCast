@@ -401,18 +401,28 @@ def train_sarima(
                     f"MDA: {metrics['mda']:>6.2f}"
                 )
  
+                # CI coverage per split
+                ci_cov = compute_ci_coverage(test, metrics["conf_int"])
+                mlflow.log_metric(f"split_{i}_ci_coverage", ci_cov)
+
+                # Horizon error per split
+                horizon_err = compute_horizon_error(model, train, test)
+                mlflow.log_metrics({f"split_{i}_{k}": v
+                                    for k, v in horizon_err.items()})
+
                 split_results.append({
                     **metrics,
-                    "split_idx" : i,
-                    "mode"      : sp["mode"],
-                    "order"     : order,
-                    "seas_order": seas_order,
-                    "aic"       : best_aic,
-                    "train"     : train,
-                    "test"      : test,
+                    "split_idx"  : i,
+                    "mode"       : sp["mode"],
+                    "order"      : order,
+                    "seas_order" : seas_order,
+                    "aic"        : best_aic,
+                    "ci_coverage": ci_cov,
+                    "train"      : train,
+                    "test"       : test,
                     "dates_train": dates_train,
                     "dates_test" : dates_test,
-                    "model"     : model,
+                    "model"      : model,
                 })
  
         # ── Weighted MAPE agregat ─────────────────────────────────────────────
