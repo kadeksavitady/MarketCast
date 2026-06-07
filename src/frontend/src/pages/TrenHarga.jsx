@@ -131,7 +131,7 @@ export default function TrenHarga() {
       const results = [];
       for (const id of proxyKomoditas) {
         try {
-          const data = await withTimeout(getTren(id, 7), 2000);
+          const data = await withTimeout(getTren(id, 7), 8000);
           results.push({
             nama: data.nama_komoditas,
             historis: data.data_historis,
