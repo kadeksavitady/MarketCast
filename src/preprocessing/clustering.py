@@ -4,6 +4,7 @@ import argparse
 import logging
 import warnings
 import tempfile
+from typing import Tuple, List, Optional
 from pathlib import Path
 
 import numpy as np
