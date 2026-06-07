@@ -517,6 +517,8 @@ def train_xgboost(
         # ── Visualisasi & Logging (Evaluasi Poin A - F) ───────────────────────
         slug = komoditas.replace(" ", "_").replace("/", "_")
         safe_name = slug # Konsistensi penamaan registry
+        all_actuals = np.concatenate([r["test"] for r in split_results])
+        all_preds   = np.concatenate([r["forecast"] for r in split_results])
 
         # 1. Feature Importance Plot (Poin A)
         fig_imp = _plot_importance(final_model, feature_cols, komoditas)
