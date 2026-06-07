@@ -134,21 +134,11 @@ def _call_model(model_name: str, komoditas: str, data: dict,
     """
     fn = MODEL_REGISTRY[model_name]
     kwargs = {"mlflow_experiment": mlflow_experiment}
-
     if model_name in ["sarima", "xgboost"]:
         kwargs["mode"] = training_mode
-
-    if model_name == "sarima":
-        return fn(komoditas, data,
-                  mlflow_experiment=mlflow_experiment,
-                  mode=training_mode)
-    
-    if tuned_params and model_name == "xgboost":
-        kwargs["tuned_params"] = tuned_params
-
-    else:
-        # Prophet & XGBoost: tidak ada parameter mode
-        return fn(komoditas, data, **kwargs)
+        if tuned_params is not None:
+            kwargs["tuned_params"] = tuned_params
+    return fn(komoditas, data, **kwargs)
 
 def _select_champion_ranksum(df_res: pd.DataFrame) -> pd.DataFrame:
     """
