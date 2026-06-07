@@ -357,43 +357,36 @@ def train_prophet(
         })
  
         # ── Optuna tuning pada split terakhir (mode=specialize) ──
-        # Dilakukan SEBELUM loop split agar best_params dipakai
-        # konsisten di semua split (bukan hanya split terakhir)
-        # Resolve None ke nilai default cluster — agar log tidak tampil None
         best_cps    = changepoint_prior_scale or CLUSTER_CPS_DEFAULT.get(cluster, 0.05)
         best_sps    = seasonality_prior_scale or 10.0
         best_fo     = 5
         tune_params = {}
  
         if mode == "specialize":
-            last_sp     = splits[-1]
-            train_last  = series_full[last_sp["train_start"]:last_sp["train_end"]]
-            test_last   = series_full[last_sp["test_start"]:last_sp["test_end"]]
-            dates_tr    = dates_full[last_sp["train_start"]:last_sp["train_end"]]
-            dates_te    = dates_full[last_sp["test_start"]:last_sp["test_end"]]
- 
-            log.info(f"\n  ── Optuna Tuning (split {last_sp['split_idx']}) ──")
- 
-            with mlflow.start_run(
-                run_name="optuna_tuning",
-                nested=True,
-            ):
-                _, tune_params, best_tune_mape = fit_prophet_optuna(
-                    train_last, dates_tr, test_last, dates_te, cluster,
-                    n_trials=15, patience=5,
-                )
-                best_cps = tune_params["changepoint_prior_scale"]
-                best_sps = tune_params["seasonality_prior_scale"]
-                best_fo  = tune_params["fourier_order_monthly"]
-                mlflow.log_params(tune_params)
-                mlflow.log_metric("tuning_best_mape", best_tune_mape)
- 
-            log.info(f"  Best params: cps={best_cps:.4f} sps={best_sps:.2f} "
-                     f"fo={best_fo}")
+            if tuned_params is not None:
+                log.info("  ── Menggunakan Parameter TUNED warisan dari Centroid ──")
+                best_cps = tuned_params.get("changepoint_prior_scale", best_cps)
+                best_sps = tuned_params.get("seasonality_prior_scale", best_sps)
+                best_fo  = tuned_params.get("fourier_order_monthly", best_fo)
+                tune_params = tuned_params
+            else:
+                # OPTUNA PADA SPLIT 0 UNTUK MENCEGAH DATA LEAKAGE!
+                sp0 = splits[0]
+                train0 = series_full[sp0["train_start"]:sp0["train_end"]]
+                test0  = series_full[sp0["test_start"]:sp0["test_end"]]
+                dates_tr0 = dates_full[sp0["train_start"]:sp0["train_end"]]
+                dates_te0 = dates_full[sp0["test_start"]:sp0["test_end"]]
+     
+                log.info(f"\n  ── Optuna Tuning (split {sp0['split_idx']}) ──")
+                with mlflow.start_run(run_name="optuna_tuning", nested=True):
+                    _, tune_params, best_tune_mape = fit_prophet_optuna(train0, dates_tr0, test0, dates_te0, cluster, n_trials=15, patience=5)
+                    best_cps, best_sps, best_fo = tune_params["changepoint_prior_scale"], tune_params["seasonality_prior_scale"], tune_params["fourier_order_monthly"]
+                    mlflow.log_params(tune_params)
+                    mlflow.log_metric("tuning_best_mape", best_tune_mape)
+                log.info(f"  Best params: cps={best_cps:.4f} sps={best_sps:.2f} fo={best_fo}")
  
         # ── Per-split training ────────────────────────────────
         split_results = []
- 
         for sp in splits:
             i           = sp["split_idx"]
             train       = series_full[sp["train_start"]:sp["train_end"]]
