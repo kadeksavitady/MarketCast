@@ -276,7 +276,6 @@ def tune_xgboost_randomized(
     best_score  = -search.best_score_   # neg → positif = MAPE
     log.info(f"  RandomizedSearch selesai | best MAPE(CV)={best_score:.4f}%")
     log.info(f"  Best params: {best_params}")
-
     return best_params, best_score
 
 
@@ -289,6 +288,7 @@ def train_xgboost(
     mlflow_experiment: str = None,
     mode: str = "tournament",       # "tournament" | "specialize"
     # Default hyperparameters (mode tournament)
+    tuned_params: dict = None,
     n_estimators     : int   = 300,
     learning_rate    : float = 0.05,
     max_depth        : int   = 4,
@@ -299,13 +299,10 @@ def train_xgboost(
     reg_lambda       : float = 1.0,
 ) -> dict:
     """
-    Train XGBoost dengan Hybrid Expanding + Sliding CV.
-
     mode="tournament":
         - Hyperparameter default
         - 5 split (atau fallback)
         - Direct forecast per split, recursive untuk future
-
     mode="specialize":
         - RandomizedSearch n_iter=30 pada split pertama (train terbesar)
         - Best params dipakai untuk semua split berikutnya
@@ -360,32 +357,31 @@ def train_xgboost(
             "split_weights": str(split_weights),
         })
 
-        # ── Mode specialize: tuning pada split pertama ────────────────────────
+        # ── Mode specialize: tuning pada split pertama atau pakai contekan ──
         best_params = None
         if mode == "specialize":
-            log.info("\n  ── RandomizedSearch Tuning (split 1 train set) ──")
-            sp0   = splits[0]
-            train0 = series_full[sp0["train_start"]:sp0["train_end"]]
-            dates0 = dates_full[sp0["train_start"]:sp0["train_end"]]
+            if tuned_params is not None:
+                log.info("  ── Menggunakan Parameter TUNED warisan dari Centroid ──")
+                best_params = tuned_params
+            else:
+                log.info("\n  ── RandomizedSearch Tuning (split 1 train set) ──")
+                sp0   = splits[0]
+                train0 = series_full[sp0["train_start"]:sp0["train_end"]]
+                dates0 = dates_full[sp0["train_start"]:sp0["train_end"]]
+                
+                feat0 = build_features(train0, dates0)
+                X0    = feat0[feature_cols].values
+                y0    = feat0["target"].values
 
-            feat0 = build_features(train0, dates0)
-            X0    = feat0[feature_cols].values
-            y0    = feat0["target"].values
+                with mlflow.start_run(run_name="randomized_search", nested=True):
+                    best_params, best_cv_mape = tune_xgboost_randomized(
+                        X0, y0, n_iter=30, cv_splits=3,
+                    )
+                    mlflow.log_params({f"tuned_{k}": v for k, v in best_params.items()})
+                    mlflow.log_metric("best_cv_mape", best_cv_mape)
+                    mlflow.log_param("tuning_method", "RandomizedSearch_n30")
 
-            with mlflow.start_run(
-                run_name="randomized_search",
-                nested=True,
-            ):
-                best_params, best_cv_mape = tune_xgboost_randomized(
-                    X0, y0, n_iter=30, cv_splits=3,
-                )
-                mlflow.log_params({
-                    f"tuned_{k}": v for k, v in best_params.items()
-                })
-                mlflow.log_metric("best_cv_mape", best_cv_mape)
-                mlflow.log_param("tuning_method", "RandomizedSearch_n30")
-
-            log.info(f"  Best params dari tuning: {best_params}")
+                log.info(f"  Best params dari tuning: {best_params}")
 
         # ── Tentukan params final ─────────────────────────────────────────────
         if best_params:
