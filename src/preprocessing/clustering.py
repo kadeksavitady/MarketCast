@@ -9,8 +9,9 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from scipy import stats
-from sklearn.cluster import KMeans
 from sklearn.preprocessing import MinMaxScaler
+import matplotlib.pyplot as plt  
+from sklearn.cluster import KMeans 
 import joblib
 
 # Set path root proyek agar import internal tidak hancur
@@ -70,6 +71,21 @@ def build_features(df: pd.DataFrame) -> pd.DataFrame:
             "trend_slope": slope,
         })
     return pd.DataFrame(features).set_index("komoditas")
+
+def find_optimal_k(X_scaled, max_k=10):
+    inertias = []
+    for k in range(1, max_k + 1):
+        km = KMeans(n_clusters=k, random_state=42, n_init=10).fit(X_scaled)
+        inertias.append(km.inertia_)
+    
+    # Visualisasi Elbow (bisa di-log ke MLflow sebagai artifact)
+    plt.figure(figsize=(8,4))
+    plt.plot(range(1, max_k + 1), inertias, 'bx-')
+    plt.xlabel('k')
+    plt.ylabel('Inertia')
+    plt.title('Elbow Method')
+    plt.savefig("/tmp/elbow_plot.png")
+    return inertias
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 3. RUN PIPELINE OMNIBUS (KONSOLIDASI SINGLE RUN)
