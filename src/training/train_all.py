@@ -385,6 +385,7 @@ def run_specialize(champion_map: dict, all_data: dict,
     # ──────────────────────────────────────────────────────────────
     log.info("\n  ── FASE 2.5: ARENA VALIDASI (DEFAULT vs TUNED) ──")
     cluster_best_mode = {}
+    cluster_tuned_params = {}
     
     for cluster_short, model_name in champion_map.items():
         # Cari nama komoditas centroid untuk klaster ini
@@ -414,9 +415,11 @@ def run_specialize(champion_map: dict, all_data: dict,
             if score_tun > score_def:
                 log.info(f"    ✓ TUNED MENANG! Klaster {cluster_short} akan dilatih menggunakan Hyperparameter Tuning.")
                 cluster_best_mode[cluster_short] = "specialize"
+                cluster_tuned_params[cluster_short] = res_tun.get("tuned_params")
             else:
                 log.info(f"    ✗ DEFAULT LEBIH BAIK/SERI. Klaster {cluster_short} akan dikunci pada parameter Default (mencegah overfitting).")
                 cluster_best_mode[cluster_short] = "tournament"
+                cluster_tuned_params[cluster_short] = None
                 
         except Exception as e:
             log.error(f"    ✗ Validasi gagal ({e}), fallback ke mode specialize.")
@@ -438,6 +441,7 @@ def run_specialize(champion_map: dict, all_data: dict,
         cluster_short = data["cluster"]
         model_name    = champion_map.get(cluster_short)
         applied_mode  = cluster_best_mode.get(cluster_short, "specialize")
+        saved_params  = cluster_tuned_params.get(cluster_short)
 
         if model_name is None:
             log.warning(
@@ -460,6 +464,7 @@ def run_specialize(champion_map: dict, all_data: dict,
                 model_name, komoditas, data,
                 mlflow_experiment=MLFLOW_EXP_SPECIALIZE,
                 training_mode=applied_mode,
+                tuned_params=saved_params
             )
  
             run_id    = result.get("run_id",    "")
