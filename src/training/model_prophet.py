@@ -96,7 +96,7 @@ def build_splits(
             test_start  = train_end
             test_end    = test_start + test_window
             mode        = "sliding"
- 
+        
         if test_end > n:
             log.warning(f"Split {i}: test_end={test_end} > n={n}, skip.")
             break
@@ -195,7 +195,6 @@ def fit_prophet_optuna(
     df_test  = pd.DataFrame({"ds": dates_test})
  
     best_mape        = float("inf")
-    best_params      = {}
     no_improve_count = 0
  
     def objective(trial) -> float:
@@ -283,7 +282,11 @@ def evaluate_split_prophet(
         "n_test"   : len(test),
     }
  
- 
+def compute_ci_coverage(test: np.ndarray, ci_lower: np.ndarray, ci_upper: np.ndarray) -> float:
+    """ Evaluasi Poin J: Coverage Prediction Interval """
+    covered = np.sum((test >= ci_lower) & (test <= ci_upper))
+    return round(float(covered / len(test) * 100), 2)
+
 # ══════════════════════════════════════════════════════════════
 # 4. MAIN TRAINING FUNCTION
 # ══════════════════════════════════════════════════════════════
