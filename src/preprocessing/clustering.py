@@ -300,14 +300,7 @@ def main():
     engine = get_db_engine()
     df_clean = load_data(engine)
     feat_df  = build_features(df_clean)
-    cols = ["cv", "mean_harga", "trend_slope"]
-    scaler = MinMaxScaler()
-    X_scaled = scaler.fit_transform(feat_df[cols])
-    log.info("Menjalankan Elbow Method untuk menentukan optimal k...")
-    find_optimal_k(X_scaled, max_k=10) # Ini akan save /tmp/elbow_plot.png
-    log.info("Elbow plot telah disimpan di /tmp/elbow_plot.png. Silakan cek untuk validasi nilai k.")
     run_and_log_clustering_pipeline(df_clean, feat_df, args.k)
-    
     engine.dispose()
 
     log.info("=" * 60)
