@@ -582,6 +582,7 @@ def train_sarima(
         "model_uri"      : model_uri,
         "data"           : data,
         "n_splits_used"  : n_splits,
+        "tuned_params"   : {"order": best_order, "seasonal_order": best_seas},
     }
  
  
