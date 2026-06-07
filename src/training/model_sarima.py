@@ -19,7 +19,6 @@ import numpy as np
 import pandas as pd
 import mlflow
 import mlflow.sklearn
-import mlflow.pyfunc
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -508,7 +507,7 @@ def train_sarima(
         # ── Log model ─────────────────────────────────────────────────────────
         # Retry logic untuk upload artifact ke DagHub (antisipasi timeout)
         import pickle, tempfile, os, time
-        import mlflow.pyfunc
+        
         class SARIMAWrapper(mlflow.pyfunc.PythonModel):
             """Wrapper pmdarima → MLflow pyfunc agar bisa di-register."""
             def load_context(self, context):
