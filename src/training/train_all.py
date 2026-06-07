@@ -236,14 +236,14 @@ def run_tournament(models: list, komoditas_list: list,
         {
             "cluster"    : r["data"]["cluster"],
             "model_name" : r["model_name"],
-            "model_uri"  : r["model_uri"],
+            "model_uri"  : r.get("model_uri", ""),
             "metric_mape": r["metrics"]["mape"],
             "metric_mda" : r["metrics"].get("mda", 0.0),
             "metric_rmse": r["metrics"]["rmse"],
         } for r in results
-        if r.get("model_uri", "")
     ])
-    df_res = df_res[df_res["model_uri"].str.len() > 0]
+    if "model_uri" in df_res.columns:
+        df_res = df_res[df_res["model_uri"].str.len() > 0]
 
     if df_res.empty:
         log.error("Semua model_uri kosong — tidak ada yang bisa diregister.")
