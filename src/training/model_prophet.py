@@ -295,6 +295,7 @@ def train_prophet(
     data: dict,
     mlflow_experiment: str = None,
     mode: str = "tournament",     # "tournament" | "specialize"
+    tuned_params: dict = None,
     changepoint_prior_scale: float = None,
     seasonality_prior_scale: float = None,
 ) -> dict:
@@ -542,7 +543,7 @@ def train_prophet(
         "n_splits_used"  : n_splits,
     }
  
- 
+
 # ══════════════════════════════════════════════════════════════
 # 5. PLOT
 # ══════════════════════════════════════════════════════════════
