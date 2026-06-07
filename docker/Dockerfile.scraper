@@ -19,6 +19,6 @@ RUN playwright install-deps chromium
 # Copy hanya file yang dibutuhkan scraper
 COPY src/data/ ./src/data/
 
-ENV PYTHONPATH="${PYTHONPATH}:/app/src/data"
+ENV PYTHONPATH="/app/src/data"
 
 CMD ["python", "src/data/daily_scraper.py"]
