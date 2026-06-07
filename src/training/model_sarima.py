@@ -548,7 +548,114 @@ def train_sarima(
  
  
 # ═════════════════════════════════════════════════════════════════════════════
-# 5. PLOT
+# 5. STEP 3 — EVALUASI DIAGNOSTIK
+# ═════════════════════════════════════════════════════════════════════════════
+def compute_horizon_error(
+    model, train: np.ndarray, test: np.ndarray
+) -> dict:
+    """
+    Evaluasi error per horizon (1, 7, 14, 30 hari ke depan).
+    Model di-fit pada train, lalu dievaluasi di tiap horizon.
+    Menunjukkan apakah error membesar seiring horizon prediksi.
+    """
+    results = {}
+    for h in [1, 7, 14, min(30, len(test))]:
+        if h > len(test):
+            continue
+        try:
+            pred = model.predict(n_periods=h)
+            actual = test[:h]
+            nonzero = actual != 0
+            mape_h = float(np.mean(
+                np.abs((actual[nonzero] - pred[nonzero]) / actual[nonzero])
+            ) * 100) if nonzero.any() else 0.0
+            results[f"horizon_{h}d_mape"] = round(mape_h, 4)
+        except Exception:
+            results[f"horizon_{h}d_mape"] = -1.0
+    return results
+
+
+def compute_diagnostics(
+    model, train: np.ndarray, komoditas: str
+) -> tuple:
+    """
+    Diagnostik residual:
+    - Ljung-Box test (uji autokorelasi residual)
+    - Plot ACF/PACF residual
+    - Plot residual vs waktu
+
+    Return: (metrics_dict, plot_paths_list)
+    """
+    import tempfile, os
+    import matplotlib.pyplot as plt
+    from statsmodels.stats.diagnostic import acorr_ljungbox
+    from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
+
+    metrics  = {}
+    plots    = []
+    safe     = komoditas.replace(" ", "_").replace("/", "_")
+
+    try:
+        residuals = model.resid()
+    except Exception:
+        return metrics, plots
+
+    # ── Ljung-Box test ────────────────────────────────────────
+    try:
+        lb = acorr_ljungbox(residuals, lags=[10, 20], return_df=True)
+        metrics["ljungbox_lag10_pval"] = round(float(lb["lb_pvalue"].iloc[0]), 4)
+        metrics["ljungbox_lag20_pval"] = round(float(lb["lb_pvalue"].iloc[1]), 4)
+        # p > 0.05 → residual tidak ada autokorelasi → model fit baik
+        metrics["ljungbox_pass"] = int(lb["lb_pvalue"].iloc[0] > 0.05)
+    except Exception as e:
+        log.warning(f"  Ljung-Box gagal: {e}")
+
+    # ── Plot residual vs waktu ────────────────────────────────
+    try:
+        fig, ax = plt.subplots(figsize=(12, 3))
+        ax.plot(residuals, color="#E74C3C", lw=0.8)
+        ax.axhline(0, color="gray", linestyle="--", lw=0.8)
+        ax.set_title(f"Residual vs Waktu — {komoditas}", fontsize=10)
+        ax.set_ylabel("Residual (Rp)")
+        plt.tight_layout()
+        p = f"/tmp/sarima_resid_{safe}.png"
+        fig.savefig(p, dpi=100)
+        plt.close(fig)
+        plots.append(p)
+    except Exception:
+        pass
+
+    # ── ACF & PACF residual ───────────────────────────────────
+    try:
+        fig, axes = plt.subplots(1, 2, figsize=(12, 4))
+        plot_acf(residuals,  ax=axes[0], lags=40, title=f"ACF Residual — {komoditas}")
+        plot_pacf(residuals, ax=axes[1], lags=40, title=f"PACF Residual — {komoditas}")
+        plt.tight_layout()
+        p = f"/tmp/sarima_acf_{safe}.png"
+        fig.savefig(p, dpi=100)
+        plt.close(fig)
+        plots.append(p)
+    except Exception:
+        pass
+
+    return metrics, plots
+
+
+def compute_ci_coverage(
+    test: np.ndarray, conf_int: np.ndarray
+) -> float:
+    """
+    Coverage interval prediksi 95%:
+    Persentase nilai aktual yang jatuh dalam CI prediksi.
+    Idealnya mendekati 95%.
+    """
+    lower, upper = conf_int[:, 0], conf_int[:, 1]
+    covered = np.sum((test >= lower) & (test <= upper))
+    return round(float(covered / len(test) * 100), 2)
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# 6. PLOT
 # ═════════════════════════════════════════════════════════════════════════════
 def _plot_sarima_cv(
     komoditas, series_full, dates_full,
