@@ -446,6 +446,7 @@ def train_xgboost(
                 )
 
                 metrics = compute_metrics(test_series, forecast)
+                horizon_err = compute_horizon_error(model, train_series, dates_train, test_series, feature_cols)
                 mlflow.log_metrics({
                     f"split_{i}_mae"  : metrics["mae"],
                     f"split_{i}_rmse" : metrics["rmse"],
@@ -505,12 +506,25 @@ def train_xgboost(
         y_full     = feat_full["target"].values
         final_model = XGBRegressor(**final_params)
         final_model.fit(X_full, y_full, verbose=False)
-
+        
         # ── Future forecast 30 hari (recursive) ──────────────────────────────
         future_forecast = _recursive_forecast(
             final_model, series_full, dates_full,
             FORECAST_DAYS, feature_cols,
         )
+
+        # ── Visualisasi Poin A - F ──
+        slug = komoditas.replace(" ", "_").replace("/", "_")
+        for fig_func, name, folder in [(_plot_importance(final_model, feature_cols, komoditas), "imp", "plots"), (_plot_xgboost_cv(komoditas, series_full, dates_full, split_results, future_forecast, cluster), "cv", "plots"), (_plot_xgb_diagnostics(all_actuals, all_preds, komoditas), "diag", "diagnostics")]:
+            fig_func.savefig(f"/tmp/xgb_{name}_{slug}.png", bbox_inches="tight"); plt.close(fig_func); mlflow.log_artifact(f"/tmp/xgb_{name}_{slug}.png", folder)
+
+        try:
+            fig_shap = _plot_shap(final_model, feat_full[feature_cols], komoditas)
+            fig_shap.savefig(f"/tmp/xgb_shap_{slug}.png", bbox_inches="tight"); plt.close(fig_shap); mlflow.log_artifact(f"/tmp/xgb_shap_{slug}.png", "diagnostics")
+        except Exception: pass
+
+        mlflow.xgboost.log_model(final_model, name=f"XGBoost_{slug}")
+        run_id, model_uri = parent_run.info.run_id, f"runs:/{parent_run.info.run_id}/XGBoost_{slug}"
 
         # ── Plots ─────────────────────────────────────────────────────────────
         slug = komoditas.replace(" ", "_").replace("/", "_")
@@ -616,4 +630,20 @@ def _plot_importance(model, feature_cols: list, komoditas: str):
     ax.set_title(f"XGBoost Feature Importance\n{komoditas}", fontweight="bold")
     ax.grid(axis="x", alpha=0.3)
     plt.tight_layout()
+    return fig
+
+def _plot_xgb_diagnostics(actuals, preds, komoditas):
+    fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+    axes[0].hist(np.array(actuals) - np.array(preds), bins=30, color='teal', edgecolor='black', alpha=0.7); axes[0].set_title("Distribusi Error (Residual)", fontweight="bold"); axes[0].axvline(0, color='red', linestyle='dashed')
+    axes[1].scatter(actuals, preds, alpha=0.5, color='blue'); min_val, max_val = min(actuals), max(actuals); axes[1].plot([min_val, max_val], [min_val, max_val], color='red', linestyle='--'); axes[1].set_title("Actual vs Predicted", fontweight="bold")
+    plt.suptitle(f"Diagnostik Model — {komoditas}", fontweight="bold"); 
+    plt.tight_layout(); return fig
+
+def _plot_shap(model, X_df, komoditas):
+    import shap
+    shap_values = shap.TreeExplainer(model).shap_values(X_df)
+    fig = plt.figure(figsize=(10, 6)); 
+    shap.summary_plot(shap_values, X_df, show=False); 
+    plt.title(f"SHAP Summary - {komoditas}", fontweight="bold"); 
+    plt.tight_layout(); 
     return fig
