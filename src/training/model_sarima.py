@@ -284,7 +284,8 @@ def train_sarima(
     komoditas: str,
     data: dict,
     mlflow_experiment: str = None,
-    mode: str = "tournament",   # "tournament" | "specialize"
+    mode: str = "tournament",  # "tournament" | "specialize"
+    tuned_params: dict = None,  
 ) -> dict:
     """
     mode="tournament":
@@ -374,8 +375,18 @@ def train_sarima(
                     model, order, seas_order = fit_auto_arima(train)
                     best_aic = round(model.aic(), 4)
                 else:   # specialize
-                    model, order, seas_order, best_aic = \
-                        fit_prior_with_gridsearch(train, cluster)
+                    if tuned_params is not None:
+                        # ── JIKA ADA CONTEKAN, LANGSUNG PAKAI! ──
+                        order = tuned_params["order"]
+                        seas_order = tuned_params["seasonal_order"]
+                        model = ARIMA(order=order, seasonal_order=seas_order)
+                        model.fit(train)
+                        best_aic = round(model.aic(), 4)
+                        log.info("  Menggunakan Orde TUNED warisan dari Centroid!")
+                    else:
+                        # ── JIKA TIDAK ADA, CARI SENDIRI (Khusus Centroid) ──
+                        model, order, seas_order, best_aic = \
+                            fit_prior_with_gridsearch(train, cluster)
                 log.info(f"  Order: SARIMA{order}x{seas_order} | AIC={best_aic:.2f}")
  
                 mlflow.log_params({
@@ -507,7 +518,7 @@ def train_sarima(
         # ── Log model ─────────────────────────────────────────────────────────
         # Retry logic untuk upload artifact ke DagHub (antisipasi timeout)
         import pickle, tempfile, os, time
-        
+
         class SARIMAWrapper(mlflow.pyfunc.PythonModel):
             """Wrapper pmdarima → MLflow pyfunc agar bisa di-register."""
             def load_context(self, context):
