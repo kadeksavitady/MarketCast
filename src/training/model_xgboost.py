@@ -159,7 +159,6 @@ def build_splits(
             f"({train_end - train_start}d) | "
             f"test [{dates[test_start].date()} → {dates[test_end-1].date()}]"
         )
-
     return splits
 
 def compute_weighted_mape(split_metrics: List[Dict]) -> float:
@@ -200,7 +199,6 @@ def _direct_forecast(
             continue
         last_row = feat_df.iloc[[-1]][feature_cols].values
         preds.append(float(model.predict(last_row)[0]))
-
     return np.array(preds)
 
 def _recursive_forecast(
@@ -230,9 +228,24 @@ def _recursive_forecast(
         pred     = float(model.predict(last_row)[0])
         preds.append(pred)
         history.append(pred)
-
     return np.array(preds)
 
+def compute_horizon_error(
+    model, train_series, dates_train, test_series, feature_cols
+) -> dict:
+    """ Evaluasi error per horizon dengan metode recursive di test window """
+    n_steps = min(30, len(test_series))
+    preds = _recursive_forecast(model, train_series, dates_train, n_steps, feature_cols)
+    
+    results = {}
+    for h in [1, 7, 14, n_steps]:
+        if h > len(test_series): continue
+        actual = test_series[:h]
+        pred_h = preds[:h]
+        nonzero = actual != 0
+        mape_h = float(np.mean(np.abs((actual[nonzero] - pred_h[nonzero]) / actual[nonzero])) * 100) if nonzero.any() else 0.0
+        results[f"horizon_{h}d_mape"] = round(mape_h, 4)
+    return results
 
 # ═════════════════════════════════════════════════════════════════════════════
 # 4. RANDOMIZED SEARCH TUNING
