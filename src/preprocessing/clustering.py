@@ -72,20 +72,62 @@ def build_features(df: pd.DataFrame) -> pd.DataFrame:
         })
     return pd.DataFrame(features).set_index("komoditas")
 
-def find_optimal_k(X_scaled, max_k=10):
-    inertias = []
+def find_optimal_k(X_scaled: np.ndarray, max_k: int = 10) -> Tuple[list, list, str]:
+    """ Elbow Method + Silhouette Score untuk menentukan k optimal. """
+    from sklearn.metrics import silhouette_score
+    import tempfile
+
+    inertias    = []
+    silhouettes = [None]  # k=1 tidak ada silhouette
+
     for k in range(1, max_k + 1):
         km = KMeans(n_clusters=k, random_state=42, n_init=10).fit(X_scaled)
         inertias.append(km.inertia_)
-    
-    # Visualisasi Elbow (bisa di-log ke MLflow sebagai artifact)
-    plt.figure(figsize=(8,4))
-    plt.plot(range(1, max_k + 1), inertias, 'bx-')
-    plt.xlabel('k')
-    plt.ylabel('Inertia')
-    plt.title('Elbow Method')
-    plt.savefig("/tmp/elbow_plot.png")
-    return inertias
+        if k >= 2:
+            sil = silhouette_score(X_scaled, km.labels_)
+            silhouettes.append(round(sil, 4))
+        log.info(f"  k={k}: inertia={km.inertia_:.2f}"
+                 + (f" | silhouette={silhouettes[-1]:.4f}" if k >= 2 else ""))
+
+    # Tentukan k optimal dari silhouette tertinggi
+    sil_values    = [s for s in silhouettes if s is not None]
+    k_optimal_sil = sil_values.index(max(sil_values)) + 2  # offset karena mulai k=2
+    log.info(f"  k optimal (silhouette): {k_optimal_sil} "
+             f"(score={max(sil_values):.4f})")
+
+    # Plot dual-axis: Elbow + Silhouette
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
+    fig.suptitle("Penentuan Jumlah Cluster Optimal", fontsize=13, fontweight="bold")
+
+    # Elbow
+    ax1.plot(range(1, max_k + 1), inertias, "bx-", lw=2, markersize=8)
+    ax1.axvline(x=3, color="red", lw=2, linestyle="--",
+                label=f"k=3 (dipilih)")
+    ax1.set_xlabel("Jumlah Cluster (k)")
+    ax1.set_ylabel("Inertia (WCSS)")
+    ax1.set_title("Elbow Method")
+    ax1.legend()
+    ax1.grid(alpha=0.3)
+
+    # Silhouette
+    k_range  = range(2, max_k + 1)
+    ax2.plot(k_range, sil_values, "ro-", lw=2, markersize=8)
+    ax2.axvline(x=k_optimal_sil, color="green", lw=2, linestyle="--",
+                label=f"k={k_optimal_sil} (silhouette optimal)")
+    ax2.axvline(x=3, color="red", lw=2, linestyle="--",
+                label="k=3 (dipilih)" if k_optimal_sil != 3 else None)
+    ax2.set_xlabel("Jumlah Cluster (k)")
+    ax2.set_ylabel("Silhouette Score")
+    ax2.set_title("Silhouette Score")
+    ax2.legend()
+    ax2.grid(alpha=0.3)
+
+    plt.tight_layout()
+    plot_path = "/tmp/elbow_silhouette_plot.png"
+    fig.savefig(plot_path, dpi=120, bbox_inches="tight")
+    plt.close(fig)
+
+    return inertias, silhouettes, plot_path
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 3. RUN PIPELINE OMNIBUS (KONSOLIDASI SINGLE RUN)
@@ -169,10 +211,21 @@ def run_and_log_clustering_pipeline(df_clean: pd.DataFrame, feat_df: pd.DataFram
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
             
-            # 1. Simpan dulu scaler penunjang ke folder lokal sementara
+            # 1. Eksekusi Elbow Plot dan simpan di tmp_path
+            inertias = []
+            for i in range(1, 11):
+                km_test = KMeans(n_clusters=i, random_state=42, n_init=10).fit(X_scaled)
+                inertias.append(km_test.inertia_)
+
+            plt.figure(figsize=(8,4))
+            plt.plot(range(1, 11), inertias, 'bx-')
+            plt.savefig(tmp_path / "elbow_plot.png")
+            plt.close()
+
+            # 2. Simpan dulu scaler penunjang ke folder lokal sementara
             joblib.dump(scaler, tmp_path / "minmax_scaler.joblib")
             
-            # 2. Export cluster_assignments.csv UTAMA (Berisi cv, mean, slope, cluster, label)
+            # 3. Export cluster_assignments.csv UTAMA (Berisi cv, mean, slope, cluster, label)
             assignments = feat_final[["cv", "mean_harga", "trend_slope", "cluster", "cluster_label", "dist", "is_centroid"]].copy()
             assignments.index.name = "komoditas"
             
@@ -181,15 +234,15 @@ def run_and_log_clustering_pipeline(df_clean: pd.DataFrame, feat_df: pd.DataFram
             os.makedirs(model_artifacts_dir, exist_ok=True)
             assignments.to_csv(model_artifacts_dir / "cluster_assignments.csv")
             
-            # 3. Export data_preprocessed.csv (WAJIB UNTUK PIPELINE TRAINING MODEL BASELINE!)
+            # 4. Export data_preprocessed.csv (WAJIB UNTUK PIPELINE TRAINING MODEL BASELINE!)
             df_export = df_clean[["tanggal", "komoditas", "harga_per_kg"]].copy()
             df_export.to_csv(tmp_path / "data_preprocessed.csv", index=False)
             
-            # 4. Export centroid_representatives.csv (Pelengkap struktural config.py)
+            # 5. Export centroid_representatives.csv (Pelengkap struktural config.py)
             centroids = feat_final[feat_final["is_centroid"]].index.tolist()
             pd.DataFrame({"komoditas": centroids}).to_csv(tmp_path / "centroid_representatives.csv", index=False)
             
-            # 5. Export Centroid Timeseries
+            # 6. Export Centroid Timeseries
             for komo in centroids:
                 slug = komo.lower().replace(" ", "_")
                 sub_df = df_clean[df_clean["komoditas"] == komo][["tanggal", "harga_per_kg"]].copy()
@@ -246,6 +299,12 @@ def main():
     engine = get_db_engine()
     df_clean = load_data(engine)
     feat_df  = build_features(df_clean)
+    cols = ["cv", "mean_harga", "trend_slope"]
+    scaler = MinMaxScaler()
+    X_scaled = scaler.fit_transform(feat_df[cols])
+    log.info("Menjalankan Elbow Method untuk menentukan optimal k...")
+    find_optimal_k(X_scaled, max_k=10) # Ini akan save /tmp/elbow_plot.png
+    log.info("Elbow plot telah disimpan di /tmp/elbow_plot.png. Silakan cek untuk validasi nilai k.")
     run_and_log_clustering_pipeline(df_clean, feat_df, args.k)
     
     engine.dispose()
