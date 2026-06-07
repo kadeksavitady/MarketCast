@@ -279,11 +279,17 @@ def run_tournament(models: list, komoditas_list: list,
 
         # Mapping cluster string → nama registry
         def cluster_to_reg_name(cluster_str: str) -> str:
-            try:
-                num = int(cluster_str[1])   # "C0_..." → 0
-                return f"cluster {num + 1}" # 0→"cluster 1", dst
-            except (IndexError, ValueError):
-                return cluster_str
+            import re
+            # Coba parse format C{N}_... → "cluster N+1"
+            m = re.match(r"C(\d+)_?", cluster_str)
+            if m:
+                num = int(m.group(1))
+                return f"cluster {num + 1}"
+            # Fallback: cari angka pertama di string
+            m = re.search(r"\d+", cluster_str)
+            if m:
+                return f"cluster {int(m.group())+1}"
+            return cluster_str
 
         # Register SEMUA model — juara dapat @champion, lainnya tidak
         for idx, row in df_ranked.iterrows():
