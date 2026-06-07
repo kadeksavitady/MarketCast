@@ -133,12 +133,17 @@ def find_optimal_k(X_scaled: np.ndarray, max_k: int = 10) -> Tuple[list, list, s
 # ─────────────────────────────────────────────────────────────────────────────
 # 3. RUN PIPELINE OMNIBUS (KONSOLIDASI SINGLE RUN)
 # ─────────────────────────────────────────────────────────────────────────────
-def run_and_log_clustering_pipeline(df_clean: pd.DataFrame, feat_df: pd.DataFrame, k: int, mlflow_experiment: str = "MarketCast-Clustering"):
+def run_and_log_clustering_pipeline(
+    df_clean: pd.DataFrame,
+    feat_df: pd.DataFrame,
+    k: int,
+    mlflow_experiment: str = "MarketCast-Clustering"
+):
     """
-    Menjalankan KMeans, membungkus seluruh parameter (cv, mean, trend_slope) ke CSV,
-    mengirimkannya murni via log_artifact, lalu mendaftarkannya ke Model Registry.
+    Menjalankan KMeans, elbow+silhouette validation, dynamic labeling,
+    upload artifacts ke DagHub, dan register scaler ke Model Registry.
     """
-    # ── TAHAP 1: EKSEKUSI STATISTIKA KMEANS LOKAL ──
+    # ── TAHAP 1: EKSEKUSI KMEANS ──────────────────────────────────────────────
     cols     = ["cv", "mean_harga", "trend_slope"]
     scaler   = MinMaxScaler()
     X_scaled = scaler.fit_transform(feat_df[cols])
@@ -147,139 +152,193 @@ def run_and_log_clustering_pipeline(df_clean: pd.DataFrame, feat_df: pd.DataFram
     feat_final = feat_df.copy()
     feat_final["cluster"] = km.labels_
 
-    # Hitung Jarak Centroid
+    # Hitung jarak ke centroid
     feat_final["dist"] = 0.0
     for cid in range(k):
         mask  = feat_final["cluster"] == cid
         dists = np.linalg.norm(X_scaled[mask] - km.cluster_centers_[cid], axis=1)
         feat_final.loc[mask, "dist"] = dists
 
+    # Tandai komoditas terdekat ke centroid
     feat_final["is_centroid"] = False
     for cid in range(k):
         nearest = feat_final[feat_final["cluster"] == cid]["dist"].idxmin()
         feat_final.loc[nearest, "is_centroid"] = True
 
-    # Pelabelan Dinamis
-    feat_final["cluster_label"] = ""
+    # Pelabelan dinamis per cluster
+    feat_final["cluster_label"] = "unknown"
     overall_harga = feat_final["mean_harga"].median()
     overall_cv    = feat_final["cv"].median()
-    
+
     for cid in range(k):
-        mask = feat_final["cluster"] == cid
+        mask      = feat_final["cluster"] == cid
         med_harga = feat_final.loc[mask, "mean_harga"].median()
         med_cv    = feat_final.loc[mask, "cv"].median()
         med_slope = feat_final.loc[mask, "trend_slope"].median()
-        
+
         harga_lbl = "Mahal" if med_harga > overall_harga else "Murah"
         cv_lbl    = "Labil" if med_cv > overall_cv else "Stabil"
-        
-        if med_slope > 0.01:
-            tren_lbl = "↑Inflasi"
-        elif med_slope < -0.01:
-            tren_lbl = "↓Deflasi"
-        else:
-            tren_lbl = "→Datar"
-            
+        tren_lbl  = (
+            "↑Inflasi" if med_slope > 0.01 else
+            "↓Deflasi" if med_slope < -0.01 else
+            "→Datar"
+        )
         label = f"Cluster {cid}: {cv_lbl} & {harga_lbl} ({tren_lbl})"
         feat_final.loc[mask, "cluster_label"] = label
         log.info(f"  [Auto-Label] {label} (Median Harga: Rp{med_harga:,.0f})")
 
-    # ── TAHAP 2: INTEGRASI MLFLOW REGISTRY (SINGLE RUN CLEANPAYLOAD) ──
+    # ── TAHAP 2: MLflow LOGGING ───────────────────────────────────────────────
     init_mlflow()
     mlflow.set_experiment(mlflow_experiment)
-    client = MlflowClient()
+    client        = MlflowClient()
     REGISTRY_NAME = "Metadata__Clustering"
 
-    log.info(f"\n=======================================================")
-    log.info(f"Mulai Proses Registrasi Metadata Clustering ke MLflow...")
-    log.info(f"=======================================================")
+    log.info(f"\n{'='*55}")
+    log.info(f"Mulai Orkestrasi Logging ke MLflow: {mlflow_experiment}")
+    log.info(f"{'='*55}")
 
     with mlflow.start_run(run_name="KMeans-Final-Orchestration") as run:
         mlflow.log_param("k", k)
         mlflow.set_tags({
-            "step": "preprocessing_clustering",
+            "step"   : "preprocessing_clustering",
             "project": "PBL-MarketCast",
-            "type": "metadata_export"
+            "type"   : "metadata_export",
         })
 
-        # Mengamankan ukuran cluster dasar sebagai metrik makro
+        # Log ukuran tiap cluster
         for cid in sorted(feat_final["cluster"].unique()):
             n = (feat_final["cluster"] == cid).sum()
             mlflow.log_metric(f"cluster_{cid}_size", int(n))
 
-        # ── TAHAP 2: INTEGRASI MLFLOW REGISTRY (KONSOLIDASI AMAN) ──
-        # Membuka gerbang folder sementara ephemeral (Clean Local)
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
-            
-            # 1. Eksekusi Elbow Plot dan simpan di tmp_path
-            inertias = []
+
+            # ── Elbow + Silhouette (dihitung sekali di sini) ──────────────────
+            from sklearn.metrics import silhouette_score as sil_score
+
+            inertias    = []
+            silhouettes = []
+
             for i in range(1, 11):
                 km_test = KMeans(n_clusters=i, random_state=42, n_init=10).fit(X_scaled)
                 inertias.append(km_test.inertia_)
+                if i >= 2:
+                    sil = sil_score(X_scaled, km_test.labels_)
+                    silhouettes.append(round(sil, 4))
+                    mlflow.log_metric(f"silhouette_k{i}", round(sil, 4))
+                mlflow.log_metric(f"elbow_inertia_k{i}", round(km_test.inertia_, 2))
 
-            plt.figure(figsize=(8,4))
-            plt.plot(range(1, 11), inertias, 'bx-')
-            plt.savefig(tmp_path / "elbow_plot.png")
-            plt.close()
+            # k optimal berdasarkan silhouette tertinggi
+            k_optimal = silhouettes.index(max(silhouettes)) + 2  # offset k=2
+            log.info(f"  k optimal (silhouette): {k_optimal} "
+                     f"(score={max(silhouettes):.4f}) | k dipilih: {k}")
+            mlflow.log_metric("k_optimal_silhouette", k_optimal)
+            mlflow.log_metric("chosen_k", k)
 
-            # 2. Simpan dulu scaler penunjang ke folder lokal sementara
+            # Plot Elbow + Silhouette dual panel
+            fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
+            fig.suptitle(
+                "Validasi Jumlah Cluster Optimal — MarketCast",
+                fontsize=13, fontweight="bold"
+            )
+
+            ax1.plot(range(1, 11), inertias, "bx-", lw=2, markersize=8)
+            ax1.axvline(x=k, color="red", lw=2, linestyle="--",
+                        label=f"k={k} (dipilih)")
+            ax1.set_xlabel("Jumlah Cluster (k)")
+            ax1.set_ylabel("Inertia (WCSS)")
+            ax1.set_title("Elbow Method")
+            ax1.legend()
+            ax1.grid(alpha=0.3)
+
+            ax2.plot(range(2, 11), silhouettes, "ro-", lw=2, markersize=8)
+            ax2.axvline(x=k_optimal, color="green", lw=2, linestyle="--",
+                        label=f"k={k_optimal} (silhouette optimal)")
+            if k != k_optimal:
+                ax2.axvline(x=k, color="red", lw=2, linestyle=":",
+                            label=f"k={k} (dipilih)")
+            ax2.set_xlabel("Jumlah Cluster (k)")
+            ax2.set_ylabel("Silhouette Score")
+            ax2.set_title("Silhouette Score")
+            ax2.legend()
+            ax2.grid(alpha=0.3)
+
+            plt.tight_layout()
+            elbow_path = tmp_path / "elbow_silhouette_plot.png"
+            fig.savefig(elbow_path, dpi=120, bbox_inches="tight")
+            plt.close(fig)
+
+            # ── Simpan scaler ─────────────────────────────────────────────────
             joblib.dump(scaler, tmp_path / "minmax_scaler.joblib")
-            
-            # 3. Export cluster_assignments.csv UTAMA (Berisi cv, mean, slope, cluster, label)
-            assignments = feat_final[["cv", "mean_harga", "trend_slope", "cluster", "cluster_label", "dist", "is_centroid"]].copy()
+
+            # ── Export CSV pipeline ───────────────────────────────────────────
+            # cluster_assignments.csv
+            assignments = feat_final[[
+                "cv", "mean_harga", "trend_slope",
+                "cluster", "cluster_label", "dist", "is_centroid"
+            ]].copy()
             assignments.index.name = "komoditas"
-            
-            # 🌟 KUNCI SUKSES TIM BACKEND: Bungkus ke sub-folder khusus untuk diselundupkan ke Registry
-            model_artifacts_dir = tmp_path / "model_artifacts"
-            os.makedirs(model_artifacts_dir, exist_ok=True)
-            assignments.to_csv(model_artifacts_dir / "cluster_assignments.csv")
-            
-            # 4. Export data_preprocessed.csv (WAJIB UNTUK PIPELINE TRAINING MODEL BASELINE!)
+            assignments.to_csv(tmp_path / "cluster_assignments.csv")
+
+            # data_preprocessed.csv
             df_export = df_clean[["tanggal", "komoditas", "harga_per_kg"]].copy()
             df_export.to_csv(tmp_path / "data_preprocessed.csv", index=False)
-            
-            # 5. Export centroid_representatives.csv (Pelengkap struktural config.py)
+
+            # centroid_representatives.csv
             centroids = feat_final[feat_final["is_centroid"]].index.tolist()
-            pd.DataFrame({"komoditas": centroids}).to_csv(tmp_path / "centroid_representatives.csv", index=False)
-            
-            # 6. Export Centroid Timeseries
+            pd.DataFrame({"komoditas": centroids}).to_csv(
+                tmp_path / "centroid_representatives.csv", index=False
+            )
+            log.info(f"  Centroid: {centroids}")
+
+            # ts_centroid_*.csv
             for komo in centroids:
-                slug = komo.lower().replace(" ", "_")
-                sub_df = df_clean[df_clean["komoditas"] == komo][["tanggal", "harga_per_kg"]].copy()
+                slug   = komo.lower().replace(" ", "_")
+                sub_df = df_clean[df_clean["komoditas"] == komo][
+                    ["tanggal", "harga_per_kg"]
+                ].copy()
                 sub_df.columns = ["ds", "y"]
                 sub_df.to_csv(tmp_path / f"ts_centroid_{slug}.csv", index=False)
 
-            # 🚀 FIX CRITICAL: Terbangkan berkas penunjang (data_preprocessed, dkk) ke folder artifacts utama
-            log.info("   🚀 Mengirim berkas preprocessed dan penunjang klaster ke DagsHub Artifacts...")
+            # ── Upload semua artifact sekaligus ───────────────────────────────
+            log.info("  Mengirim semua artifact ke DagsHub...")
             mlflow.log_artifacts(tmp_path.as_posix(), artifact_path="clustering_results")
-            
-            # 🎯 TAHAP UTAMA: Log Model Sklearn SEKALIGUS menautkan folder CSV utama di dalamnya!
-            log.info(f"   Mendaftarkan objek '{REGISTRY_NAME}' beserta berkas CSV Parameter ke Model Registry...")
-            mlflow.sklearn.log_model(
-                sk_model=scaler, 
-                artifact_path="Metadata__Clustering_Package", 
-                code_paths=[str(model_artifacts_dir / "cluster_assignments.csv")],
-                registered_model_name=REGISTRY_NAME
-            )
+            log.info("  ✅ Semua file ter-upload ke clustering_results/")
 
-        # ── TAHAP 3: LOCK ALIAS PRODUCTION VIA CLIENT API ──
-        log.info(f"   Mengunci versi terbaru '{REGISTRY_NAME}' ke label / alias 'production'...")
-        
-        # Karena pendaftaran sudah sukses di atas, kita tinggal minta Client mengambil versi terbaru di server
-        versions = client.get_registered_model(REGISTRY_NAME).latest_versions
-        latest_version = versions[0].version if versions else "1"
-        
-        # Set status ke @production agar FastAPI tim backend bisa langsung panggil
-        client.set_registered_model_alias(
-            name=REGISTRY_NAME, 
-            alias="production", 
-            version=latest_version
+            # ── Register scaler ke Model Registry (tanpa log_model sklearn) ──
+            # Cara ini sudah terbukti bekerja dengan DagHub — tidak trigger
+            # log_batch yang menyebabkan BAD_REQUEST
+            artifact_uri = run.info.artifact_uri
+            source       = f"{artifact_uri}/clustering_results/minmax_scaler.joblib"
+
+        # ── TAHAP 3: REGISTER KE MODEL REGISTRY ──────────────────────────────
+        # Dilakukan DI LUAR with tempfile agar tmpdir tidak terhapus sebelum
+        # DagHub selesai membaca source path
+        log.info(f"  Mendaftarkan '{REGISTRY_NAME}' ke Model Registry...")
+
+        try:
+            client.create_registered_model(REGISTRY_NAME)
+            log.info(f"  Registered model '{REGISTRY_NAME}' dibuat baru.")
+        except Exception:
+            log.info(f"  Registered model '{REGISTRY_NAME}' sudah ada, skip create.")
+
+        mv = client.create_model_version(
+            name   = REGISTRY_NAME,
+            source = source,
+            run_id = run.info.run_id,
         )
-        
-        log.info(f"✅ BERHASIL TOTAL! {REGISTRY_NAME} v{latest_version} resmi aktif berstatus PRODUCTION.")
-        log.info(f"   Anak backend sekarang bisa menarik CSV parameter langsung dari gerbang Model Registry!")
-        
+        log.info(f"  Model version {mv.version} dibuat.")
+
+        client.set_registered_model_alias(
+            name    = REGISTRY_NAME,
+            alias   = "production",
+            version = mv.version,
+        )
+        log.info(
+            f"✅ {REGISTRY_NAME} v{mv.version} @production — "
+            f"siap dipakai FastAPI backend."
+        )
+                
 # ─────────────────────────────────────────────────────────────────────────────
 # MAIN
 # ─────────────────────────────────────────────────────────────────────────────
