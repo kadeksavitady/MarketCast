@@ -127,19 +127,28 @@ def _register_to_mlflow_registry(model_uri: str, reg_name: str, alias_name: str,
 # HELPER: Pemanggilan Model dengan Arsitektur Unified Interface
 # ══════════════════════════════════════════════════════════════
 def _call_model(model_name: str, komoditas: str, data: dict,
-                mlflow_experiment: str, training_mode: str) -> dict:
+                mlflow_experiment: str, training_mode: str, 
+                tuned_params: dict = None) -> dict:
     """
     Wrapper pemanggilan model yang meneruskan training_mode.
     """
     fn = MODEL_REGISTRY[model_name]
+    kwargs = {"mlflow_experiment": mlflow_experiment}
+
+    if model_name in ["sarima", "xgboost"]:
+        kwargs["mode"] = training_mode
+
     if model_name == "sarima":
         return fn(komoditas, data,
                   mlflow_experiment=mlflow_experiment,
                   mode=training_mode)
+    
+    if tuned_params and model_name == "xgboost":
+        kwargs["tuned_params"] = tuned_params
+
     else:
         # Prophet & XGBoost: tidak ada parameter mode
-        return fn(komoditas, data,
-                  mlflow_experiment=mlflow_experiment)
+        return fn(komoditas, data, **kwargs)
 
 def _select_champion_ranksum(df_res: pd.DataFrame) -> pd.DataFrame:
     """
