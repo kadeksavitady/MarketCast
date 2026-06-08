@@ -19,8 +19,8 @@ dagshub==0.2.12
 requests==2.33.1
 
 # Model inference — dibutuhkan mlflow.pyfunc.load_model
-xgboost==2.0.3
+xgboost==3.2.0
 prophet==1.1.5
-pmdarima==2.0.4
-scikit-learn==1.4.2
+pmdarima==2.1.1
+scikit-learn==1.8.0
 statsmodels==0.14.6
