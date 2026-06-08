@@ -1,39 +1,25 @@
-"""
-MARKETCAST - Final Production Daily Scraper (GITHUB ACTIONS READY)
-Fitur:
-- Fully Automated (Tanpa CLI Prompt) untuk CI/CD
-- 3 Jurus Pasti Anti-Buta (100 Entries, Scroll, Wait)
-- Standardisasi Skema DB (harga_per_kg, satuan_original, faktor_konversi)
-- Idempotent Delete-Insert untuk Mencegah Duplikasi
-"""
-
-import asyncio
-import logging
-import os
-import re
-import sys
-from datetime import date
+from bs4 import BeautifulSoup
+import re, logging, os, sys
+from datetime import date, timedelta
 from sqlalchemy import create_engine, text
-from playwright.async_api import async_playwright
 from dotenv import load_dotenv
+import requests
 
 load_dotenv()
 
-# ── FIX ENCODING WINDOWS ──
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
-# ── KONFIGURASI ──
 POSTGRE_URL = os.getenv("DATABASE_URL")
-BASE_URL    = "https://siskaperbapo.jatimprov.go.id/harga/tabel"
-TIMEOUT_MS  = 60_000 
+TABEL_URL   = "https://siskaperbapo.jatimprov.go.id/harga/tabel.nodesign/"
+SCRAPER_API_KEY = os.getenv("SCRAPER_API_KEY")
+
 
 if not POSTGRE_URL:
-    print("❌ ERROR: DATABASE_URL tidak ditemukan di environment!")
+    print("❌ ERROR: DATABASE_URL tidak ditemukan!")
     sys.exit(1)
 
-# Skema Whitelist yang sama persis dengan Historical
 WHITELIST_MAP = {
     'Beras Premium': 'BERAS', 'Beras Medium': 'BERAS',
     'Gula Kristal Putih': 'GULA',
@@ -55,33 +41,20 @@ WHITELIST_MAP = {
     'WORTEL': 'SAYUR MAYUR', 'BUNCIS': 'SAYUR MAYUR',
     'Ikan Bandeng': 'IKAN SEGAR', 'Ikan Kembung': 'IKAN SEGAR', 'Ikan Tuna': 'IKAN SEGAR',
     'Ikan Tongkol': 'IKAN SEGAR', 'Ikan Cakalang': 'IKAN SEGAR',
-    'GAS ELPIGI 3 Kg': 'BARANG PENTING LAINNYA'
+    'GAS ELPIGI 3 Kg': 'BARANG PENTING LAINNYA',
 }
-
-WHITELIST_LOWER = {k.lower(): k for k in WHITELIST_MAP.keys()}
-
-# ── RENAME DISPLAY NAME ──
-RENAME_KOMODITAS = {
-    "Bata":  "Garam Bata",
-    "Halus": "Garam Halus",
-}
-
-SATUAN_KONVERSI = {
+WHITELIST_LOWER  = {k.lower(): k for k in WHITELIST_MAP.keys()}
+RENAME_KOMODITAS = {"Bata": "Garam Bata", "Halus": "Garam Halus"}
+SATUAN_KONVERSI  = {
     "kg": 1.0, "1 liter": 0.92, "370 gr/kl": 0.370,
     "400 gr/dos": 0.400, "bungkus": 0.085, "ekor": 1.0
 }
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger("MarketCast-Daily")
-
 engine = create_engine(POSTGRE_URL, pool_pre_ping=True, pool_recycle=300)
 
-# ── PARSING UTILS ──
-def normalisasi_nama(nama):
-    if not nama: return ""
-    cleaned = re.sub(r'^[\d\s\.\-]+', '', str(nama)).strip()
-    return re.sub(r'\s+', ' ', cleaned)
-
+# ── UTILS ──
 def parse_harga(teks):
     if not teks or teks.strip() in ("-", ""): return None
     cleaned = re.sub(r"[^\d]", "", teks.split(',')[0])
@@ -136,69 +109,120 @@ async def scrape_harian(page, tgl_str):
         for row in baris_html:
             cells = await row.query_selector_all("td")
             if len(cells) < 5: continue
-
-            vals = [(await c.inner_text()).strip() for c in cells]
-            nama_mentah = normalisasi_nama(vals[1]).lower()
-
-            if nama_mentah in WHITELIST_LOWER:
-                nama_asli = WHITELIST_LOWER[nama_mentah]
-                harga_raw = parse_harga(vals[4])
-                satuan_raw = vals[2].lower().strip()
-                
-                # Biarkan mengeksekusi biarpun harga_raw = 0 (untuk integritas 43 komoditas)
-                if harga_raw is not None: 
-                    faktor = SATUAN_KONVERSI.get(satuan_raw, 1.0)
-                    harga_per_kg = round(harga_raw / faktor, 2) if faktor > 0 else harga_raw
-                    
-                    rows_data.append({
-                        'tanggal_data': tgl_str,
-                        'komoditas': RENAME_KOMODITAS.get(nama_asli, nama_asli),
-                        'kategori': WHITELIST_MAP[nama_asli],
-                        'harga_per_kg': harga_per_kg,
-                        'satuan_original': satuan_raw,
-                        'faktor_konversi': faktor
-                    })
-
+            span = cells[1].find("span", class_="price-tooltip-enabled")
+            if not span: continue
+            nama_mentah = span.get_text(strip=True).lower()
+            if nama_mentah not in WHITELIST_LOWER: continue
+            nama_asli  = WHITELIST_LOWER[nama_mentah]
+            harga_raw  = parse_harga(cells[4].get_text(strip=True))
+            satuan_raw = cells[2].get_text(strip=True).lower()
+            if harga_raw is not None:
+                faktor = SATUAN_KONVERSI.get(satuan_raw, 1.0)
+                rows_data.append({
+                    "tanggal_data":    tgl_str,
+                    "komoditas":       RENAME_KOMODITAS.get(nama_asli, nama_asli),
+                    "kategori":        WHITELIST_MAP[nama_asli],
+                    "harga_per_kg":    round(harga_raw / faktor, 2) if faktor > 0 else harga_raw,
+                    "satuan_original": satuan_raw,
+                    "faktor_konversi": faktor,
+                })
         return rows_data
     except Exception as e:
-        log.error(f"❌ Error Scrape Harian: {e}")
+        log.error(f"❌ Gagal fetch {tgl_str}: {e}")
         return []
 
-# ── TRANSAKSI CLOUD NEON ──
-def push_ke_neon(data_rows, tgl_str):
-    if not data_rows:
-        return 0
-        
-    inserted = 0
-    log.info("☁️ Memulai migrasi data harian ke Neon Cloud...")
+# ── CORE FUNCTIONS ──
+def patch_zeros(tgl_str):
+    """
+    Cek data di Neon untuk tgl_str.
+    Kalau ada harga 0, ambil data terbaru dari Siskaperbapo
+    dan update yang sudah berubah jadi non-zero.
+    """
+    try:
+        with engine.connect() as conn:
+            zeros = conn.execute(text("""
+                SELECT komoditas FROM harga_historis
+                WHERE tanggal_data = :tgl AND harga_per_kg = 0
+            """), {"tgl": tgl_str}).fetchall()
+    except Exception as e:
+        log.error(f"❌ Gagal cek zeros di Neon: {e}")
+        return
+
+    if not zeros:
+        log.info(f"✅ Data {tgl_str} sudah lengkap, tidak ada yang perlu di-patch")
+        return
+
+    nama_zeros = {r[0] for r in zeros}
+    log.info(f"🔍 {len(nama_zeros)} komoditas masih 0 pada {tgl_str}: {', '.join(sorted(nama_zeros))}")
+    log.info(f"   Cek apakah sudah update di Siskaperbapo...")
+
+    data_fresh = fetch_dari_siskaperbapo(tgl_str)
+    if not data_fresh:
+        log.warning(f"⚠️ Tidak bisa ambil data fresh untuk {tgl_str}, skip patch")
+        return
+
+    updated = 0
     try:
         with engine.begin() as conn:
-            # 1. Hapus data hari ini jika sudah ada (Mencegah duplikasi saat di-run ulang)
+            for row in data_fresh:
+                # Hanya update kalau sebelumnya 0 DAN sekarang sudah non-zero
+                if row["komoditas"] in nama_zeros and row["harga_per_kg"] > 0:
+                    conn.execute(text("""
+                        UPDATE harga_historis
+                        SET harga_per_kg    = :harga,
+                            satuan_original = :satuan,
+                            faktor_konversi = :faktor
+                        WHERE tanggal_data = :tgl
+                          AND komoditas    = :komoditas
+                    """), {
+                        "harga":     row["harga_per_kg"],
+                        "satuan":    row["satuan_original"],
+                        "faktor":    row["faktor_konversi"],
+                        "tgl":       tgl_str,
+                        "komoditas": row["komoditas"],
+                    })
+                    updated += 1
+    except Exception as e:
+        log.error(f"❌ Gagal patch Neon: {e}")
+        return
+
+    if updated:
+        log.info(f"✅ Patch sukses: {updated} komoditas diperbarui untuk {tgl_str}")
+    else:
+        log.info(f"ℹ️ Siskaperbapo {tgl_str} masih 0, belum ada update hari ini")
+
+def push_ke_neon(data_rows, tgl_str):
+    """Insert data baru (delete dulu kalau sudah ada)."""
+    if not data_rows: return 0
+    inserted = 0
+    try:
+        with engine.begin() as conn:
             conn.execute(
                 text("DELETE FROM harga_historis WHERE tanggal_data = :tgl"),
                 {"tgl": tgl_str}
             )
-            
-            # 2. Masukkan data baru yang sudah terstandardisasi
             for row in data_rows:
                 try:
                     conn.execute(text("""
-                        INSERT INTO harga_historis 
-                            (tanggal_data, komoditas, kategori, harga_per_kg, satuan_original, faktor_konversi)
-                        VALUES 
-                            (:tanggal_data, :komoditas, :kategori, :harga_per_kg, :satuan_original, :faktor_konversi)
+                        INSERT INTO harga_historis
+                            (tanggal_data, komoditas, kategori, harga_per_kg,
+                             satuan_original, faktor_konversi)
+                        VALUES
+                            (:tanggal_data, :komoditas, :kategori, :harga_per_kg,
+                             :satuan_original, :faktor_konversi)
                     """), row)
                     inserted += 1
                 except Exception as e:
-                    log.warning(f"Gagal upload {row['komoditas']}: {e}")
-                    
-        log.info(f"✅ SINKRONISASI SUKSES! {inserted} data harian mendarat di Neon Singapore.")
+                    log.warning(f"Gagal insert {row['komoditas']}: {e}")
+        log.info(f"✅ {inserted} data masuk ke Neon untuk {tgl_str}")
         return inserted
     except Exception as e:
-        log.error(f"❌ Transaksi Neon Gagal: {e}")
+        log.error(f"❌ Transaksi Neon gagal: {e}")
         return 0
 
-async def job_update_harian():
+# ── MAIN ──
+def main():
+    kemarin  = (date.today() - timedelta(days=1)).strftime("%Y-%m-%d")
     hari_ini = date.today().strftime("%Y-%m-%d")
     log.info(f"🚀 Memulai Pipeline Otomatis Harian: {hari_ini}")
 
@@ -217,17 +241,11 @@ async def job_update_harian():
         try:
             data_rows = await scrape_harian(page, hari_ini)
 
-            if data_rows:
-                log.info(f"📊 Berhasil menarik {len(data_rows)} data. Langsung memompa ke Cloud...")
-                # LANGSUNG DI-PUSH KE NEON TANPA VALIDASI (Otomatisasi Penuh)
-                push_ke_neon(data_rows, hari_ini)
-            else:
-                log.warning("⚠️ Data kosong hari ini (kemungkinan server siskaperbapo error/libur).")
-
-        except Exception as e:
-            log.error(f"❌ Pipeline Gagal: {e}")
-        finally:
-            await browser.close()
+    if data_rows:
+        push_ke_neon(data_rows, hari_ini)
+    else:
+        log.error("❌ Tidak ada data hari ini. Pipeline dianggap gagal.")
+        sys.exit(1)
 
 if __name__ == "__main__":
-    asyncio.run(job_update_harian())
+    main()
