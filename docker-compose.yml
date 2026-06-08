@@ -3,6 +3,7 @@ name: marketcast-app
 services:
   # ── 1. MLOps Tracker (MLflow) ───────────────────────────────────────────────
   mlflow:
+    image: la24/marketcast-mlflow:latest
     build:
       context: .
       dockerfile: docker/Dockerfile.mlflow
@@ -12,12 +13,14 @@ services:
     volumes:
       - ./mlflow_data:/mlflow
     env_file:
-      - .env  # Menggunakan Neon Cloud
+      - .env
     networks:
       - marketcast_network
+    restart: unless-stopped
 
-  # ── 2. Backend FastAPI (Otak Aplikasi) ───────────────────────────────────────
+  # ── 2. Backend FastAPI ───────────────────────────────────────────────────────
   backend-api:
+    image: la24/marketcast-api:latest
     build:
       context: .
       dockerfile: docker/Dockerfile.api
@@ -25,25 +28,47 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      # Konsep shared volume dari file baru, tapi diubah ke struktur folder kita
-      - ./models:/app/models 
       - ./src/api:/app/src/api
     env_file:
-      - .env  # Menggunakan Neon Cloud, TIDAK ADA database lokal!
+      - .env
+    depends_on:
+      - mlflow
     networks:
       - marketcast_network
     restart: unless-stopped
 
-  # ── 3. Frontend Streamlit (UI Interaktif) ───────────────────────────────────────────────
+  # ── 3. Scraper Harian ────────────────────────────────────────────────────────
+  # OPSI A (aktif): Windows Task Scheduler di laptop tim — tidak perlu service ini
+  # OPSI B (nonaktif): uncomment service di bawah + comment/hapus Task Scheduler
+  #
+  # scraper:
+  #   image: la24/marketcast-scraper:latest
+  #   build:
+  #     context: .
+  #     dockerfile: docker/Dockerfile.scraper
+  #   container_name: marketcast_scraper
+  #   env_file:
+  #     - .env
+  #   networks:
+  #     - marketcast_network
+  #   restart: unless-stopped
+  #   # Jadwal scraping harian via cron di dalam container:
+  #   # Ganti CMD di Dockerfile.scraper ke:
+  #   # CMD ["sh", "-c", "echo '0 6 * * * python /app/src/data/daily_scraper.py' | crontab - && crond -f"]
+
+  # ── 4. Frontend React (Vite) ─────────────────────────────────────────────────
+  # Dijalankan lokal via: cd src/frontend && npm run dev
+  # Untuk production deploy ke Vercel (sudah ada vercel.json)
+  #
   # frontend:
   #   build:
   #     context: .
   #     dockerfile: docker/Dockerfile.frontend
   #   container_name: marketcast_frontend
   #   ports:
-  #     - "8501:8501"
+  #     - "5173:5173"
   #   environment:
-  #     - BACKEND_URL=http://backend-api:8000
+  #     - VITE_API_URL=http://backend-api:8000
   #   depends_on:
   #     - backend-api
   #   networks:
